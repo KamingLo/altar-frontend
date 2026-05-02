@@ -1,7 +1,7 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  allowedDevOrigins:["0.0.0.0"]
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Tambahkan host IP HP lu ke sini
+  allowedDevOrigins: ['192.168.1.11'],
 };
 
-export default nextConfig;
+module.exports = nextConfig;

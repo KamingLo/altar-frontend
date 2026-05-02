@@ -5,6 +5,8 @@ interface UserData {
   id: string;
   email: string;
   name: string;
+  id_asisten?: string | null;
+  id_koordinator?: string | null;
 }
 
 interface UserState {
