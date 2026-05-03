@@ -42,7 +42,7 @@ export default function KoordinatorHome() {
           Dashboard Koordinator
         </p>
         <h1 className="text-3xl font-bold text-slate-800 leading-tight">
-          Halo, <br />{user?.name ?? '—'}
+          Halo, <br />{user?.email.split('@')[0] ?? '—'}
         </h1>
       </div>
 

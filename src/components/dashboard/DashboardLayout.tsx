@@ -65,20 +65,20 @@ export default function DashboardLayout({ menuItems, children, homeHref }: Dashb
         style={{ fontFamily: "'Inter', sans-serif" }}
       >
         {/* NAVBAR */}
-          <header className="flex items-center justify-between px-6 pt-6 pb-4 bg-[#EDF2F4] z-10">
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-2 -ml-2 rounded-full text-[#941C2F] hover:bg-black/5 transition-colors"
-            >
-              <Menu size={26} strokeWidth={2.5} />
-            </button>
-            <button
-              onClick={handleLogout}
-              className="p-2 -mr-2 rounded-full text-[#941C2F] hover:bg-black/5 transition-colors"
-            >
-              <LogOut size={22} strokeWidth={2} />
-            </button>
-          </header>
+        <header className="flex items-center justify-between px-6 pt-6 pb-4 bg-[#EDF2F4] z-10">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 -ml-2 rounded-full text-[#941C2F] hover:bg-black/5 transition-colors"
+          >
+            <Menu size={26} strokeWidth={2.5} />
+          </button>
+          <button
+            onClick={handleLogout}
+            className="p-2 -mr-2 rounded-full text-[#941C2F] hover:bg-black/5 transition-colors"
+          >
+            <LogOut size={22} strokeWidth={2} />
+          </button>
+        </header>
 
         {/* MAIN CONTENT */}
         <div className="flex-1 overflow-y-auto no-scrollbar px-6 pb-20">
@@ -91,11 +91,17 @@ export default function DashboardLayout({ menuItems, children, homeHref }: Dashb
             className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
             onClick={() => setIsSidebarOpen(false)}
           />
-          <div className={`absolute top-0 left-0 w-[250px] h-full bg-[#941C2F] shadow-2xl transition-transform duration-300 ease-in-out flex flex-col overscroll-none ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-            <div className="pt-10 pb-6 px-6 border-b border-white/20">
+          <div className={`absolute top-0 left-0 w-[250px] h-full bg-[#941C2F] shadow-2xl transition-transform duration-300 ease-in-out flex flex-col overscroll-none overflow-hidden ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <img
+              src="/sb-bg.png"
+              alt=""
+              className="absolute bottom-0 left-0 w-full object-contain pointer-events-none z-0 translate-y-27"
+            />
+
+            <div className="relative z-10 pt-10 pb-6 px-6 border-b border-white/20">
               <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" />
             </div>
-            <div className="flex-1 px-3 py-6 overflow-hidden">
+            <div className="relative z-10 flex-1 px-3 py-6 overflow-y-auto">
               <nav className="space-y-2">
                 <Link
                   href={homeHref}
@@ -130,13 +136,6 @@ export default function DashboardLayout({ menuItems, children, homeHref }: Dashb
                   );
                 })}
               </nav>
-            </div>
-            <div className="shrink-0 w-full">
-              <img
-                src="/sb-bg.png"
-                alt=""
-                className="w-full object-contain opacity-100 translate-y-[60px]"
-              />
             </div>
           </div>
         </div>
