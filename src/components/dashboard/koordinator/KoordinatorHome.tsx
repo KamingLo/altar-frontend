@@ -8,10 +8,10 @@ import {
 import { useUserStore } from '@/store/useUserStore';
 
 export const koordinatorMenuItems = [
-  { id: 1, title: 'Data Presensi', icon: FileText, href: '/dashboard/koordinator/data-presensi' },
-  { id: 2, title: 'Generate QR', icon: QrCode, href: '/dashboard/koordinator/generate-qr' },
-  { id: 3, title: 'Manajemen Asdos', icon: Users, href: '/dashboard/koordinator/manajemen-asdos' },
-  { id: 4, title: 'Manajemen KP', icon: CalendarSync, href: '/dashboard/koordinator/manajemen-kp' },
+  { id: 1, title: 'Data Presensi', icon: FileText, href: '/koordinator/dashboard/data-presensi' },
+  { id: 2, title: 'Generate QR', icon: QrCode, href: '/koordinator/dashboard/generate-qr' },
+  { id: 3, title: 'Manajemen Asdos', icon: Users, href: '/koordinator/dashboard/manajemen-asdos' },
+  { id: 4, title: 'Manajemen KP', icon: CalendarSync, href: '/koordinator/dashboard/manajemen-kp' },
 ];
 
 const notifications = [
@@ -37,7 +37,7 @@ export default function KoordinatorHome() {
   return (
     <>
       {/* Greeting */}
-      <div className="mb-8 mt-2 animate-fade-up">
+      <div className="mb-8 animate-fade-up">
         <p className="text-sm font-semibold text-[#941C2F] tracking-wide uppercase mb-1">
           Dashboard Koordinator
         </p>

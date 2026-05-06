@@ -11,6 +11,8 @@ export interface ActionResponse<T = unknown> {
   data?: T;
 }
 
+export type UserRole = 'asdos' | 'koordinator';
+
 export interface UserData {
   id: string;
   email: string;

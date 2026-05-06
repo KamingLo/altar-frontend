@@ -11,9 +11,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!loading && user) {
       if (user.id_koordinator) {
-        router.replace('/dashboard/koordinator');
+        router.replace('/koordinator/dashboard');
       } else {
-        router.replace('/dashboard/asdos');
+        router.replace('/asdos/dashboard');
       }
     }
   }, [user, loading, router]);

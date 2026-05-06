@@ -8,12 +8,12 @@ import {
 import { useUserStore } from '@/store/useUserStore';
 
 export const asdosMenuItems = [
-  { id: 1, title: 'Check-in', icon: MapPin, href: '/dashboard/asdos/check-in' },
-  { id: 2, title: 'Check-out', icon: LogOut, href: '/dashboard/asdos/check-out' },
-  { id: 3, title: 'Pengajuan KP', icon: CalendarPlus, href: '/dashboard/asdos/pengajuan-kp' },
-  { id: 4, title: 'Riwayat Kehadiran', icon: Clock, href: '/dashboard/asdos/riwayat-kehadiran' },
-  { id: 5, title: 'Jadwal Ajar', icon: Calendar, href: '/dashboard/asdos/jadwal-ajar' },
-  { id: 6, title: 'Presensi Kelas Online', icon: Monitor, href: '/dashboard/asdos/presensi-kelas-online' },
+  { id: 1, title: 'Check-in', icon: MapPin, href: '/asdos/dashboard/check-in' },
+  { id: 2, title: 'Check-out', icon: LogOut, href: '/asdos/dashboard/check-out' },
+  { id: 3, title: 'Pengajuan KP', icon: CalendarPlus, href: '/asdos/dashboard/pengajuan-kp' },
+  { id: 4, title: 'Riwayat Kehadiran', icon: Clock, href: '/asdos/dashboard/riwayat-kehadiran' },
+  { id: 5, title: 'Jadwal Ajar', icon: Calendar, href: '/asdos/dashboard/jadwal-ajar' },
+  { id: 6, title: 'Presensi Kelas Online', icon: Monitor, href: '/asdos/dashboard/presensi-kelas-online' },
 ];
 
 const schedules = [
@@ -40,7 +40,7 @@ export default function AsdosHome() {
   return (
     <>
       {/* Greeting */}
-      <div className="mb-8 mt-2 animate-fade-up">
+      <div className="mb-8 animate-fade-up">
         <p className="text-sm font-semibold text-[#941C2F] tracking-wide uppercase mb-1">
           Dashboard Asdos
         </p>
