@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, LogOut, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { logoutUser } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
@@ -13,27 +13,32 @@ interface MenuItem {
   href: string;
 }
 
+export interface MenuGroup {
+  id: string;
+  title: string;
+  items: MenuItem[];
+}
+
 interface DashboardLayoutProps {
-  menuItems: MenuItem[];
+  menuGroups: MenuGroup[];
   children: React.ReactNode;
   homeHref: string;
   bgImage?: string;
+  bgImageDesktop?: string;
 }
 
-export default function DashboardLayout({ menuItems, children, homeHref, bgImage }: DashboardLayoutProps) {
+export default function DashboardLayout({ menuGroups, children, homeHref, bgImage, bgImageDesktop }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Set<string>>(
+    () => new Set(menuGroups.map(g => g.id))
+  );
   const router = useRouter();
   const { clearUser } = useUserStore();
 
   useEffect(() => {
-    if (isSidebarOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    document.body.style.overflow = isSidebarOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
   }, [isSidebarOpen]);
 
   const handleLogout = async () => {
@@ -42,8 +47,143 @@ export default function DashboardLayout({ menuItems, children, homeHref, bgImage
     router.push('/auth/login');
   };
 
+  const toggleGroup = (id: string) => {
+    setOpenGroups(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const allItems = menuGroups.flatMap(g => g.items);
+  const isMultiGroup = menuGroups.length > 1;
+
+  const renderDesktopNavItem = (item: MenuItem, collapsed: boolean) => {
+    const Icon = item.icon;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        title={collapsed ? item.title : undefined}
+        className={`flex items-center rounded-2xl text-white/70 transition-all duration-200 group ${collapsed
+            ? 'justify-center px-0 py-3.5 hover:text-white'
+            : 'justify-between px-4 py-3 hover:text-white hover:bg-white/10'
+          }`}
+      >
+        <div className={`flex items-center ${collapsed ? '' : 'gap-3.5'}`}>
+          <div className={`p-2.5 transition-all duration-200 shrink-0 rounded-xl ${collapsed ? 'bg-white/10' : 'bg-white/5 group-hover:bg-white/10'
+            }`}>
+            <Icon size={19} className="text-white/60 group-hover:text-white transition-colors" />
+          </div>
+          {!collapsed && (
+            <span className="font-bold text-sm tracking-wide whitespace-nowrap">{item.title}</span>
+          )}
+        </div>
+        {!collapsed && (
+          <ChevronRight size={16} className="text-white/30 opacity-0 -translate-x-2 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-200 shrink-0" />
+        )}
+      </Link>
+    );
+  };
+
+  const renderDesktopNav = () => {
+    if (isSidebarCollapsed) {
+      return <div className="space-y-1">{allItems.map(item => renderDesktopNavItem(item, true))}</div>;
+    }
+
+    if (!isMultiGroup) {
+      return <div className="space-y-1">{allItems.map(item => renderDesktopNavItem(item, false))}</div>;
+    }
+
+    return (
+      <div className="space-y-1">
+        {menuGroups.map((group, idx) => (
+          <div key={group.id}>
+            <button
+              onClick={() => toggleGroup(group.id)}
+              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-white/40 hover:text-white/60 transition-all duration-200"
+            >
+              <span className="text-[10px] font-extrabold tracking-widest uppercase">{group.title}</span>
+              <ChevronDown
+                size={13}
+                className={`transition-transform duration-200 ${openGroups.has(group.id) ? 'rotate-0' : '-rotate-90'}`}
+              />
+            </button>
+            <div
+              className="overflow-hidden transition-all duration-300"
+              style={{ maxHeight: openGroups.has(group.id) ? `${group.items.length * 80}px` : '0px' }}
+            >
+              <div className="space-y-1 pt-0.5 pb-1">
+                {group.items.map(item => renderDesktopNavItem(item, false))}
+              </div>
+            </div>
+            {idx < menuGroups.length - 1 && (
+              <div className="h-px bg-white/10 mt-3 mb-1" />
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderMobileNavItem = (item: MenuItem) => {
+    const Icon = item.icon;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={() => setIsSidebarOpen(false)}
+        className="flex items-center justify-between px-4 py-3 rounded-2xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300 group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-white/5 group-hover:bg-white/10 transition-all duration-300">
+            <Icon size={18} className="text-white/60 group-hover:text-white transition-colors" />
+          </div>
+          <span className="font-semibold text-sm tracking-wide">{item.title}</span>
+        </div>
+        <ChevronRight size={16} className="text-white/30 opacity-0 -translate-x-2 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300" />
+      </Link>
+    );
+  };
+
+  const renderMobileNav = () => {
+    if (!isMultiGroup) {
+      return <div className="space-y-1">{allItems.map(item => renderMobileNavItem(item))}</div>;
+    }
+
+    return (
+      <div className="space-y-1">
+        {menuGroups.map((group, idx) => (
+          <div key={group.id}>
+            <button
+              onClick={() => toggleGroup(group.id)}
+              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-white/40 hover:text-white/60 transition-all duration-200"
+            >
+              <span className="text-[10px] font-extrabold tracking-widest uppercase">{group.title}</span>
+              <ChevronDown
+                size={13}
+                className={`transition-transform duration-200 ${openGroups.has(group.id) ? 'rotate-0' : '-rotate-90'}`}
+              />
+            </button>
+            <div
+              className="overflow-hidden transition-all duration-300"
+              style={{ maxHeight: openGroups.has(group.id) ? `${group.items.length * 80}px` : '0px' }}
+            >
+              <div className="space-y-1 pt-0.5 pb-1">
+                {group.items.map(item => renderMobileNavItem(item))}
+              </div>
+            </div>
+            {idx < menuGroups.length - 1 && (
+              <div className="h-px bg-white/10 mt-3 mb-1" />
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-100 lg:bg-[#EDF2F4]">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -55,160 +195,134 @@ export default function DashboardLayout({ menuItems, children, homeHref, bgImage
         .animate-fade-up { animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
       `}</style>
 
-      <main
-        className="relative w-full max-w-md h-screen bg-[#EDF2F4] overflow-hidden shadow-2xl flex flex-col"
-        style={{ fontFamily: "'Inter', sans-serif" }}
-      >
-        {bgImage && (
-          <div className="absolute top-0 left-0 right-0 h-[45svh] z-0 pointer-events-none">
-            <div
-              className="absolute inset-0 bg-cover bg-[center_top] opacity-30"
-              style={{ backgroundImage: `url(${bgImage})` }}
-            />
-            <div
-              className="absolute inset-0 z-10"
-              style={{
-                background: 'linear-gradient(to top, #EDF2F4 0%, #EDF2F4 15%, rgba(237, 242, 244, 0.8) 30%, rgba(237, 242, 244, 0.4) 45%, rgba(237, 242, 244, 0.1) 65%, transparent 100%)'
-              }}
-            />
-          </div>
-        )}
+      <div className="flex w-full h-screen overflow-hidden lg:max-w-none bg-[#EDF2F4] shadow-2xl lg:shadow-none">
 
-        {/* NAVBAR */}
-        <header className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-6 z-20 bg-transparent">
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.08)] text-[#941C2F] hover:scale-105 active:scale-95 transition-all"
-          >
-            <Menu size={24} strokeWidth={2.5} />
-          </button>
-          <button
-            onClick={handleLogout}
-            className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.08)] text-[#941C2F] hover:scale-105 active:scale-95 transition-all"
-          >
-            <LogOut size={20} strokeWidth={2.5} />
-          </button>
-        </header>
-
-        <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-6 pt-24 pb-20">
-          {children}
-        </div>
-
-        <div
-          className={`fixed inset-0 z-50 ${isSidebarOpen ? '' : 'pointer-events-none'}`}
+        <aside
+          className={`hidden lg:flex flex-col h-full overflow-hidden shrink-0 bg-[#941C2F] shadow-[4px_0_24px_rgba(0,0,0,0.08)] transition-[width] duration-300 ease-in-out ${isSidebarCollapsed ? 'w-[72px]' : 'w-[280px]'}`}
         >
-          <div
-            className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ease-in-out ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
-            onClick={() => setIsSidebarOpen(false)}
-          />
-
-          <div
-            className={`absolute top-0 left-0 w-[280px] h-full bg-[#941C2F] shadow-2xl flex flex-col overscroll-none overflow-hidden transition-transform duration-300 ease-in-out transform-gpu ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
-          >
-            <img
-              src="/sb-bg.png"
-              alt=""
-              className="absolute bottom-0 left-0 w-full object-contain pointer-events-none z-0 translate-y-27"
-            />
-
-            <div className="relative z-10 pt-10 pb-6 px-6 border-b border-white/20">
-              <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" />
+          <div className={`pt-10 pb-7 border-b border-white/10 flex items-center transition-all duration-300 shrink-0 ${isSidebarCollapsed ? 'justify-center px-3' : 'justify-between px-7'}`}>
+            <div className={`overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'}`}>
+              <img src="/logo.png" alt="Logo" className="h-9 w-auto object-contain" />
             </div>
-            <div className="relative z-10 flex-1 px-3 py-6 overflow-y-auto no-scrollbar">
-              <nav className="space-y-2">
-                <Link
-                  href={homeHref}
-                  onClick={() => setIsSidebarOpen(false)}
-                  className="flex items-center justify-between px-4 py-3 rounded-2xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300 group mb-4"
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              title={isSidebarCollapsed ? 'Buka Sidebar' : 'Tutup Sidebar'}
+              className="p-2 rounded-xl text-white/50 hover:text-white hover:bg-white/15 active:scale-90 transition-all duration-200 shrink-0"
+            >
+              {isSidebarCollapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
+            </button>
+          </div>
+
+          <div className="flex-1 min-h-0 px-3 py-6 overflow-y-auto no-scrollbar">
+            {renderDesktopNav()}
+          </div>
+
+          <div className={`shrink-0 px-3 pb-6 pt-3 border-t border-white/10`}>
+            <button
+              onClick={handleLogout}
+              title={isSidebarCollapsed ? 'Keluar' : undefined}
+              className={`w-full flex items-center rounded-2xl text-white/70 transition-all duration-200 group ${isSidebarCollapsed
+                  ? 'justify-center px-0 py-3.5 hover:text-white'
+                  : 'justify-between px-4 py-3 hover:text-white hover:bg-red-500/20'
+                }`}
+            >
+              <div className={`flex items-center ${isSidebarCollapsed ? '' : 'gap-3.5'}`}>
+                <div className={`p-2.5 transition-all duration-200 shrink-0 rounded-xl ${isSidebarCollapsed ? 'bg-white/10' : 'bg-white/5 group-hover:bg-red-500/20'
+                  }`}>
+                  <LogOut size={19} className="text-white/60 group-hover:text-red-400 transition-colors" />
+                </div>
+                {!isSidebarCollapsed && (
+                  <span className="font-bold text-sm tracking-wide">Keluar</span>
+                )}
+              </div>
+            </button>
+          </div>
+        </aside>
+
+        <main
+          className="relative w-full max-w-md lg:max-w-none h-screen bg-[#EDF2F4] overflow-hidden flex flex-col mx-auto lg:mx-0 transition-all duration-300"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
+          {bgImage && (
+            <div className="absolute top-0 left-0 right-0 h-[45svh] lg:h-[35svh] z-0 pointer-events-none">
+              <div
+                className="absolute inset-0 bg-cover bg-[center_top] opacity-30 lg:hidden"
+                style={{ backgroundImage: `url(${bgImage})` }}
+              />
+              <div
+                className="absolute inset-0 bg-cover bg-[center_top] opacity-20 hidden lg:block"
+                style={{ backgroundImage: `url(${bgImageDesktop ?? bgImage})` }}
+              />
+              <div
+                className="absolute inset-0 z-10"
+                style={{
+                  background: 'linear-gradient(to top, #EDF2F4 0%, #EDF2F4 15%, rgba(237, 242, 244, 0.8) 30%, rgba(237, 242, 244, 0.4) 45%, rgba(237, 242, 244, 0.1) 65%, transparent 100%)'
+                }}
+              />
+            </div>
+          )}
+
+          <div className="hidden lg:flex absolute top-7 left-7 z-20">
+            <Link
+              href={homeHref}
+              className="text-[#941C2F] bg-white/40 backdrop-blur-md hover:bg-white/60 hover:scale-105 active:scale-95 rounded-2xl p-3 shadow-sm border border-white/20 transition-all duration-200 flex items-center justify-center"
+              title="Dashboard Utama"
+            >
+              <Home size={22} strokeWidth={2.5} />
+            </Link>
+          </div>
+
+          <header className="lg:hidden absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-7 z-20 bg-transparent">
+            <Link
+              href={homeHref}
+              className="text-[#941C2F] hover:scale-105 active:scale-90 active:bg-[#941C2F]/10 active:shadow-[0_0_20px_rgba(148,28,47,0.15)] rounded-full transition-all duration-200 p-2.5 flex items-center justify-center"
+            >
+              <Home size={26} strokeWidth={2.5} />
+            </Link>
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="text-[#941C2F] hover:scale-105 active:scale-90 active:bg-[#941C2F]/10 active:shadow-[0_0_20px_rgba(148,28,47,0.15)] rounded-full transition-all duration-200 p-2.5 flex items-center justify-center"
+            >
+              <Menu size={28} strokeWidth={2.5} />
+            </button>
+          </header>
+
+          <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-6 lg:px-12 pt-24 lg:pt-24 pb-20">
+            {children}
+          </div>
+
+          <div className={`lg:hidden fixed inset-0 z-50 ${isSidebarOpen ? '' : 'pointer-events-none'}`}>
+            <div
+              className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ease-in-out ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
+              onClick={() => setIsSidebarOpen(false)}
+            />
+            <div
+              className={`absolute top-0 left-0 w-[280px] h-full bg-[#941C2F] shadow-2xl flex flex-col overscroll-none overflow-x-hidden transition-transform duration-300 ease-in-out transform-gpu ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+            >
+              <div className="pt-10 pb-6 px-6 border-b border-white/20 shrink-0">
+                <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" />
+              </div>
+              <div className="flex-1 min-h-0 px-3 py-6 overflow-y-auto no-scrollbar">
+                {renderMobileNav()}
+              </div>
+
+              <div className="shrink-0 px-3 pb-6 pt-3 border-t border-white/20">
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-white/70 hover:text-white hover:bg-red-500/20 transition-all duration-300 group"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-white/5 group-hover:bg-white/10 transition-all duration-300">
-                      <ArrowLeft size={18} className="text-white/60 group-hover:text-white transition-colors" />
+                    <div className="p-2 rounded-xl bg-white/5 group-hover:bg-red-500/20 transition-all duration-300">
+                      <LogOut size={18} className="text-white/60 group-hover:text-red-400 transition-colors" />
                     </div>
-                    <span className="font-semibold text-sm tracking-wide">Dashboard</span>
+                    <span className="font-semibold text-sm tracking-wide">Keluar</span>
                   </div>
-                </Link>
-                <div className="h-px bg-white/10 mb-4" />
-                {menuItems.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      onClick={() => setIsSidebarOpen(false)}
-                      className="flex items-center justify-between px-4 py-3 rounded-2xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300 group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-white/5 group-hover:bg-white/10 transition-all duration-300">
-                          <Icon size={18} className="text-white/60 group-hover:text-white transition-colors" />
-                        </div>
-                        <span className="font-semibold text-sm tracking-wide">{item.title}</span>
-                      </div>
-                      <ChevronRight size={16} className="text-white/30 opacity-0 -translate-x-2 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300" />
-                    </Link>
-                  );
-                })}
-              </nav>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* 
-        <div className={`fixed inset-0 z-50 transition-all duration-300 ${isSidebarOpen ? 'visible' : 'invisible'}`}>
-          <div
-            className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
-            onClick={() => setIsSidebarOpen(false)}
-          />
-          <div className={`absolute top-0 left-0 w-[250px] h-full bg-[#941C2F] shadow-2xl transition-transform duration-300 ease-in-out flex flex-col overscroll-none overflow-hidden ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-            <img
-              src="/sb-bg.png"
-              alt=""
-              className="absolute bottom-0 left-0 w-full object-contain pointer-events-none z-0 translate-y-27"
-            />
-
-            <div className="relative z-10 pt-10 pb-6 px-6 border-b border-white/20">
-              <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" />
-            </div>
-            <div className="relative z-10 flex-1 px-3 py-6 overflow-y-auto">
-              <nav className="space-y-2">
-                <Link
-                  href={homeHref}
-                  onClick={() => setIsSidebarOpen(false)}
-                  className="flex items-center justify-between px-4 py-3 rounded-2xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300 group mb-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-white/5 group-hover:bg-white/10 transition-all duration-300">
-                      <ArrowLeft size={18} className="text-white/60 group-hover:text-white transition-colors" />
-                    </div>
-                    <span className="font-semibold text-sm tracking-wide">Dashboard</span>
-                  </div>
-                </Link>
-                <div className="h-px bg-white/10 mb-4" />
-                {menuItems.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      onClick={() => setIsSidebarOpen(false)}
-                      className="flex items-center justify-between px-4 py-3 rounded-2xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300 group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-white/5 group-hover:bg-white/10 transition-all duration-300">
-                          <Icon size={18} className="text-white/60 group-hover:text-white transition-colors" />
-                        </div>
-                        <span className="font-semibold text-sm tracking-wide">{item.title}</span>
-                      </div>
-                      <ChevronRight size={16} className="text-white/30 opacity-0 -translate-x-2 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300" />
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
-          </div>
-        </div>
-        */}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
