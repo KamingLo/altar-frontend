@@ -2,19 +2,55 @@
 import React from 'react';
 import Link from 'next/link';
 import {
-  MapPin, LogOut, CalendarPlus, Clock,
-  Calendar, Monitor, CalendarClock, CheckCircle2, Info,
-  TrendingUp
+  ScanLine, FileSignature, Monitor, History,
+  CalendarDays, CalendarX2, CalendarClock,
+  CheckCircle2, Info, TrendingUp
 } from 'lucide-react';
 import { useUserStore } from '@/store/useUserStore';
 
 export const asdosMenuItems = [
-  { id: 1, title: 'Check-in', icon: MapPin, href: '/asdos/dashboard/check-in', desc: 'Tandai kehadiran masuk' },
-  { id: 2, title: 'Check-out', icon: LogOut, href: '/asdos/dashboard/check-out', desc: 'Tandai kehadiran keluar' },
-  { id: 3, title: 'Pengajuan KP', icon: CalendarPlus, href: '/asdos/dashboard/pengajuan-kp', desc: 'Ajukan kerja praktik' },
-  { id: 4, title: 'Riwayat Kehadiran', icon: Clock, href: '/asdos/dashboard/riwayat-kehadiran', desc: 'Lihat riwayat presensi' },
-  { id: 5, title: 'Jadwal Ajar', icon: Calendar, href: '/asdos/dashboard/jadwal-ajar', desc: 'Lihat jadwal mengajar' },
-  { id: 6, title: 'Presensi Kelas Online', icon: Monitor, href: '/asdos/dashboard/presensi-kelas-online', desc: 'Presensi via kelas online' },
+  {
+    id: 1,
+    title: 'Check-in Kelas',
+    icon: ScanLine,
+    href: '/asdos/dashboard/check-in',
+    desc: 'Tandai kehadiran masuk',
+  },
+  {
+    id: 2,
+    title: 'Check-out Kelas',
+    icon: FileSignature,
+    href: '/asdos/dashboard/check-out',
+    desc: 'Tandai kehadiran keluar',
+  },
+  {
+    id: 3,
+    title: 'Presensi Kelas Online',
+    icon: Monitor,
+    href: '/asdos/dashboard/presensi-kelas-online',
+    desc: 'Presensi via kelas online',
+  },
+  {
+    id: 4,
+    title: 'Riwayat Kehadiran',
+    icon: History,
+    href: '/asdos/dashboard/riwayat-kehadiran',
+    desc: 'Lihat riwayat presensi',
+  },
+  {
+    id: 5,
+    title: 'Jadwal Mengajar',
+    icon: CalendarDays,
+    href: '/asdos/dashboard/jadwal-ajar',
+    desc: 'Lihat jadwal mengajar',
+  },
+  {
+    id: 6,
+    title: 'Kelas Pengganti',
+    icon: CalendarX2,
+    href: '/asdos/dashboard/pengajuan-kp',
+    desc: 'Ajukan kelas pengganti',
+  },
 ];
 
 const schedules = [
@@ -24,14 +60,22 @@ const schedules = [
 
 const feedbacks = [
   {
-    id: 1, sender: 'Koordinator Lab', title: 'KP Disetujui',
-    detail: 'Pengajuan KP Jarkom untuk Kamis, 14 Nov telah diverifikasi.',
-    time: '30 mnt lalu', type: 'success', icon: CheckCircle2,
+    id: 1,
+    sender: 'Koordinator Lab',
+    title: 'Kelas Pengganti Disetujui',
+    detail: 'Pengajuan kelas pengganti Jarkom untuk Kamis, 14 Nov telah diverifikasi.',
+    time: '30 mnt lalu',
+    type: 'success',
+    icon: CheckCircle2,
   },
   {
-    id: 2, sender: 'Admin Koordinator', title: 'Revisi Absensi',
+    id: 2,
+    sender: 'Admin Koordinator',
+    title: 'Revisi Absensi',
     detail: 'Harap perbaiki berita acara sesi 2 Basis Data kemarin.',
-    time: '2 jam lalu', type: 'warning', icon: Info,
+    time: '2 jam lalu',
+    type: 'warning',
+    icon: Info,
   },
 ];
 
