@@ -10,7 +10,7 @@ import { useUserStore } from '@/store/useUserStore';
 export const koordinatorMenuItems = [
   { id: 1, title: 'Data Presensi', icon: FileText, href: '/koordinator/dashboard/data-presensi', desc: 'Lihat & kelola data presensi' },
   { id: 2, title: 'Generate QR', icon: QrCode, href: '/koordinator/dashboard/generate-qr', desc: 'Buat kode QR untuk sesi' },
-  { id: 3, title: 'Manajemen Asdos', icon: Users, href: '/koordinator/dashboard/manajemen-asdos', desc: 'Kelola data asisten dosen' },
+  { id: 3, title: 'Manajemen User', icon: Users, href: '/koordinator/dashboard/manajemen-user', desc: 'Kelola data asisten dosen' },
   { id: 4, title: 'Manajemen KP', icon: CalendarSync, href: '/koordinator/dashboard/manajemen-kp', desc: 'Jadwal & data kerja praktik' },
 ];
 
