@@ -2,111 +2,219 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Search, Filter, Clock, MapPin, BookOpen } from 'lucide-react';
 
-const mockDates = [
-  { day: 'SAB', date: '13' }, { day: 'MIN', date: '14' },
-  { day: 'SEN', date: '15' }, { day: 'SEL', date: '16' },
-  { day: 'RAB', date: '17' }, { day: 'KAM', date: '18' },
-  { day: 'JUM', date: '19' },
-];
+const daysInMonth = 31;
+const startDayOfWeek = 3;
+const dayNamesGrid = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
+const dayNamesFull = ['MIN', 'SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB'];
+
+const mockDates = Array.from({ length: daysInMonth }, (_, i) => {
+  const date = (i + 1).toString();
+  const dayIndex = (startDayOfWeek + i) % 7;
+  return { dayMobile: dayNamesFull[dayIndex], dayGrid: dayNamesGrid[dayIndex], date };
+});
+
 const mockSchedules = [
-  { id: 1, session: 'SESI 1', day: 'Sabtu', subject: 'Basis Data', time: '07:30 - 10:00', room: 'Ruang 901', date: '13' },
-  { id: 2, session: 'SESI 3', day: 'Sabtu', subject: 'Sistem Operasi', time: '13:30 - 16:00', room: 'Ruang 702', date: '13' },
-  { id: 3, session: 'SESI 4', day: 'Sabtu', subject: 'Pemrograman Web', time: '16:30 - 19:00', room: 'Ruang 801', date: '13' },
+  { id: 1, session: 'SESI 1', day: 'Sabtu', subject: 'Jaringan Komputer', time: '13:20 - --:--', room: 'R. M301', date: '13', status: 'Berjalan' },
+  { id: 2, session: 'SESI 3', day: 'Sabtu', subject: 'Jaringan Komputer', time: '13:15 - 16:05', room: 'R. M301', date: '13', status: 'Selesai' },
+  { id: 3, session: 'SESI 4', day: 'Sabtu', subject: 'Basis Data', time: '13:10 - 15:55', room: 'R. Lab Komp A', date: '13', status: 'Selesai' },
+  { id: 4, session: 'SESI 1', day: 'Senin', subject: 'Struktur Data', time: '08:00 - 10:30', room: 'Ruang 402', date: '15', status: 'Selesai' },
 ];
 
 export default function JadwalAjarPage() {
   const [selectedDate, setSelectedDate] = useState('13');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'Berjalan' | 'Selesai'>('ALL');
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    if (val.trim() !== '') {
+      const found = mockSchedules.find(s =>
+        s.subject.toLowerCase().includes(val.toLowerCase()) ||
+        s.room.toLowerCase().includes(val.toLowerCase())
+      );
+      if (found && found.date !== selectedDate) setSelectedDate(found.date);
+    }
+  };
+
   const filtered = mockSchedules.filter(s =>
     s.date === selectedDate &&
     (s.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.room.toLowerCase().includes(searchTerm.toLowerCase()))
+      s.room.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (filterStatus === 'ALL' || s.status === filterStatus)
   );
 
+  const hasSchedule = (date: string) => mockSchedules.some(s => s.date === date);
+
   return (
-    <div className="w-full max-w-md md:max-w-4xl lg:max-w-6xl mx-auto font-sans text-slate-800 pb-20 md:pb-8 pt-2 md:pt-10 relative md:px-6 overflow-hidden">
-      <div className="px-3 md:px-0 animate-fade-up md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-10 lg:p-12">
+    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 pb-8 pt-2 min-h-screen font-sans">
+      <div>
 
-        <div className="flex justify-between items-center mb-5 mt-2 md:mb-8">
-          <h1 className="text-xl md:text-3xl font-bold md:font-extrabold text-slate-800">Mei 2024</h1>
-          <div className="flex items-center gap-2 md:gap-3">
-            {[ChevronLeft, ChevronRight].map((Icon, i) => (
-              <button key={i} className="w-8 h-8 md:w-11 md:h-11 flex items-center justify-center bg-white border border-slate-200 rounded-xl md:rounded-2xl text-slate-500 active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:bg-slate-50">
-                <Icon className="w-[18px] h-[18px] md:w-6 md:h-6" />
-              </button>
-            ))}
+        {/* Header */}
+        <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4 md:gap-6">
+          <div>
+            <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">Jadwal Mengajar</p>
+            <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Jadwal Ajar</h2>
+            <p className="text-sm text-slate-500 mt-1 md:text-base">Daftar jadwal mengajar Anda.</p>
           </div>
-        </div>
-
-        <div className="flex gap-3 md:gap-4 lg:gap-6 overflow-x-auto pb-4 mb-2 md:mb-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x px-1 md:justify-center md:overflow-visible">
-          {mockDates.map((item) => {
-            const sel = selectedDate === item.date;
-            return (
-              <div key={item.date} onClick={() => setSelectedDate(item.date)}
-                className={`flex flex-col items-center min-w-[70px] md:min-w-[90px] py-4 md:py-5 rounded-3xl md:rounded-[2rem] cursor-pointer transition-all duration-200 snap-center shrink-0 border
-                  ${sel ? 'bg-[#941C2F] text-white shadow-lg shadow-[#941C2F]/20 border-[#941C2F] md:-translate-y-1' : 'bg-white text-slate-500 border-slate-100 hover:border-[#941C2F]/30 md:hover:-translate-y-1 md:hover:shadow-md'}`}>
-                <span className={`text-[10px] md:text-xs font-bold tracking-widest mb-1 md:mb-2 ${sel ? 'text-white/80' : 'text-slate-400'}`}>{item.day}</span>
-                <span className="text-xl md:text-2xl font-bold mb-1 md:mb-2">{item.date}</span>
-                <div className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full ${sel ? 'bg-white' : 'bg-[#941C2F]/50'}`} />
+          <div className="flex gap-3 relative z-20 w-full md:w-auto md:min-w-[380px]">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
+                <Search className="w-[18px] h-[18px] md:w-5 md:h-5" />
               </div>
-            );
-          })}
-        </div>
-
-        <div className="flex gap-3 mb-8 md:mb-10 md:max-w-2xl md:mx-auto">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-4 md:left-5 flex items-center pointer-events-none text-slate-400">
-              <Search className="w-[18px] h-[18px] md:w-5 md:h-5" />
+              <input
+                type="text"
+                placeholder="Cari materi atau kelas..."
+                value={searchTerm}
+                onChange={handleSearch}
+                className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+              />
             </div>
-            <input type="text" placeholder="Cari kelas atau ruangan..." value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]" />
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setShowFilterMenu(!showFilterMenu)}
+                className={`border p-3.5 md:p-4 rounded-2xl md:rounded-3xl active:scale-95 transition-all flex items-center justify-center
+                  ${filterStatus !== 'ALL' ? 'bg-red-50 border-[#941C2F] text-[#941C2F]' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
+                <Filter className="w-[18px] h-[18px] md:w-5 md:h-5" />
+              </button>
+              {showFilterMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowFilterMenu(false)} />
+                  <div className="absolute right-0 top-[110%] w-48 bg-white border border-slate-100 rounded-2xl shadow-xl z-20 py-2 overflow-hidden">
+                    {(['ALL', 'Berjalan', 'Selesai'] as const).map(s => (
+                      <button key={s} onClick={() => { setFilterStatus(s); setShowFilterMenu(false); }}
+                        className={`w-full text-left px-5 py-3 text-sm transition-colors ${filterStatus === s ? 'bg-slate-50 text-[#941C2F] font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                        {s === 'ALL' ? 'Semua Status' : s}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-          <button className="bg-white border border-slate-200 p-3.5 md:p-4 rounded-2xl md:rounded-3xl text-slate-500 active:scale-95 transition-all hover:bg-slate-50">
-            <Filter className="w-[18px] h-[18px] md:w-5 md:h-5" />
-          </button>
         </div>
 
-        <div className="flex justify-between items-center mb-4 md:mb-6 px-1">
-          <h4 className="text-[11px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Jadwal Terdaftar</h4>
-          <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] md:text-xs font-bold px-2.5 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg">{filtered.length} Sesi</span>
-        </div>
-
-        <div className="space-y-3 pb-8 pt-2">
-          {filtered.length > 0 ? filtered.map(s => (
-            <div key={s.id} className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border border-slate-100 active:scale-[0.99] md:hover:shadow-md md:hover:border-slate-200 transition-all gap-3 md:gap-0">
-              <div className="flex items-center gap-3 md:gap-4 min-w-0 md:w-2/5">
-                <div className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
-                  <BookOpen size={20} strokeWidth={2} />
+        {/* Kalender Horizontal - Mobile Only */}
+        <div className="md:hidden mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-base font-bold text-slate-800">Mei 2024</h3>
+            <div className="flex items-center gap-2">
+              {[ChevronLeft, ChevronRight].map((Icon, i) => (
+                <button key={i} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl text-slate-500 active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                  <Icon className="w-[18px] h-[18px]" />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x">
+            {mockDates.map((item) => {
+              const sel = selectedDate === item.date;
+              return (
+                <div key={item.date} onClick={() => setSelectedDate(item.date)}
+                  className={`flex flex-col items-center min-w-[64px] py-3.5 rounded-2xl cursor-pointer transition-all duration-200 snap-center shrink-0 border
+                    ${sel ? 'bg-[#941C2F] text-white shadow-lg shadow-[#941C2F]/20 border-[#941C2F]' : 'bg-white text-slate-500 border-slate-100'}`}>
+                  <span className={`text-[10px] font-bold tracking-widest mb-1 ${sel ? 'text-white/80' : 'text-slate-400'}`}>{item.dayMobile}</span>
+                  <span className="text-xl font-bold mb-1">{item.date}</span>
+                  <div className={`w-1 h-1 rounded-full ${sel ? 'bg-white' : hasSchedule(item.date) ? 'bg-[#941C2F]/50' : 'bg-transparent'}`} />
                 </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{s.subject}</h3>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[10px] md:text-xs font-bold text-slate-400 tracking-wider">{s.session}</span>
-                    <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                    <span className="text-[10px] md:text-xs font-bold text-[#941C2F] tracking-wider uppercase">{s.day}</span>
+              );
+            })}
+          </div>
+          <div className="flex justify-between items-center mt-4 px-1">
+            <h4 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">Jadwal Terdaftar</h4>
+            <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] font-bold px-2.5 py-1 rounded-md">{filtered.length} Sesi</span>
+          </div>
+        </div>
+
+        {/* Body: Kalender Desktop + List */}
+        <div className="flex flex-col md:flex-row gap-6 lg:gap-8 items-start">
+
+          {/* Kalender Grid - Desktop Only */}
+          <div className="hidden md:block w-[300px] lg:w-[320px] bg-white rounded-[2rem] p-6 md:p-7 shadow-sm border border-slate-100 shrink-0">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold text-slate-800">Mei 2024</h2>
+              <div className="flex items-center gap-2">
+                {[ChevronLeft, ChevronRight].map((Icon, i) => (
+                  <button key={i} className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all">
+                    <Icon className="w-4 h-4" />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-y-4 gap-x-1">
+              {dayNamesGrid.map((day, i) => (
+                <div key={i} className="text-center text-[11px] font-bold text-[#8BA3CB] mb-2">{day}</div>
+              ))}
+              {Array.from({ length: startDayOfWeek }).map((_, i) => <div key={`sp-${i}`} />)}
+              {mockDates.map((item) => {
+                const sel = selectedDate === item.date;
+                const hasItem = hasSchedule(item.date);
+                return (
+                  <div key={item.date} onClick={() => setSelectedDate(item.date)}
+                    className="flex flex-col items-center justify-center group cursor-pointer">
+                    <div className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-200
+                      ${sel ? 'bg-[#941C2F] text-white shadow-md' : 'bg-transparent text-slate-700 group-hover:bg-slate-100'}`}>
+                      <span className="text-sm font-bold">{item.date}</span>
+                    </div>
+                    <div className={`w-1 h-1 rounded-full mt-1.5 transition-all
+                      ${sel && hasItem ? 'bg-[#941C2F]' : !sel && hasItem ? 'bg-[#941C2F]/50' : 'bg-transparent'}`} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* List Jadwal */}
+          <div className="flex-1 w-full space-y-3">
+            <div className="hidden md:block mb-1">
+              <h3 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">Jadwal Terdaftar</h3>
+            </div>
+
+            {filtered.length > 0 ? filtered.map(s => (
+              <div key={s.id} className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all gap-3 md:gap-0">
+                <div className="flex items-center gap-3 md:gap-4 min-w-0 md:w-2/5">
+                  <div className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
+                    <BookOpen size={20} strokeWidth={2} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{s.subject}</h3>
+                    <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-wider mt-0.5">{s.day}, {s.date} MEI 2024</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2 md:gap-3 pt-3 border-t border-slate-100 md:border-none md:pt-0">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                      <Clock size={13} className="text-slate-400 shrink-0" />
+                      <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{s.time}</span>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                      <MapPin size={13} className="text-slate-400 shrink-0" />
+                      <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{s.room}</span>
+                    </div>
+                  </div>
+                  <div className={`shrink-0 self-center px-2.5 py-2 rounded-lg text-[10px] font-bold tracking-wider
+                    ${s.status === 'Berjalan' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                    {s.status}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 md:gap-3 pt-3 border-t border-slate-100 md:border-none md:pt-0">
-                <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center md:justify-start gap-2">
-                  <Clock size={13} className="text-slate-400 shrink-0" />
-                  <span className="text-xs md:text-[13px] font-semibold text-slate-700">{s.time}</span>
+            )) : (
+              <div className="bg-white rounded-2xl p-6 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
+                <div className="mx-auto mb-3 w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                  <BookOpen size={22} />
                 </div>
-                <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center md:justify-start gap-2">
-                  <MapPin size={13} className="text-slate-400 shrink-0" />
-                  <span className="text-xs md:text-[13px] font-semibold text-slate-700">{s.room}</span>
-                </div>
+                <p className="text-sm md:text-base font-semibold text-slate-700">Tidak ada jadwal.</p>
+                <p className="text-xs md:text-sm text-slate-500 mt-1">Belum ada jadwal untuk tanggal ini.</p>
               </div>
-            </div>
-          )) : (
-            <div className="bg-white rounded-2xl p-6 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
-              <div className="mx-auto mb-3 w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400"><BookOpen size={22} /></div>
-              <p className="text-sm md:text-base font-semibold text-slate-700">Tidak ada jadwal terdaftar</p>
-              <p className="text-xs md:text-sm text-slate-500 mt-1">Anda tidak memiliki jadwal mengajar di hari ini.</p>
-            </div>
-          )}
+            )}
+
+            <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 md:mt-2">
+              Menampilkan {filtered.length} jadwal pada {selectedDate} Mei.
+            </p>
+          </div>
         </div>
+
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { logoutUser } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
 
@@ -34,7 +34,10 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
     () => new Set(menuGroups.map(g => g.id))
   );
   const router = useRouter();
+  const pathname = usePathname();
   const { clearUser } = useUserStore();
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
   useEffect(() => {
     document.body.style.overflow = isSidebarOpen ? 'hidden' : '';
@@ -60,27 +63,35 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
 
   const renderDesktopNavItem = (item: MenuItem, collapsed: boolean) => {
     const Icon = item.icon;
+    const active = isActive(item.href);
     return (
       <Link
         key={item.href}
         href={item.href}
         title={collapsed ? item.title : undefined}
-        className={`flex items-center rounded-2xl text-white/70 transition-all duration-200 group ${collapsed
-            ? 'justify-center px-0 py-3.5 hover:text-white'
-            : 'justify-between px-4 py-3 hover:text-white hover:bg-white/10'
+        className={`flex items-center rounded-2xl transition-all duration-200 group ${collapsed
+          ? `justify-center px-0 py-3.5 ${active ? 'text-white' : 'text-white/70 hover:text-white'}`
+          : `justify-between px-4 py-3 ${active ? 'text-white bg-white/15' : 'text-white/70 hover:text-white hover:bg-white/10'}`
           }`}
       >
         <div className={`flex items-center ${collapsed ? '' : 'gap-3.5'}`}>
-          <div className={`p-2.5 transition-all duration-200 shrink-0 rounded-xl ${collapsed ? 'bg-white/10' : 'bg-white/5 group-hover:bg-white/10'
+          <div className={`p-2.5 transition-all duration-200 shrink-0 rounded-xl relative ${collapsed
+            ? active ? 'bg-white/20' : 'bg-white/10'
+            : active ? 'bg-white/20' : 'bg-white/5 group-hover:bg-white/10'
             }`}>
-            <Icon size={19} className="text-white/60 group-hover:text-white transition-colors" />
+            {collapsed && active && (
+              <span className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-5 bg-white rounded-r-full" />
+            )}
+            <Icon size={19} className={`transition-colors ${active ? 'text-white' : 'text-white/60 group-hover:text-white'}`} />
           </div>
           {!collapsed && (
-            <span className="font-bold text-sm tracking-wide whitespace-nowrap">{item.title}</span>
+            <span className={`font-bold text-sm tracking-wide whitespace-nowrap ${active ? 'text-white' : ''}`}>{item.title}</span>
           )}
         </div>
         {!collapsed && (
-          <ChevronRight size={16} className="text-white/30 opacity-0 -translate-x-2 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-200 shrink-0" />
+          active
+            ? <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+            : <ChevronRight size={16} className="text-white/30 opacity-0 -translate-x-2 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-200 shrink-0" />
         )}
       </Link>
     );
@@ -128,20 +139,25 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
 
   const renderMobileNavItem = (item: MenuItem) => {
     const Icon = item.icon;
+    const active = isActive(item.href);
     return (
       <Link
         key={item.href}
         href={item.href}
         onClick={() => setIsSidebarOpen(false)}
-        className="flex items-center justify-between px-4 py-3 rounded-2xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300 group"
+        className={`flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-300 group ${active ? 'text-white bg-white/15' : 'text-white/70 hover:text-white hover:bg-white/10'
+          }`}
       >
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-white/5 group-hover:bg-white/10 transition-all duration-300">
-            <Icon size={18} className="text-white/60 group-hover:text-white transition-colors" />
+          <div className={`p-2 rounded-xl transition-all duration-300 ${active ? 'bg-white/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
+            <Icon size={18} className={`transition-colors ${active ? 'text-white' : 'text-white/60 group-hover:text-white'}`} />
           </div>
-          <span className="font-semibold text-sm tracking-wide">{item.title}</span>
+          <span className={`font-semibold text-sm tracking-wide ${active ? 'text-white' : ''}`}>{item.title}</span>
         </div>
-        <ChevronRight size={16} className="text-white/30 opacity-0 -translate-x-2 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300" />
+        {active
+          ? <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+          : <ChevronRight size={16} className="text-white/30 opacity-0 -translate-x-2 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300" />
+        }
       </Link>
     );
   };
@@ -202,7 +218,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
         >
           <div className={`pt-10 pb-7 border-b border-white/10 flex items-center transition-all duration-300 shrink-0 ${isSidebarCollapsed ? 'justify-center px-3' : 'justify-between px-7'}`}>
             <div className={`overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'}`}>
-              <img src="/logo.png" alt="Logo" className="h-9 w-auto object-contain" />
+              <img src="/logo-sb.png" alt="Logo" className="h-9 w-auto object-contain" />
             </div>
             <button
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -222,8 +238,8 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
               onClick={handleLogout}
               title={isSidebarCollapsed ? 'Keluar' : undefined}
               className={`w-full flex items-center rounded-2xl text-white/70 transition-all duration-200 group ${isSidebarCollapsed
-                  ? 'justify-center px-0 py-3.5 hover:text-white'
-                  : 'justify-between px-4 py-3 hover:text-white hover:bg-red-500/20'
+                ? 'justify-center px-0 py-3.5 hover:text-white'
+                : 'justify-between px-4 py-3 hover:text-white hover:bg-red-500/20'
                 }`}
             >
               <div className={`flex items-center ${isSidebarCollapsed ? '' : 'gap-3.5'}`}>
@@ -300,7 +316,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
               className={`absolute top-0 left-0 w-[280px] h-full bg-[#941C2F] shadow-2xl flex flex-col overscroll-none overflow-x-hidden transition-transform duration-300 ease-in-out transform-gpu ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
             >
               <div className="pt-10 pb-6 px-6 border-b border-white/20 shrink-0">
-                <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" />
+                <img src="/logo-sb.png" alt="Logo" className="h-8 w-auto object-contain" />
               </div>
               <div className="flex-1 min-h-0 px-3 py-6 overflow-y-auto no-scrollbar">
                 {renderMobileNav()}
