@@ -86,16 +86,16 @@ export default function CheckOutPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 md:gap-3 pt-3 border-t border-slate-100 md:border-none md:pt-0">
-                <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center md:justify-start gap-2">
+              <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3 pt-3 border-t border-slate-100 md:border-none md:pt-0">
+                <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center gap-2">
                   <Clock size={13} className="text-slate-400 shrink-0" />
                   <span className="text-xs md:text-[13px] font-semibold text-slate-700">{activeSession.time}</span>
                 </div>
-                <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center md:justify-start gap-2">
+                <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center gap-2">
                   <MapPin size={13} className="text-slate-400 shrink-0" />
                   <span className="text-xs md:text-[13px] font-semibold text-slate-700">{activeSession.room}</span>
                 </div>
-                <div className="flex-none bg-emerald-50 border border-emerald-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center gap-2">
+                <div className="bg-emerald-50 border border-emerald-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center gap-2">
                   <Clock size={13} className="text-emerald-500 shrink-0" />
                   <span className="text-xs md:text-[13px] font-semibold text-emerald-700">Masuk: {activeSession.checkInTime}</span>
                 </div>
@@ -150,7 +150,7 @@ export default function CheckOutPage() {
             <div className="md:flex-1">
               <div className="bg-white rounded-3xl border border-slate-100 md:border-slate-200 overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.03)] md:shadow-md">
                 <div className="h-1 bg-[#941C2F]" />
-                <div className="p-6 md:p-7">
+                <div className="p-6 md:p-7 text-center">
                   <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-1">Detail Sesi Diselesaikan</p>
                   <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-6 leading-snug">
                     {activeSession.subject}

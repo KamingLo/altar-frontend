@@ -172,32 +172,60 @@ export default function JadwalAjarPage() {
             </div>
 
             {filtered.length > 0 ? filtered.map(s => (
-              <div key={s.id} className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all gap-3 md:gap-0">
-                <div className="flex items-center gap-3 md:gap-4 min-w-0 md:w-2/5">
-                  <div className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
+              <div key={s.id} className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all">
+
+                {/* Mobile */}
+                <div className="flex items-center gap-3 md:hidden">
+                  <div className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
                     <BookOpen size={20} strokeWidth={2} />
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{s.subject}</h3>
-                    <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-wider mt-0.5">{s.day}, {s.date} MEI 2024</p>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-[15px] text-[#1F2937] truncate">{s.subject}</h3>
+                    <p className="text-[10px] font-bold text-slate-400 tracking-wider mt-0.5">{s.day}, {s.date} MEI 2024</p>
                   </div>
-                </div>
-                <div className="flex items-center justify-between gap-2 md:gap-3 pt-3 border-t border-slate-100 md:border-none md:pt-0">
-                  <div className="flex flex-col gap-1.5">
-                    <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                      <Clock size={13} className="text-slate-400 shrink-0" />
-                      <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{s.time}</span>
-                    </div>
-                    <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                      <MapPin size={13} className="text-slate-400 shrink-0" />
-                      <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{s.room}</span>
-                    </div>
-                  </div>
-                  <div className={`shrink-0 self-center px-2.5 py-2 rounded-lg text-[10px] font-bold tracking-wider
+                  <div className={`shrink-0 self-start mt-0.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold tracking-wider
                     ${s.status === 'Berjalan' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}>
                     {s.status}
                   </div>
                 </div>
+                <div className="flex md:hidden flex-col gap-1.5 mt-3 pt-3 border-t border-slate-100">
+                  <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <Clock size={13} className="text-slate-400 shrink-0" />
+                    <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{s.time}</span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <MapPin size={13} className="text-slate-400 shrink-0" />
+                    <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{s.room}</span>
+                  </div>
+                </div>
+
+                {/* Desktop */}
+                <div className="hidden md:flex md:items-center md:justify-between">
+                  <div className="flex items-center gap-4 min-w-0 w-2/5">
+                    <div className="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
+                      <BookOpen size={20} strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-base text-[#1F2937] truncate">{s.subject}</h3>
+                      <p className="text-xs font-bold text-slate-400 tracking-wider mt-0.5">{s.day}, {s.date} MEI 2024</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center gap-2">
+                      <Clock size={13} className="text-slate-400 shrink-0" />
+                      <span className="text-[13px] font-semibold text-slate-700 whitespace-nowrap">{s.time}</span>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center gap-2">
+                      <MapPin size={13} className="text-slate-400 shrink-0" />
+                      <span className="text-[13px] font-semibold text-slate-700 whitespace-nowrap">{s.room}</span>
+                    </div>
+                    <div className={`shrink-0 px-3 py-2 rounded-lg text-xs font-bold tracking-wider
+                      ${s.status === 'Berjalan' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                      {s.status}
+                    </div>
+                  </div>
+                </div>
+
               </div>
             )) : (
               <div className="bg-white rounded-2xl p-6 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">

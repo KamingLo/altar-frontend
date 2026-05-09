@@ -203,9 +203,11 @@ export default function CheckInPage() {
               {mockSessions.map(s => {
                 const isSel = selectedSessionId === s.id;
                 const isAktif = s.status === 'Aktif';
+                const isMendatang = s.status === 'Mendatang';
                 return (
-                  <div key={s.id} onClick={() => setSelectedSessionId(s.id)}
-                    className={`bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border-2 cursor-pointer active:scale-[0.99] transition-all gap-3 md:gap-0
+                  <div key={s.id} onClick={() => !isMendatang && setSelectedSessionId(s.id)}
+                    className={`bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border-2 transition-all gap-3 md:gap-0
+                      ${isMendatang ? 'cursor-not-allowed opacity-50' : 'cursor-pointer active:scale-[0.99]'}
                       ${isSel ? 'border-[#941C2F] shadow-md shadow-[#941C2F]/10' : 'border-transparent md:border-slate-100 md:hover:border-slate-200 md:hover:shadow-md'}`}>
                     <div className="flex items-center gap-3 md:gap-4 min-w-0 md:w-2/5">
                       <div className={`w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center transition-colors ${isSel ? 'bg-[#941C2F]/10' : 'bg-rose-50'} text-[#941C2F]`}>
@@ -239,26 +241,20 @@ export default function CheckInPage() {
               })}
             </div>
 
-            <div className={`transition-all duration-300 ${selectedSessionId ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-50 border border-slate-100 rounded-2xl p-4 md:p-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 md:w-10 md:h-10 shrink-0 bg-[#941C2F]/10 rounded-2xl flex items-center justify-center">
-                    <BookOpen size={16} className="text-[#941C2F]" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mb-0.5">Sesi Dipilih</p>
-                    <p className="text-sm md:text-[15px] font-bold text-slate-800 leading-tight">
-                      {selectedSession?.subject}
-                      <span className="font-normal text-slate-400 ml-2 text-xs">· {selectedSession?.sessionName} · {selectedSession?.room}</span>
-                    </p>
-                  </div>
-                </div>
-                <button onClick={handleOpenSheet} disabled={!selectedSessionId}
-                  className="w-full md:w-auto shrink-0 bg-[#941C2F] text-white font-bold py-3.5 md:py-3 md:px-10 text-sm md:text-[15px] rounded-xl md:rounded-2xl shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] disabled:opacity-50">
-                  Check-in Sekarang
-                </button>
-              </div>
+            <div className={`hidden md:flex md:justify-end transition-all duration-300 ${selectedSessionId ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+              <button onClick={handleOpenSheet} disabled={!selectedSessionId}
+                className="bg-[#941C2F] text-white font-bold py-3 px-10 text-[15px] rounded-2xl shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] disabled:opacity-50">
+                Check-in Sekarang
+              </button>
             </div>
+          </div>
+
+          <div className="h-24 md:hidden" />
+          <div className={`md:hidden fixed bottom-0 left-0 right-0 px-4 pb-6 z-30 transition-all duration-300 ${selectedSessionId ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+            <button onClick={handleOpenSheet} disabled={!selectedSessionId}
+              className="w-full bg-[#941C2F] text-white font-bold py-4 text-[15px] rounded-2xl shadow-xl shadow-[#941C2F]/30 active:scale-[0.98] transition-all disabled:opacity-50">
+              Check-in Sekarang
+            </button>
           </div>
         </>
       )}
@@ -283,7 +279,7 @@ export default function CheckInPage() {
             <div className="md:flex-1">
               <div className="bg-white rounded-3xl border border-slate-100 md:border-slate-200 overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.03)] md:shadow-md">
                 <div className="h-1 bg-[#941C2F]" />
-                <div className="p-6 md:p-7">
+                <div className="p-6 md:p-7 text-center">
                   <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-1">Detail Sesi Aktif</p>
                   <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-6 leading-snug">
                     {selectedSession?.subject}

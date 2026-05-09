@@ -33,6 +33,11 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const [openGroups, setOpenGroups] = useState<Set<string>>(
     () => new Set(menuGroups.map(g => g.id))
   );
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const [isLogoutVisible, setIsLogoutVisible] = useState(false);
+  const [isLogoutClosing, setIsLogoutClosing] = useState(false);
+  const [logoutStartY, setLogoutStartY] = useState(0);
+  const [logoutDragY, setLogoutDragY] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
   const { clearUser } = useUserStore();
@@ -48,6 +53,28 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
     await logoutUser();
     clearUser();
     router.push('/auth/login');
+  };
+
+  const openLogoutConfirm = () => {
+    setIsLogoutOpen(true);
+    setIsLogoutClosing(false);
+    setLogoutDragY(0);
+    setTimeout(() => setIsLogoutVisible(true), 10);
+  };
+
+  const closeLogoutConfirm = () => {
+    setIsLogoutClosing(true);
+    setIsLogoutVisible(false);
+    setTimeout(() => {
+      setIsLogoutOpen(false);
+      setIsLogoutClosing(false);
+      setLogoutDragY(0);
+    }, 300);
+  };
+
+  const confirmLogout = () => {
+    closeLogoutConfirm();
+    setTimeout(() => handleLogout(), 300);
   };
 
   const toggleGroup = (id: string) => {
@@ -235,7 +262,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
 
           <div className={`shrink-0 px-3 pb-6 pt-3 border-t border-white/10`}>
             <button
-              onClick={handleLogout}
+              onClick={openLogoutConfirm}
               title={isSidebarCollapsed ? 'Keluar' : undefined}
               className={`w-full flex items-center rounded-2xl text-white/70 transition-all duration-200 group ${isSidebarCollapsed
                 ? 'justify-center px-0 py-3.5 hover:text-white'
@@ -324,7 +351,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
 
               <div className="shrink-0 px-3 pb-6 pt-3 border-t border-white/20">
                 <button
-                  onClick={handleLogout}
+                  onClick={openLogoutConfirm}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-white/70 hover:text-white hover:bg-red-500/20 transition-all duration-300 group"
                 >
                   <div className="flex items-center gap-3">
@@ -339,6 +366,87 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
           </div>
         </main>
       </div>
+
+      {isLogoutOpen && (
+        <>
+          <div
+            onClick={closeLogoutConfirm}
+            className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] transition-opacity duration-300 ease-out ${isLogoutVisible && !isLogoutClosing ? 'opacity-100' : 'opacity-0'}`}
+          />
+
+          {/* Desktop popout */}
+          <div className="hidden lg:flex fixed inset-0 z-[70] items-center justify-center">
+            <div
+              className={`bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden transition-all duration-300 ${isLogoutVisible && !isLogoutClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+            >
+              <div className="p-7 pb-5">
+                <div className="flex items-center justify-center w-14 h-14 bg-red-50 rounded-2xl mx-auto mb-5">
+                  <LogOut size={24} className="text-[#941C2F]" />
+                </div>
+                <h2 className="text-[20px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">Keluar dari Sistem?</h2>
+                <p className="text-sm text-slate-500 text-center leading-relaxed">Anda akan keluar dari akun ini. Pastikan semua pekerjaan sudah tersimpan.</p>
+              </div>
+              <div className="px-6 pb-6 flex gap-3">
+                <button onClick={closeLogoutConfirm}
+                  className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 active:scale-[0.98] transition-all">
+                  Batal
+                </button>
+                <button onClick={confirmLogout}
+                  className="flex-1 py-3 rounded-xl bg-[#941C2F] text-white font-bold text-sm shadow-md shadow-[#941C2F]/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                  <LogOut size={14} /> Keluar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile bottom sheet */}
+          <div className="lg:hidden fixed inset-0 z-[70] flex items-end justify-center pointer-events-none">
+            <div
+              className="w-full max-w-md bg-white rounded-t-[28px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden pointer-events-auto"
+              style={{
+                transform: (!isLogoutVisible || isLogoutClosing)
+                  ? 'translateY(100%)'
+                  : `translateY(${logoutDragY}px)`,
+                transition: (!isLogoutVisible || isLogoutClosing || logoutDragY === 0)
+                  ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
+                  : 'none',
+              }}
+            >
+              <div
+                className="w-full flex items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none shrink-0"
+                onTouchStart={(e) => setLogoutStartY(e.touches[0].clientY)}
+                onTouchMove={(e) => {
+                  const delta = e.touches[0].clientY - logoutStartY;
+                  if (delta > 0) setLogoutDragY(delta);
+                }}
+                onTouchEnd={() => {
+                  if (logoutDragY > 100) closeLogoutConfirm();
+                  else setLogoutDragY(0);
+                }}
+              >
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+              </div>
+              <div className="px-6 pt-4 pb-8">
+                <div className="flex items-center justify-center w-14 h-14 bg-red-50 rounded-2xl mx-auto mb-5">
+                  <LogOut size={24} className="text-[#941C2F]" />
+                </div>
+                <h2 className="text-[22px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">Keluar dari Sistem?</h2>
+                <p className="text-sm text-slate-500 text-center leading-relaxed mb-7">Anda akan keluar dari akun ini. Pastikan semua pekerjaan sudah tersimpan.</p>
+                <div className="flex flex-col gap-3">
+                  <button onClick={confirmLogout}
+                    className="w-full py-4 rounded-2xl bg-[#941C2F] text-white font-bold text-[15px] shadow-md shadow-[#941C2F]/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                    <LogOut size={16} /> Keluar Sekarang
+                  </button>
+                  <button onClick={closeLogoutConfirm}
+                    className="w-full py-4 rounded-2xl bg-slate-100 text-slate-600 font-bold text-[15px] hover:bg-slate-200 active:scale-[0.98] transition-all">
+                    Batal
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
