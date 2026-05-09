@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen } from 'lucide-react';
+import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle } from 'lucide-react';
 
 const mockSessions = [
   { id: 1, sessionName: 'SESI 1', subject: 'Basis Data', room: 'R. 901', time: '07:30 - 10:00', status: 'Aktif' },
@@ -10,12 +10,141 @@ const mockSessions = [
 
 export default function CheckInPage() {
   const [step, setStep] = useState(1);
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(2);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(mockSessions[0]?.id ?? null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isSheetVisible, setIsSheetVisible] = useState(false);
+  const [isSheetClosing, setIsSheetClosing] = useState(false);
+  const [sheetStartY, setSheetStartY] = useState(0);
+  const [sheetDragY, setSheetDragY] = useState(0);
+
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   const selectedSession = mockSessions.find(s => s.id === selectedSessionId);
 
+  const handleOpenSheet = () => {
+    setIsSheetOpen(true);
+    setIsSheetClosing(false);
+    setSheetDragY(0);
+    setTimeout(() => setIsSheetVisible(true), 10);
+  };
+
+  const handleCloseSheet = () => {
+    setIsSheetClosing(true);
+    setIsSheetVisible(false);
+    setTimeout(() => {
+      setIsSheetOpen(false);
+      setIsSheetClosing(false);
+      setSheetDragY(0);
+    }, 300);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => setSheetStartY(e.touches[0].clientY);
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const delta = e.touches[0].clientY - sheetStartY;
+    if (delta > 0) setSheetDragY(delta);
+  };
+  const handleTouchEnd = () => {
+    if (sheetDragY > 100) handleCloseSheet();
+    else setSheetDragY(0);
+  };
+
+  const handleConfirmCheckIn = () => {
+    handleCloseSheet();
+    setTimeout(() => setStep(3), 300);
+  };
+
   return (
     <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 pb-8 pt-2 min-h-screen font-sans">
+      {isSheetOpen && (
+        <>
+          <div
+            onClick={handleCloseSheet}
+            className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out
+              ${isSheetVisible && !isSheetClosing ? 'opacity-100' : 'opacity-0'}`}
+          />
+          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none">
+            <div
+              className="w-full max-w-md md:max-w-xl bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[90dvh] md:max-h-[85vh] overflow-hidden pointer-events-auto"
+              style={{
+                transform: (!isSheetVisible || isSheetClosing)
+                  ? 'translateY(100%)'
+                  : `translateY(${sheetDragY}px)`,
+                transition: (!isSheetVisible || isSheetClosing || sheetDragY === 0)
+                  ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
+                  : 'none',
+              }}
+            >
+              <div
+                className="w-full flex md:hidden items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none shrink-0"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+              </div>
+
+              <div className="px-5 pt-2 md:pt-6 pb-6 overflow-y-auto">
+                <div className="flex items-start justify-between mb-5">
+                  <div className="pr-10">
+                    <h2 className="text-[20px] font-extrabold text-[#1F2937] leading-7">Konfirmasi Check-in</h2>
+                    <p className="text-sm text-slate-500 mt-0.5">Pastikan data sesi sudah benar.</p>
+                  </div>
+                  <button onClick={handleCloseSheet}
+                    className="hidden md:flex shrink-0 w-9 h-9 items-center justify-center bg-slate-50 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-5 mb-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] space-y-3">
+                  {[
+                    { label: 'Mata Kuliah', value: selectedSession?.subject ?? '-' },
+                    { label: 'Sesi',        value: selectedSession?.sessionName ?? '-' },
+                    { label: 'Ruangan',     value: selectedSession?.room ?? '-' },
+                    { label: 'Waktu',       value: selectedSession?.time ?? '-' },
+                  ].map(({ label, value }, i, arr) => (
+                    <React.Fragment key={label}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">{label}</span>
+                        <span className={`text-sm font-semibold text-slate-700 ${label === 'Mata Kuliah' ? 'font-bold text-[#1F2937]' : ''}`}>{value}</span>
+                      </div>
+                      {i < arr.length - 1 && <div className="h-px bg-slate-100" />}
+                    </React.Fragment>
+                  ))}
+                </div>
+
+                <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 mb-6">
+                  <AlertCircle size={15} className="text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[11px] md:text-xs text-amber-700 font-medium leading-relaxed">
+                    Check-in tidak dapat dibatalkan setelah dikonfirmasi.
+                  </p>
+                </div>
+              </div>
+
+              <div className="sticky bottom-0 px-5 pb-6 md:pb-6 pt-4 border-t border-slate-100 bg-white">
+                <div className="hidden md:flex gap-3">
+                  <button onClick={handleCloseSheet}
+                    className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm active:scale-[0.98] transition-all hover:bg-slate-50">
+                    Batal
+                  </button>
+                  <button onClick={handleConfirmCheckIn}
+                    className="flex-1 py-3 rounded-xl bg-[#941C2F] text-white font-bold text-sm shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727]">
+                    Ya, Check-in
+                  </button>
+                </div>
+                <div className="flex flex-col gap-3 md:hidden">
+                  <button onClick={handleConfirmCheckIn}
+                    className="w-full py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-md shadow-[#941C2F]/20">
+                    Ya, Check-in
+                  </button>
+                  <button onClick={handleCloseSheet}
+                    className="w-full bg-slate-100 text-slate-600 font-bold py-3.5 rounded-xl active:scale-[0.98] hover:bg-slate-200 transition-all text-[15px]">
+                    Kembali ke Beranda
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {step === 1 && (
         <>
@@ -24,7 +153,6 @@ export default function CheckInPage() {
             <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Pindai Kode QR</h2>
             <p className="text-sm text-slate-500 mt-1 md:text-base">Arahkan kamera ke kode QR yang disediakan koordinator.</p>
           </div>
-
           <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-12 lg:p-16 md:flex md:items-center md:gap-16">
             <div className="hidden md:flex md:flex-1 flex-col justify-center">
               <h3 className="text-2xl lg:text-3xl font-extrabold text-[#1F2937] mb-3">Pindai Kode QR</h3>
@@ -32,7 +160,6 @@ export default function CheckInPage() {
                 Arahkan kamera Anda ke kode QR yang disediakan oleh Koordinator di depan kelas untuk melakukan check-in kehadiran.
               </p>
             </div>
-
             <div className="md:flex-1 flex flex-col items-center justify-center">
               <div
                 className="relative w-64 h-64 md:w-72 md:h-72 cursor-pointer active:scale-95 transition-transform hover:scale-[1.02]"
@@ -55,14 +182,15 @@ export default function CheckInPage() {
 
       {step === 2 && (
         <>
-          <div className="mb-6 md:mb-8 flex items-center gap-4">
-            <button onClick={() => setStep(1)} className="shrink-0 w-9 h-9 md:w-10 md:h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-2xl active:scale-95 transition-all hover:bg-slate-50 shadow-sm">
-              <ArrowLeft size={18} />
-            </button>
+          <div className="mb-6 md:mb-8 flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase md:text-xs">Check-in Kehadiran</p>
               <h2 className="text-[22px] md:text-3xl leading-7 md:leading-8 font-extrabold text-[#1F2937]">Pilih Sesi Mengajar</h2>
             </div>
+            <button onClick={() => setStep(1)}
+              className="shrink-0 w-9 h-9 md:w-10 md:h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-2xl active:scale-95 transition-all hover:bg-slate-50 shadow-sm">
+              <ArrowLeft size={18} />
+            </button>
           </div>
 
           <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-10 lg:p-12">
@@ -125,7 +253,7 @@ export default function CheckInPage() {
                     </p>
                   </div>
                 </div>
-                <button onClick={() => setStep(3)} disabled={!selectedSessionId}
+                <button onClick={handleOpenSheet} disabled={!selectedSessionId}
                   className="w-full md:w-auto shrink-0 bg-[#941C2F] text-white font-bold py-3.5 md:py-3 md:px-10 text-sm md:text-[15px] rounded-xl md:rounded-2xl shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] disabled:opacity-50">
                   Check-in Sekarang
                 </button>
@@ -137,7 +265,7 @@ export default function CheckInPage() {
 
       {step === 3 && (
         <>
-          <div className="mb-6 md:mb-8">
+          <div className="mb-6 md:mb-8 text-center md:text-left">
             <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">Check-in Kehadiran</p>
             <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Berhasil!</h2>
             <p className="text-sm text-slate-500 mt-1 md:text-base">Kehadiran Anda telah tercatat di sistem.</p>
@@ -171,7 +299,7 @@ export default function CheckInPage() {
                 </div>
               </div>
               <button onClick={() => setStep(1)} className="mt-4 w-full bg-[#941C2F] text-white font-bold py-4 md:text-[15px] rounded-xl md:rounded-2xl shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727]">
-                Selesai
+                Kembali ke Beranda
               </button>
             </div>
           </div>

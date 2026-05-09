@@ -57,14 +57,17 @@ export default function CheckOutPage() {
 
       {step === 2 && (
         <>
-          <div className="mb-6 md:mb-8 flex items-center gap-4">
-            <button onClick={() => setStep(1)} className="shrink-0 w-9 h-9 md:w-10 md:h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-2xl active:scale-95 transition-all hover:bg-slate-50 shadow-sm">
-              <ArrowLeft size={18} />
-            </button>
+          <div className="mb-6 md:mb-8 flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase md:text-xs">Check-out Kehadiran</p>
               <h2 className="text-[22px] md:text-3xl leading-7 md:leading-8 font-extrabold text-[#1F2937]">Isi Laporan Materi</h2>
             </div>
+            <button
+              onClick={() => setStep(1)}
+              className="shrink-0 w-9 h-9 md:w-10 md:h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-2xl active:scale-95 transition-all hover:bg-slate-50 shadow-sm"
+            >
+              <ArrowLeft size={18} />
+            </button>
           </div>
 
           <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-10 lg:p-12">
@@ -128,7 +131,7 @@ export default function CheckOutPage() {
 
       {step === 3 && (
         <>
-          <div className="mb-6 md:mb-8">
+          <div className="mb-6 md:mb-8 text-center md:text-left">
             <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">Check-out Kehadiran</p>
             <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Sesi Selesai!</h2>
             <p className="text-sm text-slate-500 mt-1 md:text-base">Sesi mengajar Anda telah diselesaikan dan dicatat.</p>

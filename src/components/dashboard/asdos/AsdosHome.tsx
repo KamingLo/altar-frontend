@@ -3,7 +3,7 @@ import React from 'react';
 import Link from 'next/link';
 import {
   ScanLine, FileSignature, Monitor, History,
-  CalendarDays, CalendarX2, CalendarClock,
+  CalendarDays, CalendarSync, CalendarClock,
   CheckCircle2, Info, TrendingUp
 } from 'lucide-react';
 import { useUserStore } from '@/store/useUserStore';
@@ -47,7 +47,7 @@ export const asdosMenuItems = [
   {
     id: 6,
     title: 'Kelas Pengganti',
-    icon: CalendarX2,
+    icon: CalendarSync,
     href: '/asdos/dashboard/pengajuan-kp',
     desc: 'Ajukan kelas pengganti',
   },
