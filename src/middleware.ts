@@ -34,7 +34,7 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/login', request.url));
     }
     return NextResponse.redirect(
-      new URL(payload.id_koordinator ? '/koordinator/dashboard' : '/asdos/dashboard', request.url)
+      new URL(payload.id_koordinator ? '/koordinator' : '/asdos', request.url)
     );
   }
 
@@ -47,9 +47,9 @@ export function middleware(request: NextRequest) {
   if (isAuthPage && token) {
     const payload = decodeJwtPayload(token);
     if (payload?.id_koordinator) {
-      return NextResponse.redirect(new URL('/koordinator/dashboard', request.url));
+      return NextResponse.redirect(new URL('/koordinator', request.url));
     }
-    return NextResponse.redirect(new URL('/asdos/dashboard', request.url));
+    return NextResponse.redirect(new URL('/asdos', request.url));
   }
 
   // Role mismatch: redirect ke dashboard yang benar
@@ -64,13 +64,13 @@ export function middleware(request: NextRequest) {
 
     if (isAsdosPath && !isAsdos) {
       return NextResponse.redirect(
-        new URL(isKoordinator ? '/koordinator/dashboard' : '/auth/login', request.url)
+        new URL(isKoordinator ? '/koordinator' : '/auth/login', request.url)
       );
     }
 
     if (isKoordinatorPath && !isKoordinator) {
       return NextResponse.redirect(
-        new URL(isAsdos ? '/asdos/dashboard' : '/auth/login', request.url)
+        new URL(isAsdos ? '/asdos' : '/auth/login', request.url)
       );
     }
   }

@@ -22,7 +22,7 @@ export default function AsdosLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <DashboardLayout menuGroups={menuGroups} homeHref="/asdos/dashboard" bgImage="/gedung-untar.png" bgImageDesktop="/gedung-untar-fl.webp">
+    <DashboardLayout menuGroups={menuGroups} homeHref="/asdos" bgImage="/gedung-untar.png" bgImageDesktop="/gedung-untar-fl.webp">
       {children}
     </DashboardLayout>
   );

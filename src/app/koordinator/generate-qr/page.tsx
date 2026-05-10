@@ -32,7 +32,7 @@ export default function GenerateQrPage() {
   }, []);
 
   const handleDone = useCallback(() => {
-    router.push('/koordinator/dashboard');
+    router.push('/koordinator');
   }, [router]);
 
   const DownloadIcon = () => (

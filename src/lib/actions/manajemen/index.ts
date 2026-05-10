@@ -149,3 +149,18 @@ export async function deleteKoor(id: string) {
   const res = await apiClient.delete(`/koor/${id}`, { auth: true });
   return { success: res.success, message: res.message };
 }
+
+export async function createUser(data: { username: string; email: string }) {
+  const res = await apiClient.post('/users/', data, { auth: true });
+  return { success: res.success, message: res.message };
+}
+
+export async function assignKoor(data: { user_id: string; nip: string }) {
+  const res = await apiClient.post('/koor', data, { auth: true });
+  return { success: res.success, message: res.message };
+}
+
+export async function assignAsdos(data: { user_id: string; nim: string; phone_number: string }) {
+  const res = await apiClient.post('/asdos', data, { auth: true });
+  return { success: res.success, message: res.message };
+}

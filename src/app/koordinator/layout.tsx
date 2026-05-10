@@ -22,7 +22,7 @@ export default function KoordinatorLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <DashboardLayout menuGroups={menuGroups} homeHref="/koordinator/dashboard" bgImage="/gedung-untar-fl.webp">
+    <DashboardLayout menuGroups={menuGroups} homeHref="/koordinator" bgImage="/gedung-untar-fl.webp">
       {children}
     </DashboardLayout>
   );
