@@ -36,7 +36,7 @@ export async function getAllSessions(params: {
   );
 }
 
-type SessionBody = {
+export type SessionBody = {
   id_kelas: string;
   id_mk: string;
   id_semester: string;

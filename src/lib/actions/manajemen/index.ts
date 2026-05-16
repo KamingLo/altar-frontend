@@ -28,9 +28,9 @@ export type AsdosDetail = {
   user: { username: string; email: string };
 };
 
-export async function getAsdosList(page = 1, search = '') {
+export async function getAsdosList(page = 1, search = '', limit = 10) {
   return apiClient.get<AsdosListItem[]>(
-    `/asdos?page=${page}&search=${encodeURIComponent(search)}`,
+    `/asdos?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
     { auth: true, cache: 'no-store' },
   );
 }

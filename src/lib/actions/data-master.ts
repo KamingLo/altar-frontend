@@ -7,9 +7,9 @@ type PaginatedResponse<T> = { items: T[]; total: number; page: number; limit: nu
 
 // ─── KELAS (/classes) — auth: Koordinator ─────────────────────────────────────
 
-export async function getKelasList(page = 1, search = '') {
+export async function getKelasList(page = 1, search = '', limit = 10) {
   return apiClient.get<PaginatedResponse<KelasItem>>(
-    `/classes?page=${page}&limit=10&search=${encodeURIComponent(search)}`,
+    `/classes?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
     { auth: true, cache: 'no-store' },
   );
 }
@@ -31,9 +31,9 @@ export async function deleteKelas(id: string) {
 
 // ─── MATA KULIAH (/courses) — auth: Koordinator ───────────────────────────────
 
-export async function getMKList(page = 1, search = '') {
+export async function getMKList(page = 1, search = '', limit = 10) {
   return apiClient.get<PaginatedResponse<MataKuliahItem>>(
-    `/courses?page=${page}&limit=10&search=${encodeURIComponent(search)}`,
+    `/courses?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
     { auth: true, cache: 'no-store' },
   );
 }
@@ -79,9 +79,9 @@ export async function deleteRuangan(id: string) {
 
 // ─── SEMESTER (/semesters) — public ──────────────────────────────────────────
 
-export async function getSemesterList(page = 1, search = '') {
+export async function getSemesterList(page = 1, search = '', limit = 10) {
   return apiClient.get<PaginatedResponse<SemesterItem>>(
-    `/semesters?page=${page}&limit=10&search=${encodeURIComponent(search)}`,
+    `/semesters?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
     { cache: 'no-store' },
   );
 }
