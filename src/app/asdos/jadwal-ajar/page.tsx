@@ -1,51 +1,87 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Search, Filter, Clock, MapPin, BookOpen } from 'lucide-react';
+import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 
-const daysInMonth = 31;
-const startDayOfWeek = 3;
 const dayNamesGrid = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
 const dayNamesFull = ['MIN', 'SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB'];
 
-const mockDates = Array.from({ length: daysInMonth }, (_, i) => {
-  const date = (i + 1).toString();
-  const dayIndex = (startDayOfWeek + i) % 7;
-  return { dayMobile: dayNamesFull[dayIndex], dayGrid: dayNamesGrid[dayIndex], date };
-});
-
-const mockSchedules = [
-  { id: 1, session: 'SESI 1', day: 'Sabtu', subject: 'Jaringan Komputer', time: '13:20 - --:--', room: 'R. M301', date: '13', status: 'Berjalan' },
-  { id: 2, session: 'SESI 3', day: 'Sabtu', subject: 'Jaringan Komputer', time: '13:15 - 16:05', room: 'R. M301', date: '13', status: 'Selesai' },
-  { id: 3, session: 'SESI 4', day: 'Sabtu', subject: 'Basis Data', time: '13:10 - 15:55', room: 'R. Lab Komp A', date: '13', status: 'Selesai' },
-  { id: 4, session: 'SESI 1', day: 'Senin', subject: 'Struktur Data', time: '08:00 - 10:30', room: 'Ruang 402', date: '15', status: 'Selesai' },
-];
+function deriveStatus(waktu: string): 'Berjalan' | 'Selesai' {
+  const endTime = waktu.split(', ')[1]?.split(' - ')[1]?.trim();
+  if (!endTime || endTime === '--:--') return 'Berjalan';
+  const [h, m] = endTime.split(':').map(Number);
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+  return now >= end ? 'Selesai' : 'Berjalan';
+}
 
 export default function JadwalAjarPage() {
-  const [selectedDate, setSelectedDate] = useState('13');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'Berjalan' | 'Selesai'>('ALL');
+  const [currentYear, setCurrentYear]     = useState(() => new Date().getFullYear());
+  const [currentMonth, setCurrentMonth]   = useState(() => new Date().getMonth());
+  const [selectedDate, setSelectedDate]   = useState(() => new Date().getDate().toString());
+  const [sessions, setSessions]           = useState<SessionFromAPI[]>([]);
+  const [isLoading, setIsLoading]         = useState(false);
+  const [error, setError]                 = useState<string | null>(null);
+  const [searchTerm, setSearchTerm]       = useState('');
+  const [filterStatus, setFilterStatus]   = useState<'ALL' | 'Berjalan' | 'Selesai'>('ALL');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setSearchTerm(val);
-    if (val.trim() !== '') {
-      const found = mockSchedules.find(s =>
-        s.subject.toLowerCase().includes(val.toLowerCase()) ||
-        s.room.toLowerCase().includes(val.toLowerCase())
-      );
-      if (found && found.date !== selectedDate) setSelectedDate(found.date);
-    }
+  const daysInMonth  = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const gridOffset   = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7;
+  const monthLabel   = new Date(currentYear, currentMonth, 1)
+                         .toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  const calendarDays = Array.from({ length: daysInMonth }, (_, i) => ({
+    date: (i + 1).toString(),
+    dayMobile: dayNamesFull[(gridOffset + i) % 7],
+    dayGrid: dayNamesGrid[(gridOffset + i) % 7],
+  }));
+  const selectedIso  = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(parseInt(selectedDate, 10)).padStart(2, '0')}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    getSessionsByDate(selectedIso).then(res => {
+      if (cancelled) return;
+      if (res.success && res.data) {
+        setSessions(prev => [
+          ...prev.filter(s => !s.waktu.startsWith(selectedIso)),
+          ...res.data!,
+        ]);
+      } else {
+        setError(res.message);
+        setSessions(prev => prev.filter(s => !s.waktu.startsWith(selectedIso)));
+      }
+      setIsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [selectedIso]);
+
+  const handlePrevMonth = () => {
+    if (currentMonth === 0) { setCurrentYear(y => y - 1); setCurrentMonth(11); }
+    else { setCurrentMonth(m => m - 1); }
+    setSelectedDate('1');
   };
 
-  const filtered = mockSchedules.filter(s =>
-    s.date === selectedDate &&
-    (s.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.room.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (filterStatus === 'ALL' || s.status === filterStatus)
+  const handleNextMonth = () => {
+    if (currentMonth === 11) { setCurrentYear(y => y + 1); setCurrentMonth(0); }
+    else { setCurrentMonth(m => m + 1); }
+    setSelectedDate('1');
+  };
+
+  const hasSchedule = (date: string) => {
+    const iso = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(parseInt(date, 10)).padStart(2, '0')}`;
+    return sessions.some(s => s.waktu.startsWith(iso));
+  };
+
+  const sessionsForDate = sessions.filter(s => s.waktu.startsWith(selectedIso));
+  const filtered = sessionsForDate.filter(s =>
+    (s.mata_kuliah.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     s.ruangan.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (filterStatus === 'ALL' || deriveStatus(s.waktu) === filterStatus)
   );
 
-  const hasSchedule = (date: string) => mockSchedules.some(s => s.date === date);
+  const selectedDayLabel = calendarDays[parseInt(selectedDate, 10) - 1]?.dayMobile ?? '';
 
   return (
     <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 pb-8 pt-2 min-h-screen font-sans">
@@ -67,7 +103,7 @@ export default function JadwalAjarPage() {
                 type="text"
                 placeholder="Cari materi atau kelas..."
                 value={searchTerm}
-                onChange={handleSearch}
+                onChange={e => setSearchTerm(e.target.value)}
                 className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
               />
             </div>
@@ -98,17 +134,18 @@ export default function JadwalAjarPage() {
         {/* Kalender Horizontal - Mobile Only */}
         <div className="md:hidden mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-base font-bold text-slate-800">Mei 2024</h3>
+            <h3 className="text-base font-bold text-slate-800">{monthLabel}</h3>
             <div className="flex items-center gap-2">
-              {[ChevronLeft, ChevronRight].map((Icon, i) => (
-                <button key={i} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl text-slate-500 active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-                  <Icon className="w-[18px] h-[18px]" />
-                </button>
-              ))}
+              <button onClick={handlePrevMonth} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl text-slate-500 active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                <ChevronLeft className="w-[18px] h-[18px]" />
+              </button>
+              <button onClick={handleNextMonth} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl text-slate-500 active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                <ChevronRight className="w-[18px] h-[18px]" />
+              </button>
             </div>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x">
-            {mockDates.map((item) => {
+            {calendarDays.map((item) => {
               const sel = selectedDate === item.date;
               return (
                 <div key={item.date} onClick={() => setSelectedDate(item.date)}
@@ -133,21 +170,22 @@ export default function JadwalAjarPage() {
           {/* Kalender Grid - Desktop Only */}
           <div className="hidden md:block w-[300px] lg:w-[320px] bg-white rounded-[2rem] p-6 md:p-7 shadow-sm border border-slate-100 shrink-0">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-bold text-slate-800">Mei 2024</h2>
+              <h2 className="text-lg font-bold text-slate-800">{monthLabel}</h2>
               <div className="flex items-center gap-2">
-                {[ChevronLeft, ChevronRight].map((Icon, i) => (
-                  <button key={i} className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all">
-                    <Icon className="w-4 h-4" />
-                  </button>
-                ))}
+                <button onClick={handlePrevMonth} className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button onClick={handleNextMonth} className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
             <div className="grid grid-cols-7 gap-y-4 gap-x-1">
               {dayNamesGrid.map((day, i) => (
                 <div key={i} className="text-center text-[11px] font-bold text-[#8BA3CB] mb-2">{day}</div>
               ))}
-              {Array.from({ length: startDayOfWeek }).map((_, i) => <div key={`sp-${i}`} />)}
-              {mockDates.map((item) => {
+              {Array.from({ length: gridOffset }).map((_, i) => <div key={`sp-${i}`} />)}
+              {calendarDays.map((item) => {
                 const sel = selectedDate === item.date;
                 const hasItem = hasSchedule(item.date);
                 return (
@@ -171,63 +209,95 @@ export default function JadwalAjarPage() {
               <h3 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">Jadwal Terdaftar</h3>
             </div>
 
-            {filtered.length > 0 ? filtered.map(s => (
-              <div key={s.id} className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all">
+            {isLoading && (
+              <div className="flex justify-center py-10">
+                <div className="w-6 h-6 border-2 border-[#941C2F] border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
 
-                {/* Mobile */}
-                <div className="flex items-center gap-3 md:hidden">
-                  <div className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
-                    <BookOpen size={20} strokeWidth={2} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-[15px] text-[#1F2937] truncate">{s.subject}</h3>
-                    <p className="text-[10px] font-bold text-slate-400 tracking-wider mt-0.5">{s.day}, {s.date} MEI 2024</p>
-                  </div>
-                  <div className={`shrink-0 self-start mt-0.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold tracking-wider
-                    ${s.status === 'Berjalan' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}>
-                    {s.status}
-                  </div>
-                </div>
-                <div className="flex md:hidden flex-col gap-1.5 mt-3 pt-3 border-t border-slate-100">
-                  <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                    <Clock size={13} className="text-slate-400 shrink-0" />
-                    <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{s.time}</span>
-                  </div>
-                  <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                    <MapPin size={13} className="text-slate-400 shrink-0" />
-                    <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{s.room}</span>
-                  </div>
-                </div>
+            {error && !isLoading && (
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-sm text-red-600 font-semibold">
+                {error}
+              </div>
+            )}
 
-                {/* Desktop */}
-                <div className="hidden md:flex md:items-center md:justify-between">
-                  <div className="flex items-center gap-4 min-w-0 w-2/5">
-                    <div className="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
+            {!isLoading && !error && filtered.length > 0 && filtered.map(s => {
+              const status = deriveStatus(s.waktu);
+              const timePart = s.waktu.split(', ')[1] ?? s.waktu;
+              return (
+                <div key={s.id_sesi} className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all">
+
+                  {/* Mobile */}
+                  <div className="flex items-center gap-3 md:hidden">
+                    <div className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
                       <BookOpen size={20} strokeWidth={2} />
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-base text-[#1F2937] truncate">{s.subject}</h3>
-                      <p className="text-xs font-bold text-slate-400 tracking-wider mt-0.5">{s.day}, {s.date} MEI 2024</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="font-bold text-[15px] text-[#1F2937] truncate">{s.mata_kuliah}</h3>
+                        {s.tipe_jadwal === 'PENGGANTI' && (
+                          <span className="shrink-0 text-[9px] font-bold bg-amber-50 text-amber-500 border border-amber-100 px-1.5 py-0.5 rounded-md tracking-wider">
+                            PENGGANTI
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-bold text-slate-400 tracking-wider mt-0.5">{selectedDayLabel}, {selectedDate} {monthLabel}</p>
+                    </div>
+                    <div className={`shrink-0 self-start mt-0.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold tracking-wider
+                      ${status === 'Berjalan' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                      {status}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center gap-2">
+                  <div className="flex md:hidden flex-col gap-1.5 mt-3 pt-3 border-t border-slate-100">
+                    <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
                       <Clock size={13} className="text-slate-400 shrink-0" />
-                      <span className="text-[13px] font-semibold text-slate-700 whitespace-nowrap">{s.time}</span>
+                      <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{timePart}</span>
                     </div>
-                    <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center gap-2">
+                    <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
                       <MapPin size={13} className="text-slate-400 shrink-0" />
-                      <span className="text-[13px] font-semibold text-slate-700 whitespace-nowrap">{s.room}</span>
-                    </div>
-                    <div className={`shrink-0 px-3 py-2 rounded-lg text-xs font-bold tracking-wider
-                      ${s.status === 'Berjalan' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}>
-                      {s.status}
+                      <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{s.ruangan}</span>
                     </div>
                   </div>
-                </div>
 
-              </div>
-            )) : (
+                  {/* Desktop */}
+                  <div className="hidden md:flex md:items-center md:justify-between">
+                    <div className="flex items-center gap-4 min-w-0 w-2/5">
+                      <div className="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
+                        <BookOpen size={20} strokeWidth={2} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <h3 className="font-bold text-base text-[#1F2937] truncate">{s.mata_kuliah}</h3>
+                          {s.tipe_jadwal === 'PENGGANTI' && (
+                            <span className="shrink-0 text-[9px] font-bold bg-amber-50 text-amber-500 border border-amber-100 px-1.5 py-0.5 rounded-md tracking-wider">
+                              PENGGANTI
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs font-bold text-slate-400 tracking-wider mt-0.5">{selectedDayLabel}, {selectedDate} {monthLabel}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center gap-2">
+                        <Clock size={13} className="text-slate-400 shrink-0" />
+                        <span className="text-[13px] font-semibold text-slate-700 whitespace-nowrap">{timePart}</span>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center gap-2">
+                        <MapPin size={13} className="text-slate-400 shrink-0" />
+                        <span className="text-[13px] font-semibold text-slate-700 whitespace-nowrap">{s.ruangan}</span>
+                      </div>
+                      <div className={`shrink-0 px-3 py-2 rounded-lg text-xs font-bold tracking-wider
+                        ${status === 'Berjalan' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                        {status}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })}
+
+            {!isLoading && !error && filtered.length === 0 && (
               <div className="bg-white rounded-2xl p-6 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
                 <div className="mx-auto mb-3 w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
                   <BookOpen size={22} />
@@ -238,7 +308,7 @@ export default function JadwalAjarPage() {
             )}
 
             <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 md:mt-2">
-              Menampilkan {filtered.length} jadwal pada {selectedDate} Mei.
+              Menampilkan {filtered.length} jadwal pada {selectedDate} {monthLabel}.
             </p>
           </div>
         </div>

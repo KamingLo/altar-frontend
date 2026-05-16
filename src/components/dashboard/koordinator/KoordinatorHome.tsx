@@ -3,7 +3,8 @@ import React from 'react';
 import Link from 'next/link';
 import {
   FileText, QrCode, Users, CalendarSync,
-  MapPin, LogOut, ChevronRight, TrendingUp, Clock, CheckCircle2
+  MapPin, LogOut, ChevronRight, TrendingUp, Clock, CheckCircle2,
+  Database, CalendarDays
 } from 'lucide-react';
 import { useUserStore } from '@/store/useUserStore';
 
@@ -12,6 +13,8 @@ export const koordinatorMenuItems = [
   { id: 2, title: 'Generate QR', icon: QrCode, href: '/koordinator/generate-qr', desc: 'Buat kode QR untuk sesi' },
   { id: 3, title: 'Manajemen User', icon: Users, href: '/koordinator/manajemen-user', desc: 'Kelola data asisten dosen' },
   { id: 4, title: 'Manajemen KP', icon: CalendarSync, href: '/koordinator/manajemen-kp', desc: 'Jadwal & data kerja praktik' },
+  { id: 5, title: 'Data Master', icon: Database, href: '/koordinator/data-master', desc: 'Kelola kelas, MK, ruangan, semester' },
+  { id: 6, title: 'Manajemen Jadwal', icon: CalendarDays, href: '/koordinator/manajemen-jadwal', desc: 'Kelola sesi jadwal mengajar' },
 ];
 
 const desktopStats = [

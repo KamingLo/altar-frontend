@@ -19,3 +19,94 @@ export interface UserData {
   id_asisten?: string | null;
   id_koordinator?: string | null;
 }
+
+// --- Pergantian Kelas ---
+
+export interface SubstituteSessionDetail {
+  id: string;
+  status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  reason: string;
+  coordinator_reason: string | null;
+  substitute_date: string;
+  original_date: string;
+  time_slot: string;
+  room: string;
+  substitute_teacher: string;
+  session: {
+    id_sesi: string;
+    nama_kelas: string;
+    mata_kuliah: string;
+    ruangan: string;
+    pengajar: string;
+    waktu: string;
+    tipe_jadwal: 'REGULAR' | 'PENGGANTI';
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Data Master ---
+
+export interface KelasItem {
+  id: string;
+  nama_kelas: string;
+  jurusan: string;
+  jumlah_siswa: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MataKuliahItem {
+  id: string;
+  nama_mk: string;
+  sks: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RuanganItem {
+  id: string;
+  nama_ruangan: string;
+  lantai: number;
+  kapasitas: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SemesterItem {
+  id: string;
+  tahun_ajaran: string;
+  tipe_semester: 'Ganjil' | 'Genap' | 'Pendek';
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Manajemen Jadwal ---
+
+export interface SessionTimeline {
+  id_sesi: string;
+  tipe: 'REGULER' | 'PENGGANTI';
+  tanggal: string;
+  nama_kelas: string;
+  mata_kuliah: string;
+  ruangan: string;
+  pengajar: string;
+  waktu: string;
+}
+
+export interface UnifiedJadwalResponse {
+  id_sesi: string;
+  tipe: 'REGULER' | 'PENGGANTI';
+  tanggal: string;
+  nama_kelas: string;
+  mata_kuliah: string;
+  ruangan: string;
+  pengajar: string;
+  waktu: string;
+}
+
+export interface JadwalTimelineParams {
+  start_date: string;
+  end_date: string;
+  id_semester: string;
+}
