@@ -23,3 +23,77 @@ export function getMonthBounds(year: number, month: number) {
 export function semesterLabel(tahun: string, tipe: string) {
   return `${tahun} · ${tipe}`;
 }
+
+/** Normalisasi tanggal dari API (YYYY-MM-DD atau ISO datetime) */
+export function sessionDateKey(tanggal: string): string {
+  return tanggal.slice(0, 10);
+}
+
+export type SessionTipe = 'REGULER' | 'PENGGANTI';
+
+/** Backend bisa mengirim REGULAR atau REGULER */
+export function normalizeSessionTipe(tipe: string): SessionTipe {
+  const u = tipe.trim().toUpperCase();
+  if (u === 'PENGGANTI') return 'PENGGANTI';
+  return 'REGULER';
+}
+
+export function isPenggantiTipe(tipe: string): boolean {
+  return normalizeSessionTipe(tipe) === 'PENGGANTI';
+}
+
+/** Key unik per baris list (id_sesi bisa sama untuk beberapa instance tanggal) */
+export function sessionRowKey(session: {
+  id_sesi: string;
+  tanggal: string;
+  waktu: string;
+  nama_kelas?: string;
+  mata_kuliah?: string;
+}): string {
+  return [
+    session.id_sesi,
+    sessionDateKey(session.tanggal),
+    session.waktu,
+    session.nama_kelas ?? '',
+    session.mata_kuliah ?? '',
+  ].join('|');
+}
+
+export function normalizeLookupLabel(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** Cocokkan label dari timeline ke item dropdown (nama bisa sedikit berbeda) */
+export function findByDisplayLabel<T>(
+  items: T[],
+  label: string,
+  getLabel: (item: T) => string,
+): T | undefined {
+  const target = normalizeLookupLabel(label);
+  if (!target) return undefined;
+  const exact = items.find(item => normalizeLookupLabel(getLabel(item)) === target);
+  if (exact) return exact;
+  return items.find(item => {
+    const itemLabel = normalizeLookupLabel(getLabel(item));
+    return itemLabel.includes(target) || target.includes(itemLabel);
+  });
+}
+
+/** Pengajar di timeline bisa berformat "Nama (Substitute Teacher)" */
+export function pengajarDisplayName(pengajar: string): string {
+  return pengajar.split('(')[0]?.trim() ?? pengajar.trim();
+}
+
+export function dedupeSessions<T extends { id_sesi: string; tanggal: string; waktu: string }>(
+  items: T[],
+): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const item of items) {
+    const key = sessionRowKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+  return result;
+}

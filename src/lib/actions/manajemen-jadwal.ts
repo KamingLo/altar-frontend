@@ -14,12 +14,11 @@ import {
   getSemesterList,
 } from '@/lib/actions/data-master';
 import { getAsdosList } from '@/lib/actions/manajemen';
+import { dedupeSessions } from '@/lib/jadwal-utils';
 import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem, SessionTimeline } from '@/types/api';
 import type { AsdosListItem } from '@/lib/actions/manajemen';
 
-const DROPDOWN_LIMIT = 100;
-
-export type { SessionBody };
+const DROPDOWN_LIMIT = 500;
 
 export type DropdownData = {
   kelasList: KelasItem[];
@@ -45,7 +44,11 @@ export async function fetchSessions(params: {
 }): Promise<{ success: boolean; message: string; items: SessionTimeline[] }> {
   const res = await getAllSessions(params);
   if (res.success && res.data) {
-    return { success: true, message: res.message, items: res.data.items ?? [] };
+    return {
+      success: true,
+      message: res.message,
+      items: dedupeSessions(res.data.items ?? []),
+    };
   }
   return {
     success: false,
@@ -72,7 +75,7 @@ export async function fetchDropdownData(): Promise<{
   if (failed) {
     return {
       success: false,
-      message: failed.message || 'Gagal memuat data master.',
+      message: failed.message || 'Gagal memuat data form dari server.',
       data: { kelasList: [], mkList: [], ruanganList: [], semesterList: [], asdosList: [] },
     };
   }
@@ -112,14 +115,14 @@ export async function buatSesi(data: SessionBody) {
   return { success: res.success, message: res.message };
 }
 
-/** PATCH /sessions/:id */
-export async function editSesi(id: string, data: SessionBody) {
-  const res = await updateSession(id, data);
+/** PATCH /sessions/:id — tanggal instance dikirim di body & query agar backend tahu baris mana */
+export async function editSesi(id: string, data: SessionBody, instanceDate?: string) {
+  const res = await updateSession(id, data, instanceDate ?? data.tanggal);
   return { success: res.success, message: res.message };
 }
 
 /** DELETE /sessions/:id */
-export async function hapusSesi(id: string) {
-  const res = await deleteSession(id);
+export async function hapusSesi(id: string, instanceDate?: string) {
+  const res = await deleteSession(id, instanceDate);
   return { success: res.success, message: res.message };
 }

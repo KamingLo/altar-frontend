@@ -44,6 +44,7 @@ export type SessionBody = {
   id_asdos1?: string | null;
   id_asdos2?: string | null;
   id_dosen?: string | null;
+  tanggal: string; // YYYY-MM-DD — tanggal spesifik sesi
   opsi_hari: number; // 1=Senin … 6=Sabtu
   opsi_jam: number;  // 1-7 (lihat slot mapping di PANDUAN_API.txt)
 };
@@ -54,15 +55,18 @@ export async function createSession(data: SessionBody) {
   return { success: res.success, message: res.message };
 }
 
-// Koordinator: edit sesi jadwal
-export async function updateSession(id: string, data: SessionBody) {
-  const res = await apiClient.patch(`/sessions/${id}`, data, { auth: true });
+// Koordinator: edit sesi jadwal (instanceDate = tanggal baris timeline yang diedit)
+export async function updateSession(id: string, data: SessionBody, instanceDate?: string) {
+  const date = instanceDate ?? data.tanggal;
+  const q = date ? `?tanggal=${encodeURIComponent(date)}` : '';
+  const res = await apiClient.patch(`/sessions/${id}${q}`, data, { auth: true });
   return { success: res.success, message: res.message };
 }
 
-// Koordinator: hapus sesi jadwal
-export async function deleteSession(id: string) {
-  const res = await apiClient.delete(`/sessions/${id}`, { auth: true });
+// Koordinator: hapus sesi jadwal (instanceDate = tanggal baris timeline yang dihapus)
+export async function deleteSession(id: string, instanceDate?: string) {
+  const q = instanceDate ? `?tanggal=${encodeURIComponent(instanceDate)}` : '';
+  const res = await apiClient.delete(`/sessions/${id}${q}`, { auth: true });
   return { success: res.success, message: res.message };
 }
 
