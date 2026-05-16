@@ -1,0 +1,125 @@
+'use server';
+
+import {
+  createSession,
+  deleteSession,
+  getAllSessions,
+  updateSession,
+  type SessionBody,
+} from '@/lib/actions/jadwal';
+import {
+  getKelasList,
+  getMKList,
+  getRuanganList,
+  getSemesterList,
+} from '@/lib/actions/data-master';
+import { getAsdosList } from '@/lib/actions/manajemen';
+import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem, SessionTimeline } from '@/types/api';
+import type { AsdosListItem } from '@/lib/actions/manajemen';
+
+const DROPDOWN_LIMIT = 100;
+
+export type { SessionBody };
+
+export type DropdownData = {
+  kelasList: KelasItem[];
+  mkList: MataKuliahItem[];
+  ruanganList: RuanganItem[];
+  semesterList: SemesterItem[];
+  asdosList: AsdosListItem[];
+};
+
+function normalizeAsdosList(data: unknown): AsdosListItem[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && 'items' in data && Array.isArray((data as { items: unknown }).items)) {
+    return (data as { items: AsdosListItem[] }).items;
+  }
+  return [];
+}
+
+/** Fetch timeline sesi dari backend (GET /sessions) */
+export async function fetchSessions(params: {
+  id_semester: string;
+  start_date?: string;
+  end_date?: string;
+}): Promise<{ success: boolean; message: string; items: SessionTimeline[] }> {
+  const res = await getAllSessions(params);
+  if (res.success && res.data) {
+    return { success: true, message: res.message, items: res.data.items ?? [] };
+  }
+  return {
+    success: false,
+    message: res.message || 'Gagal memuat jadwal dari server.',
+    items: [],
+  };
+}
+
+/** Data dropdown form — kelas, MK, ruangan, semester, asdos dari DB */
+export async function fetchDropdownData(): Promise<{
+  success: boolean;
+  message: string;
+  data: DropdownData;
+}> {
+  const [kelasRes, mkRes, ruanganRes, semesterRes, asdosRes] = await Promise.all([
+    getKelasList(1, '', DROPDOWN_LIMIT),
+    getMKList(1, '', DROPDOWN_LIMIT),
+    getRuanganList(1, '', DROPDOWN_LIMIT),
+    getSemesterList(1, '', DROPDOWN_LIMIT),
+    getAsdosList(1, '', DROPDOWN_LIMIT),
+  ]);
+
+  const failed = [kelasRes, mkRes, ruanganRes, semesterRes, asdosRes].find(r => !r.success);
+  if (failed) {
+    return {
+      success: false,
+      message: failed.message || 'Gagal memuat data master.',
+      data: { kelasList: [], mkList: [], ruanganList: [], semesterList: [], asdosList: [] },
+    };
+  }
+
+  return {
+    success: true,
+    message: '',
+    data: {
+      kelasList: kelasRes.data?.items ?? [],
+      mkList: mkRes.data?.items ?? [],
+      ruanganList: ruanganRes.data?.items ?? [],
+      semesterList: semesterRes.data?.items ?? [],
+      asdosList: normalizeAsdosList(asdosRes.data),
+    },
+  };
+}
+
+export async function fetchSemesters(): Promise<{
+  success: boolean;
+  message: string;
+  items: SemesterItem[];
+}> {
+  const res = await getSemesterList(1, '', DROPDOWN_LIMIT);
+  if (res.success && res.data) {
+    return { success: true, message: res.message, items: res.data.items ?? [] };
+  }
+  return {
+    success: false,
+    message: res.message || 'Gagal memuat daftar semester.',
+    items: [],
+  };
+}
+
+/** POST /sessions */
+export async function buatSesi(data: SessionBody) {
+  const res = await createSession(data);
+  return { success: res.success, message: res.message };
+}
+
+/** PATCH /sessions/:id */
+export async function editSesi(id: string, data: SessionBody) {
+  const res = await updateSession(id, data);
+  return { success: res.success, message: res.message };
+}
+
+/** DELETE /sessions/:id */
+export async function hapusSesi(id: string) {
+  const res = await deleteSession(id);
+  return { success: res.success, message: res.message };
+}
