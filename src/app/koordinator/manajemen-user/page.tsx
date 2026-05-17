@@ -527,7 +527,7 @@ export default function ManajemenAsdosPage() {
           />
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none">
             <div
-              className="w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[90dvh] md:max-h-[85vh] overflow-hidden pointer-events-auto"
+              className="w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto"
               style={{
                 transform: (!isModalVisible || isClosing) ? 'translateY(100%)' : `translateY(${sheetDragY}px)`,
                 transition: (!isModalVisible || isClosing || sheetDragY === 0) ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',

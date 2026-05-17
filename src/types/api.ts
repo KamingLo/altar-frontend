@@ -85,7 +85,7 @@ export interface SemesterItem {
 
 export interface SessionTimeline {
   id_sesi: string;
-  tipe: 'REGULER' | 'REGULAR' | 'PENGGANTI';
+  tipe: 'REGULER' | 'REGULAR' | 'PENGGANTI' | 'SUBSTITUTE';
   tanggal: string;
   nama_kelas: string;
   mata_kuliah: string;

@@ -73,7 +73,7 @@ export default function PresensiKelasOnlinePage() {
           />
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none">
             <div
-              className="w-full max-w-md md:max-w-xl bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[90dvh] md:max-h-[85vh] overflow-hidden pointer-events-auto"
+              className="w-full max-w-md md:max-w-xl bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto"
               style={{
                 transform: (!isSheetVisible || isSheetClosing)
                   ? 'translateY(100%)'

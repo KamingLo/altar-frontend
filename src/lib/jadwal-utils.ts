@@ -31,10 +31,10 @@ export function sessionDateKey(tanggal: string): string {
 
 export type SessionTipe = 'REGULER' | 'PENGGANTI';
 
-/** Backend bisa mengirim REGULAR atau REGULER */
+/** Backend bisa mengirim REGULAR/REGULER atau SUBSTITUTE/PENGGANTI */
 export function normalizeSessionTipe(tipe: string): SessionTipe {
   const u = tipe.trim().toUpperCase();
-  if (u === 'PENGGANTI') return 'PENGGANTI';
+  if (u === 'PENGGANTI' || u === 'SUBSTITUTE') return 'PENGGANTI';
   return 'REGULER';
 }
 
