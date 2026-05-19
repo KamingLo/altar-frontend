@@ -1,24 +1,200 @@
 'use client';
-import React, { useState } from 'react';
-import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
+import { submitCheckIn } from '@/lib/actions/presensi';
+import { toast } from 'sonner';
 
-const mockSessions = [
-  { id: 1, sessionName: 'SESI 1', subject: 'Basis Data', room: 'R. 901', time: '07:30 - 10:00', status: 'Aktif' },
-  { id: 2, sessionName: 'SESI 2', subject: 'Algoritma Pemrograman', room: 'R. Lab 2', time: '10:30 - 13:00', status: 'Aktif' },
-  { id: 3, sessionName: 'SESI 3', subject: 'Sistem Operasi', room: 'R. 804', time: '13:30 - 16:00', status: 'Mendatang' },
-];
+
+
 
 export default function CheckInPage() {
   const [step, setStep] = useState(1);
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(mockSessions[0]?.id ?? null);
+  const [sessions, setSessions] = useState<SessionFromAPI[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
   const [isSheetClosing, setIsSheetClosing] = useState(false);
   const [sheetStartY, setSheetStartY] = useState(0);
   const [sheetDragY, setSheetDragY] = useState(0);
+  const [qrToken, setQrToken] = useState<string>('');
+
+  const [cameraStatus, setCameraStatus] = useState<'idle' | 'requesting' | 'active' | 'denied' | 'scanning'>('idle');
+  const [scanMessage, setScanMessage] = useState<string>('');
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [activeCameraId, setActiveCameraId] = useState<string>('');
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    async function fetchSessions() {
+      setIsLoading(true);
+      const today = new Date().toISOString().split('T')[0];
+      const res = await getSessionsByDate(today);
+      if (res.success && res.data) {
+        setSessions(res.data);
+        if (res.data.length > 0) setSelectedSessionId(res.data[0].id_sesi);
+      } else {
+        toast.error(res.message || 'Gagal mengambil data sesi');
+      }
+      setIsLoading(false);
+    }
+    fetchSessions();
+  }, []);
+
+  useEffect(() => {
+    if (step !== 1) stopCamera();
+    return () => stopCamera();
+  }, [step]);
+
+  const stopCamera = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
+
+  const startDecodeLoop = useCallback(async () => {
+
+    const jsQR = (await import('jsqr')).default;
+
+    const tick = () => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        animFrameRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert',
+      });
+
+      if (code) {
+
+        stopCamera();
+        setQrToken(code.data);
+        setStep(2);
+        return;
+      }
+
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    animFrameRef.current = requestAnimationFrame(tick);
+  }, [stopCamera]);
+
+  const startCamera = useCallback(async (deviceId?: string) => {
+    setCameraStatus('requesting');
+    setScanMessage('');
+    stopCamera();
+
+    try {
+      const constraints: MediaStreamConstraints = {
+        video: deviceId
+          ? { deviceId: { exact: deviceId } }
+          : { facingMode: 'environment' },
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      setCameras(videoDevices);
+
+      const activeTrack = stream.getVideoTracks()[0];
+      const activeDevice = videoDevices.find(d => d.label === activeTrack.label);
+      if (activeDevice) setActiveCameraId(activeDevice.deviceId);
+
+      setCameraStatus('active');
+      startDecodeLoop();
+    } catch (err: any) {
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setCameraStatus('denied');
+        setScanMessage('Izin kamera ditolak. Aktifkan izin kamera di pengaturan browser wak.');
+      } else {
+        setCameraStatus('idle');
+        setScanMessage('Gagal mengakses kamera. Coba lagi.');
+      }
+    }
+  }, [stopCamera, startDecodeLoop]);
+
+  const switchCamera = useCallback(async (deviceId: string) => {
+    setActiveCameraId(deviceId);
+    await startCamera(deviceId);
+  }, [startCamera]);
+
+  const handleScanFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCameraStatus('scanning');
+    setScanMessage('Menganalisis gambar...');
+
+    const jsQR = (await import('jsqr')).default;
+
+    const img = new window.Image();
+    const url = URL.createObjectURL(file);
+    img.src = url;
+
+    img.onload = () => {
+      const canvas = canvasRef.current ?? document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'attemptBoth',
+      });
+      URL.revokeObjectURL(url);
+
+      if (code) {
+        setQrToken(code.data);
+        setCameraStatus('idle');
+        setStep(2);
+      } else {
+        setCameraStatus('idle');
+        setScanMessage('❌ QR Code tidak ditemukan di gambar ini. Coba gambar lain.');
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      setCameraStatus('idle');
+      setScanMessage('Gagal membaca file gambar.');
+    };
+
+    e.target.value = '';
+  }, []);
 
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-  const selectedSession = mockSessions.find(s => s.id === selectedSessionId);
+  const selectedSession = sessions.find(s => s.id_sesi === selectedSessionId);
 
   const handleOpenSheet = () => {
     setIsSheetOpen(true);
@@ -47,10 +223,33 @@ export default function CheckInPage() {
     else setSheetDragY(0);
   };
 
-  const handleConfirmCheckIn = () => {
-    handleCloseSheet();
-    setTimeout(() => setStep(3), 300);
+  const handleConfirmCheckIn = async () => {
+    if (!selectedSessionId) return;
+    setIsSubmitting(true);
+    const res = await submitCheckIn({
+      id_sesi: selectedSessionId,
+      qr_token: qrToken,
+      menggantikan: selectedSession?.tipe_jadwal === 'PENGGANTI',
+      id_sesi_pengganti: selectedSession?.tipe_jadwal === 'PENGGANTI' ? selectedSession.id_sesi : undefined,
+    });
+    if (res.success) {
+      toast.success('Check-in berhasil!');
+      handleCloseSheet();
+      setTimeout(() => setStep(3), 300);
+    } else {
+      toast.error(res.message || 'Gagal melakukan check-in');
+    }
+    setIsSubmitting(false);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80vh]">
+        <Loader2 className="w-10 h-10 text-[#941C2F] animate-spin mb-4" />
+        <p className="text-slate-500 font-medium">Memuat data sesi...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 pb-8 pt-2 min-h-screen font-sans">
@@ -96,10 +295,10 @@ export default function CheckInPage() {
 
                 <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-5 mb-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] space-y-3">
                   {[
-                    { label: 'Mata Kuliah', value: selectedSession?.subject ?? '-' },
-                    { label: 'Sesi',        value: selectedSession?.sessionName ?? '-' },
-                    { label: 'Ruangan',     value: selectedSession?.room ?? '-' },
-                    { label: 'Waktu',       value: selectedSession?.time ?? '-' },
+                    { label: 'Mata Kuliah', value: selectedSession?.mata_kuliah ?? '-' },
+                    { label: 'Kelas', value: selectedSession?.nama_kelas ?? '-' },
+                    { label: 'Ruangan', value: selectedSession?.ruangan ?? '-' },
+                    { label: 'Waktu', value: selectedSession?.waktu ?? '-' },
                   ].map(({ label, value }, i, arr) => (
                     <React.Fragment key={label}>
                       <div className="flex items-center justify-between">
@@ -125,19 +324,21 @@ export default function CheckInPage() {
                     className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm active:scale-[0.98] transition-all hover:bg-slate-50">
                     Batal
                   </button>
-                  <button onClick={handleConfirmCheckIn}
-                    className="flex-1 py-3 rounded-xl bg-[#941C2F] text-white font-bold text-sm shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727]">
+                  <button onClick={handleConfirmCheckIn} disabled={isSubmitting}
+                    className="flex-1 py-3 rounded-xl bg-[#941C2F] text-white font-bold text-sm shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] disabled:opacity-50 flex items-center justify-center gap-2">
+                    {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                     Ya, Check-in
                   </button>
                 </div>
                 <div className="flex flex-col gap-3 md:hidden">
-                  <button onClick={handleConfirmCheckIn}
-                    className="w-full py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-md shadow-[#941C2F]/20">
+                  <button onClick={handleConfirmCheckIn} disabled={isSubmitting}
+                    className="w-full py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-md shadow-[#941C2F]/20 flex items-center justify-center gap-2">
+                    {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                     Ya, Check-in
                   </button>
                   <button onClick={handleCloseSheet}
                     className="w-full bg-slate-100 text-slate-600 font-bold py-3.5 rounded-xl active:scale-[0.98] hover:bg-slate-200 transition-all text-[15px]">
-                    Kembali ke Beranda
+                    Kembali
                   </button>
                 </div>
               </div>
@@ -145,41 +346,179 @@ export default function CheckInPage() {
           </div>
         </>
       )}
-
       {step === 1 && (
         <>
           <div className="mb-6 md:mb-8">
-            <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">Check-in Kehadiran</p>
-            <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Pindai Kode QR</h2>
-            <p className="text-sm text-slate-500 mt-1 md:text-base">Arahkan kamera ke kode QR yang disediakan koordinator.</p>
+            <p className="text-left text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">Check-in Kehadiran</p>
+            <h2 className="text-left text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Pindai Kode QR</h2>
+            <p className="text-left md:text-left text-sm text-slate-500 mt-1 md:text-base">Arahkan kamera ke kode QR yang disediakan koordinator.</p>
           </div>
-          <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-12 lg:p-16 md:flex md:items-center md:gap-16">
-            <div className="hidden md:flex md:flex-1 flex-col justify-center">
+
+          <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-12 lg:p-16 md:flex md:items-start md:gap-16">
+            <div className="hidden md:flex md:flex-1 flex-col justify-center pt-8">
               <h3 className="text-2xl lg:text-3xl font-extrabold text-[#1F2937] mb-3">Pindai Kode QR</h3>
               <p className="text-base text-slate-500 leading-relaxed">
-                Arahkan kamera Anda ke kode QR yang disediakan oleh Koordinator di depan kelas untuk melakukan check-in kehadiran.
+                Arahkan kamera Anda ke kode QR yang disediakan oleh Koordinator di depan kelas untuk melakukan check-in kehadiran. Pastikan pencahayaan cukup dan kode QR berada di dalam area pindai.
               </p>
-            </div>
-            <div className="md:flex-1 flex flex-col items-center justify-center">
-              <div
-                className="relative w-64 h-64 md:w-72 md:h-72 cursor-pointer active:scale-95 transition-transform hover:scale-[1.02]"
-                onClick={() => setStep(2)}
-              >
-                <div className="absolute top-0 left-0 w-12 h-12 md:w-16 md:h-16 border-t-[4px] md:border-t-[5px] border-l-[4px] md:border-l-[5px] border-[#941C2F] rounded-tl-3xl md:rounded-tl-[1.75rem]" />
-                <div className="absolute top-0 right-0 w-12 h-12 md:w-16 md:h-16 border-t-[4px] md:border-t-[5px] border-r-[4px] md:border-r-[5px] border-[#941C2F] rounded-tr-3xl md:rounded-tr-[1.75rem]" />
-                <div className="absolute bottom-0 left-0 w-12 h-12 md:w-16 md:h-16 border-b-[4px] md:border-b-[5px] border-l-[4px] md:border-l-[5px] border-[#941C2F] rounded-bl-3xl md:rounded-bl-[1.75rem]" />
-                <div className="absolute bottom-0 right-0 w-12 h-12 md:w-16 md:h-16 border-b-[4px] md:border-b-[5px] border-r-[4px] md:border-r-[5px] border-[#941C2F] rounded-br-3xl md:rounded-br-[1.75rem]" />
-                <div className="absolute top-1/2 left-4 right-4 h-[2px] md:h-[3px] bg-red-400 shadow-[0_0_10px_rgba(239,68,68,0.8)] opacity-80" />
-                <div className="absolute inset-0 flex items-center justify-center opacity-[0.07]">
-                  <Scan size={96} className="md:w-28 md:h-28" />
-                </div>
+              <div className="mt-8 flex flex-row gap-4 w-full">
+                {cameraStatus === 'idle' || cameraStatus === 'denied' ? (
+                  <button
+                    onClick={() => startCamera()}
+                    className="flex-1 flex items-center justify-center gap-2.5 bg-[#941C2F] text-white font-bold py-3.5 rounded-xl text-sm shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727]"
+                  >
+                    <Camera size={18} />
+                    Aktifkan Kamera
+                  </button>
+                ) : cameraStatus === 'requesting' || cameraStatus === 'scanning' ? (
+                  <button disabled
+                    className="flex-1 flex items-center justify-center gap-2.5 bg-[#941C2F]/60 text-white font-bold py-3.5 rounded-xl text-sm cursor-not-allowed">
+                    <Loader2 size={18} className="animate-spin" />
+                    Memproses...
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { stopCamera(); setCameraStatus('idle'); }}
+                    className="flex-1 flex items-center justify-center gap-2.5 bg-slate-100 text-slate-700 font-bold py-3.5 rounded-xl text-sm active:scale-[0.98] transition-all hover:bg-slate-200"
+                  >
+                    <RefreshCw size={18} />
+                    Hentikan Kamera
+                  </button>
+                )}
+
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={cameraStatus === 'requesting' || cameraStatus === 'scanning'}
+                  className="flex-1 flex items-center justify-center gap-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-all hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
+                >
+                  <ImageIcon size={17} />
+                  Pindai dari File
+                </button>
               </div>
-              <p className="mt-8 text-xs md:text-sm text-slate-400 italic">*Klik area ini untuk simulasi scan</p>
+              {cameras.length > 1 && cameraStatus === 'active' && (
+                <select
+                  value={activeCameraId}
+                  onChange={e => switchCamera(e.target.value)}
+                  className="mt-4 w-full p-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none focus:border-[#941C2F] transition-colors"
+                >
+                  {cameras.map(cam => (
+                    <option key={cam.deviceId} value={cam.deviceId}>
+                      {cam.label || `Kamera ${cameras.indexOf(cam) + 1}`}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {scanMessage && (
+                <div className="mt-4 flex items-center gap-3 text-amber-600 bg-amber-50 px-4 py-3.5 rounded-2xl border border-amber-100 w-full shadow-sm animate-in fade-in duration-300">
+                  <AlertCircle size={18} className="shrink-0" />
+                  <p className="text-[11px] md:text-xs font-medium leading-relaxed">{scanMessage}</p>
+                </div>
+              )}
+            </div>
+            <div className="md:flex-1 flex flex-col items-center w-full gap-4">
+              <div className="w-full max-w-[280px] md:max-w-[320px] relative group mx-auto">
+                <div className={`w-full aspect-square flex flex-col items-center justify-center text-slate-300 bg-slate-50 rounded-2xl border border-slate-200 shadow-inner
+                  ${cameraStatus === 'active' ? 'opacity-0' : 'opacity-100'} transition-opacity`}>
+                  {cameraStatus === 'requesting' ? (
+                    <Loader2 size={48} className="opacity-60 animate-spin mb-3 text-[#941C2F]" />
+                  ) : cameraStatus === 'scanning' ? (
+                    <Loader2 size={48} className="opacity-60 animate-spin mb-3 text-[#941C2F]" />
+                  ) : cameraStatus === 'denied' ? (
+                    <AlertCircle size={48} className="opacity-60 mb-3 text-amber-400" />
+                  ) : (
+                    <Scan size={48} className="opacity-50 animate-pulse mb-3" />
+                  )}
+                  <p className="text-xs font-semibold text-center px-4">
+                    {cameraStatus === 'requesting' ? 'Meminta izin kamera...' :
+                      cameraStatus === 'scanning' ? 'Menganalisis gambar...' :
+                        cameraStatus === 'denied' ? 'Izin kamera ditolak' :
+                          'Area Pindai QR'}
+                  </p>
+                </div>
+                <video
+                  ref={videoRef}
+                  playsInline
+                  muted
+                  className={`absolute top-0 left-0 w-full aspect-square object-cover rounded-2xl
+                    ${cameraStatus === 'active' ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
+                />
+                <canvas ref={canvasRef} className="hidden" />
+                <div className="absolute top-0 left-0 w-full aspect-square pointer-events-none z-20">
+                  <div className="absolute -top-3 -left-3 w-12 h-12 border-t-4 border-l-4 border-[#941C2F] rounded-tl-2xl transition-all duration-300 group-hover:-translate-x-1 group-hover:-translate-y-1" />
+                  <div className="absolute -top-3 -right-3 w-12 h-12 border-t-4 border-r-4 border-[#941C2F] rounded-tr-2xl transition-all duration-300 group-hover:translate-x-1 group-hover:-translate-y-1" />
+                  <div className="absolute -bottom-3 -left-3 w-12 h-12 border-b-4 border-l-4 border-[#941C2F] rounded-bl-2xl transition-all duration-300 group-hover:-translate-x-1 group-hover:translate-y-1" />
+                  <div className="absolute -bottom-3 -right-3 w-12 h-12 border-b-4 border-r-4 border-[#941C2F] rounded-br-2xl transition-all duration-300 group-hover:translate-x-1 group-hover:translate-y-1" />
+                </div>
+                {cameraStatus === 'active' && (
+                  <div className="absolute top-0 left-0 w-full aspect-square rounded-2xl overflow-hidden pointer-events-none z-10">
+                    <div className="absolute left-0 w-full h-0.5 bg-[#941C2F]/60 shadow-[0_0_8px_#941C2F]"
+                      style={{ animation: 'scanLine 2s linear infinite' }} />
+                  </div>
+                )}
+              </div>
+              <div className="w-full max-w-[280px] md:max-w-[320px] flex md:hidden flex-col gap-3 mt-2">
+                {cameraStatus === 'idle' || cameraStatus === 'denied' ? (
+                  <button
+                    onClick={() => startCamera()}
+                    className="w-full flex items-center justify-center gap-2.5 bg-[#941C2F] text-white font-bold py-3.5 rounded-xl text-sm shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727]"
+                  >
+                    <Camera size={18} />
+                    Aktifkan Kamera
+                  </button>
+                ) : cameraStatus === 'requesting' || cameraStatus === 'scanning' ? (
+                  <button disabled
+                    className="w-full flex items-center justify-center gap-2.5 bg-[#941C2F]/60 text-white font-bold py-3.5 rounded-xl text-sm cursor-not-allowed">
+                    <Loader2 size={18} className="animate-spin" />
+                    Memproses...
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { stopCamera(); setCameraStatus('idle'); }}
+                    className="w-full flex items-center justify-center gap-2.5 bg-slate-100 text-slate-700 font-bold py-3.5 rounded-xl text-sm active:scale-[0.98] transition-all hover:bg-slate-200"
+                  >
+                    <RefreshCw size={18} />
+                    Hentikan Kamera
+                  </button>
+                )}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={cameraStatus === 'requesting' || cameraStatus === 'scanning'}
+                  className="w-full flex items-center justify-center gap-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-all hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
+                >
+                  <ImageIcon size={17} />
+                  Pindai dari File Gambar
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleScanFile}
+                />
+                {cameras.length > 1 && cameraStatus === 'active' && (
+                  <select
+                    value={activeCameraId}
+                    onChange={e => switchCamera(e.target.value)}
+                    className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none focus:border-[#941C2F] transition-colors"
+                  >
+                    {cameras.map(cam => (
+                      <option key={cam.deviceId} value={cam.deviceId}>
+                        {cam.label || `Kamera ${cameras.indexOf(cam) + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {scanMessage && (
+                  <div className="flex items-center gap-3 text-amber-600 bg-amber-50 px-4 py-3.5 rounded-2xl border border-amber-100 w-full shadow-sm animate-in fade-in duration-300">
+                    <AlertCircle size={18} className="shrink-0" />
+                    <p className="text-[11px] md:text-xs font-medium leading-relaxed">{scanMessage}</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </>
       )}
-
       {step === 2 && (
         <>
           <div className="mb-6 md:mb-8 flex items-center justify-between">
@@ -196,49 +535,54 @@ export default function CheckInPage() {
           <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-10 lg:p-12">
             <div className="flex justify-between items-center mb-4 md:mb-6 px-1">
               <h4 className="text-[11px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Sesi Tersedia Hari Ini</h4>
-              <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] md:text-xs font-bold px-2.5 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg">{mockSessions.length} Sesi</span>
+              <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] md:text-xs font-bold px-2.5 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg">{sessions.length} Sesi</span>
             </div>
 
             <div className="space-y-3 mb-8 md:mb-10">
-              {mockSessions.map(s => {
-                const isSel = selectedSessionId === s.id;
-                const isAktif = s.status === 'Aktif';
-                const isMendatang = s.status === 'Mendatang';
-                return (
-                  <div key={s.id} onClick={() => !isMendatang && setSelectedSessionId(s.id)}
-                    className={`bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border-2 transition-all gap-3 md:gap-0
-                      ${isMendatang ? 'cursor-not-allowed opacity-50' : 'cursor-pointer active:scale-[0.99]'}
-                      ${isSel ? 'border-[#941C2F] shadow-md shadow-[#941C2F]/10' : 'border-transparent md:border-slate-100 md:hover:border-slate-200 md:hover:shadow-md'}`}>
-                    <div className="flex items-center gap-3 md:gap-4 min-w-0 md:w-2/5">
-                      <div className={`w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center transition-colors ${isSel ? 'bg-[#941C2F]/10' : 'bg-rose-50'} text-[#941C2F]`}>
-                        <BookOpen size={20} strokeWidth={2} />
+              {sessions.length === 0 ? (
+                <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center">
+                  <p className="text-slate-500 font-medium">Tidak ada sesi mengajar untuk hari ini.</p>
+                </div>
+              ) : (
+                sessions.map(s => {
+                  const isSel = selectedSessionId === s.id_sesi;
+                  const isAktif = true;
+                  return (
+                    <div key={s.id_sesi} onClick={() => setSelectedSessionId(s.id_sesi)}
+                      className={`bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border-2 transition-all gap-3 md:gap-0
+                        cursor-pointer active:scale-[0.99]
+                        ${isSel ? 'border-[#941C2F] shadow-md shadow-[#941C2F]/10' : 'border-transparent md:border-slate-100 md:hover:border-slate-200 md:hover:shadow-md'}`}>
+                      <div className="flex items-center gap-3 md:gap-4 min-w-0 md:w-2/5">
+                        <div className={`w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center transition-colors ${isSel ? 'bg-[#941C2F]/10' : 'bg-rose-50'} text-[#941C2F]`}>
+                          <BookOpen size={20} strokeWidth={2} />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{s.mata_kuliah}</h3>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`text-[10px] md:text-xs font-bold tracking-wider ${isAktif ? 'text-[#941C2F]' : 'text-slate-400'}`}>{s.nama_kelas}</span>
+                            <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                            <div className={`w-1.5 h-1.5 rounded-full ${isAktif ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                            <span className={`text-[10px] md:text-xs font-semibold ${isAktif ? 'text-emerald-600' : 'text-slate-400'}`}>{s.tipe_jadwal}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{s.subject}</h3>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={`text-[10px] md:text-xs font-bold tracking-wider ${isAktif ? 'text-[#941C2F]' : 'text-slate-400'}`}>{s.sessionName}</span>
-                          <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                          <div className={`w-1.5 h-1.5 rounded-full ${isAktif ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                          <span className={`text-[10px] md:text-xs font-semibold ${isAktif ? 'text-emerald-600' : 'text-slate-400'}`}>{s.status}</span>
+                      <div className="flex items-center gap-2 md:gap-3 pt-3 border-t border-slate-100 md:border-none md:pt-0">
+                        <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center md:justify-start gap-2">
+                          <Clock size={13} className="text-slate-400 shrink-0" />
+                          <span className="text-xs md:text-[13px] font-semibold text-slate-700">{s.waktu}</span>
+                        </div>
+                        <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center md:justify-start gap-2">
+                          <MapPin size={13} className="text-slate-400 shrink-0" />
+                          <span className="text-xs md:text-[13px] font-semibold text-slate-700">{s.ruangan}</span>
+                        </div>
+                        <div className={`shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center transition-all ${isSel ? 'bg-[#941C2F] shadow-md' : 'bg-slate-100'}`}>
+                          <Check size={13} strokeWidth={3} className={isSel ? 'text-white' : 'text-slate-300'} />
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 md:gap-3 pt-3 border-t border-slate-100 md:border-none md:pt-0">
-                      <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center md:justify-start gap-2">
-                        <Clock size={13} className="text-slate-400 shrink-0" />
-                        <span className="text-xs md:text-[13px] font-semibold text-slate-700">{s.time}</span>
-                      </div>
-                      <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center md:justify-start gap-2">
-                        <MapPin size={13} className="text-slate-400 shrink-0" />
-                        <span className="text-xs md:text-[13px] font-semibold text-slate-700">{s.room}</span>
-                      </div>
-                      <div className={`shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center transition-all ${isSel ? 'bg-[#941C2F] shadow-md' : 'bg-slate-100'}`}>
-                        <Check size={13} strokeWidth={3} className={isSel ? 'text-white' : 'text-slate-300'} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             <div className={`hidden md:flex md:justify-end transition-all duration-300 ${selectedSessionId ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
@@ -258,7 +602,6 @@ export default function CheckInPage() {
           </div>
         </>
       )}
-
       {step === 3 && (
         <>
           <div className="mb-6 md:mb-8 text-center md:text-left">
@@ -282,8 +625,8 @@ export default function CheckInPage() {
                 <div className="p-6 md:p-7 text-center">
                   <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-1">Detail Sesi Aktif</p>
                   <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-6 leading-snug">
-                    {selectedSession?.subject}
-                    <span className="block text-sm font-medium text-slate-400 mt-0.5">{selectedSession?.room} · {selectedSession?.sessionName}</span>
+                    {selectedSession?.mata_kuliah}
+                    <span className="block text-sm font-medium text-slate-400 mt-0.5">{selectedSession?.ruangan} · {selectedSession?.nama_kelas}</span>
                   </h3>
                   <div className="border-t border-slate-100 pt-5 pb-5">
                     <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-1">Check-in Pada</p>
@@ -301,6 +644,13 @@ export default function CheckInPage() {
           </div>
         </>
       )}
+      <style>{`
+        @keyframes scanLine {
+          0%   { top: 8%; }
+          50%  { top: 88%; }
+          100% { top: 8%; }
+        }
+      `}</style>
     </div>
   );
 }

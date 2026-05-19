@@ -58,7 +58,7 @@ export async function deleteMK(id: string) {
 export async function getRuanganList(page = 1, search = '') {
   return apiClient.get<PaginatedResponse<RuanganItem>>(
     `/rooms?page=${page}&limit=10&search=${encodeURIComponent(search)}`,
-    { cache: 'no-store' },
+    { auth: true, cache: 'no-store' },
   );
 }
 
@@ -82,7 +82,7 @@ export async function deleteRuangan(id: string) {
 export async function getSemesterList(page = 1, search = '', limit = 10) {
   return apiClient.get<PaginatedResponse<SemesterItem>>(
     `/semesters?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
-    { cache: 'no-store' },
+    { auth: true, cache: 'no-store' },
   );
 }
 

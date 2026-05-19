@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import "./globals.css"
+import { Toaster } from 'sonner'
 
 // 1. Konfigurasi Viewport untuk iOS
 export const viewport: Viewport = {
@@ -32,7 +33,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <Toaster richColors position="top-center" />
+      </body>
     </html>
   )
 }

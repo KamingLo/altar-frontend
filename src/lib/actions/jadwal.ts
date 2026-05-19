@@ -51,7 +51,7 @@ export type SessionBody = {
 
 // Koordinator: buat sesi jadwal baru
 export async function createSession(data: SessionBody) {
-  const res = await apiClient.post('/sessions', data, { auth: true });
+  const res = await apiClient.post('/sessions/', data, { auth: true });
   return { success: res.success, message: res.message };
 }
 
