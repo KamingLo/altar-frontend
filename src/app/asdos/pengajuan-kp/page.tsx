@@ -235,7 +235,6 @@ export default function PengajuanKpPage() {
         eyebrow="Kelas Pengganti"
         title="Riwayat Kelas Pengganti"
         description="Daftar pengajuan Kelas Pengganti Anda."
-        className="px-4 md:px-0"
         action={
           <AsdosPrimaryButton onClick={handleOpenSheet} icon={<CalendarPlus size={18} />} className="hidden md:flex py-3 px-6 text-[15px] mt-4 md:mt-0">
             Ajukan Kelas Pengganti
@@ -262,67 +261,131 @@ export default function PengajuanKpPage() {
           const session = item.session;
           return (
             <div key={item.id}
-              className="bg-white rounded-2xl p-4 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
-                    <CalendarPlus size={20} strokeWidth={2} />
+              className="bg-white rounded-2xl md:rounded-[1.25rem] p-4 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all group">
+              
+              {/* Mobile View */}
+              <div className="flex flex-col gap-3 md:hidden">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-white bg-gradient-to-br from-[#941C2F] to-[#b3273e]">
+                      <CalendarPlus size={22} strokeWidth={1.5} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-[15px] text-[#1F2937] leading-tight truncate">{session?.mata_kuliah ?? 'Mata kuliah tidak tersedia'}</h3>
+                      <p className="text-xs font-semibold text-slate-500 mt-1 truncate">{session?.nama_kelas ?? 'Kelas tidak tersedia'}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-[15px] text-[#1F2937] truncate">{session?.mata_kuliah ?? 'Mata kuliah tidak tersedia'}</h3>
-                    <p className="text-xs font-semibold text-[#8BA3CB] truncate">{session?.nama_kelas ?? 'Kelas tidak tersedia'}</p>
+                  <div className={`shrink-0 ml-3 px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wider uppercase border ${cfg.bg} ${cfg.text} ${cfg.border} flex items-center gap-1.5`}>
+                    <Icon size={12} strokeWidth={2.5} />
+                    {cfg.label}
                   </div>
                 </div>
-                <div className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
-                  <Icon size={13} strokeWidth={2.5} />
-                  <span className="text-[10px] font-bold tracking-wider uppercase">{cfg.label}</span>
-                </div>
-              </div>
 
-              <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-2">
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg">
-                  <Calendar size={12} className="text-slate-400" />
-                  <span className="text-xs font-semibold text-slate-600">
-                    {formatDate(item.original_date)} → {formatDate(item.substitute_date)}
-                  </span>
+                <div className="flex flex-col gap-1.5 mt-1 pt-3 border-t border-slate-100">
+                  <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <Calendar size={13} className="text-slate-400 shrink-0" />
+                    <span className="text-xs font-semibold text-slate-700">
+                      {formatDate(item.original_date)} → {formatDate(item.substitute_date)}
+                    </span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <Clock size={13} className="text-slate-400 shrink-0" />
+                    <span className="text-xs font-semibold text-slate-700">{item.time_slot}</span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <MapPin size={13} className="text-slate-400 shrink-0" />
+                    <span className="text-xs font-semibold text-slate-700 truncate">{item.room}</span>
+                  </div>
+                  <div className="bg-slate-50/50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <p className="text-xs text-slate-500 italic line-clamp-1 flex-1">&quot;{item.reason}&quot;</p>
+                    {isPending && (
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        disabled={deletingId === item.id}
+                        className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-rose-50 text-rose-400 border border-rose-100 transition-colors">
+                        {deletingId === item.id
+                          ? <div className="w-3.5 h-3.5 border-2 border-rose-400/30 border-t-rose-500 rounded-full animate-spin" />
+                          : <Trash2 size={13} />
+                        }
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg">
-                  <Clock size={12} className="text-slate-400" />
-                  <span className="text-xs font-semibold text-slate-600">{item.time_slot}</span>
-                </div>
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg">
-                  <MapPin size={12} className="text-slate-400" />
-                  <span className="text-xs font-semibold text-slate-600">{item.room}</span>
-                </div>
-              </div>
-
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg">
-                  <p className="text-xs text-slate-500 italic line-clamp-1">&quot;{item.reason}&quot;</p>
-                </div>
-
-                {isPending && (
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    disabled={deletingId === item.id}
-                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-rose-50 text-rose-400 hover:bg-rose-100 hover:text-rose-600 border border-rose-100 transition-colors disabled:opacity-50">
-                    {deletingId === item.id
-                      ? <div className="w-3.5 h-3.5 border-2 border-rose-400/30 border-t-rose-500 rounded-full animate-spin" />
-                      : <Trash2 size={14} />
-                    }
-                  </button>
+                
+                {item.status === 'REJECTED' && item.coordinator_reason && (
+                  <div className="bg-rose-50 border border-rose-100 px-3 py-2 rounded-lg">
+                    <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-0.5">Alasan Ditolak</p>
+                    <p className="text-xs text-rose-600 leading-tight">{item.coordinator_reason}</p>
+                  </div>
                 )}
               </div>
 
-              {item.status === 'REJECTED' && item.coordinator_reason && (
-                <div className="mt-2 bg-rose-50 border border-rose-100 px-3 py-2 rounded-lg">
-                  <p className="text-[11px] font-bold text-rose-500 uppercase tracking-wider mb-0.5">Alasan Ditolak</p>
-                  <p className="text-xs text-rose-600">{item.coordinator_reason}</p>
+              {/* Desktop View */}
+              <div className="hidden md:block">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center bg-rose-50 text-[#941C2F] shadow-sm">
+                      <CalendarPlus size={22} strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-base text-[#1F2937] truncate">{session?.mata_kuliah ?? 'Mata kuliah tidak tersedia'}</h3>
+                      <p className="text-[13px] font-semibold text-[#8BA3CB] truncate">{session?.nama_kelas ?? 'Kelas tidak tersedia'}</p>
+                    </div>
+                  </div>
+                  <div className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-bold tracking-widest uppercase ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+                    <Icon size={14} strokeWidth={2.5} />
+                    <span>{cfg.label}</span>
+                  </div>
                 </div>
-              )}
+
+                <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg transition-colors">
+                      <Calendar size={13} className="text-slate-400" />
+                      <span className="text-xs font-semibold text-slate-700">
+                        {formatDate(item.original_date)} → {formatDate(item.substitute_date)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg transition-colors">
+                      <Clock size={13} className="text-slate-400" />
+                      <span className="text-xs font-semibold text-slate-700">{item.time_slot}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg transition-colors">
+                      <MapPin size={13} className="text-slate-400" />
+                      <span className="text-xs font-semibold text-slate-700">{item.room}</span>
+                    </div>
+                  </div>
+
+                  {isPending && (
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      disabled={deletingId === item.id}
+                      className="shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-rose-50 text-rose-400 hover:bg-rose-100 hover:text-rose-600 border border-rose-100 transition-colors disabled:opacity-50">
+                      {deletingId === item.id
+                        ? <div className="w-4 h-4 border-2 border-rose-400/30 border-t-rose-500 rounded-full animate-spin" />
+                        : <Trash2 size={16} />
+                      }
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-3 flex items-start gap-2">
+                  <div className="flex-1 bg-slate-50/50 border border-slate-100 px-3.5 py-2 rounded-xl">
+                    <p className="text-xs text-slate-500 italic line-clamp-1">&quot;{item.reason}&quot;</p>
+                  </div>
+                </div>
+
+                {item.status === 'REJECTED' && item.coordinator_reason && (
+                  <div className="mt-3 bg-rose-50 border border-rose-100 px-4 py-3 rounded-xl">
+                    <p className="text-[11px] font-bold text-rose-500 uppercase tracking-wider mb-1">Alasan Ditolak</p>
+                    <p className="text-xs text-rose-600 leading-relaxed">{item.coordinator_reason}</p>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
+
 
         {!historyLoading && !historyError && history.length > 0 && (
           <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 mt-2 text-center md:text-left">
