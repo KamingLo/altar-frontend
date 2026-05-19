@@ -19,8 +19,8 @@ function deriveStatus(waktu: string): 'Berjalan' | 'Selesai' {
 }
 
 export default function JadwalAjarPage() {
-  const [viewMode, setViewMode]           = useState<'PERSONAL' | 'ALL'>('PERSONAL');
-  const [semesterList, setSemesterList]   = useState<SemesterItem[]>([]);
+  const [viewMode, setViewMode] = useState<'PERSONAL' | 'ALL'>('PERSONAL');
+  const [semesterList, setSemesterList] = useState<SemesterItem[]>([]);
   const [selectedSemesterId, setSelectedSemesterId] = useState<string>('');
   
   const {
@@ -29,8 +29,9 @@ export default function JadwalAjarPage() {
     addPersonalSessions, addAllSessions, markMonthFetched,
     setCalendar, setSelectedDate, setIsLoading, setError
   } = useJadwalStore();
-  const [searchTerm, setSearchTerm]       = useState('');
-  const [filterStatus, setFilterStatus]   = useState<'ALL' | 'Berjalan' | 'Selesai'>('ALL');
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'Berjalan' | 'Selesai'>('ALL');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   useEffect(() => {
@@ -172,17 +173,19 @@ export default function JadwalAjarPage() {
   const sessionsForDate = currentSessions.filter(s => s.waktu.startsWith(selectedIso));
   const filtered = sessionsForDate.filter(s =>
     (s.mata_kuliah.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     s.ruangan.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      s.ruangan.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.nama_kelas && s.nama_kelas.toLowerCase().includes(searchTerm.toLowerCase()))) &&
     (filterStatus === 'ALL' || deriveStatus(s.waktu) === filterStatus)
   );
 
   const selectedDayLabel = calendarDays[parseInt(selectedDate, 10) - 1]?.dayMobile ?? '';
+  const isSemesterLoading = semesterList.length === 0;
 
   return (
     <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 pb-8 pt-2 min-h-screen font-sans">
       <div>
 
-        {/* Header */}
+
         <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-start md:justify-between gap-4 md:gap-6">
           <div>
             <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">Jadwal Mengajar</p>
@@ -191,9 +194,9 @@ export default function JadwalAjarPage() {
               {viewMode === 'PERSONAL' ? 'Daftar jadwal mengajar Anda.' : 'Daftar semua jadwal mengajar.'}
             </p>
           </div>
-
+          
           <div className="flex flex-col gap-3 w-full md:w-auto">
-            {/* View Mode Tabs */}
+
             <div className="flex bg-slate-100/50 p-1 rounded-2xl self-start">
               <button 
                 onClick={() => setViewMode('PERSONAL')}
@@ -230,14 +233,14 @@ export default function JadwalAjarPage() {
                   </div>
                 </div>
               )}
-              
+
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
                   <Search className="w-[18px] h-[18px] md:w-5 md:h-5" />
                 </div>
                 <input
                   type="text"
-                  placeholder="Cari mata kuliah atau ruangan..."
+                  placeholder="Cari materi atau kelas..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                   className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
@@ -268,8 +271,7 @@ export default function JadwalAjarPage() {
           </div>
         </div>
 
-        {/* Kalender Horizontal - Mobile Only */}
-        <div className="md:hidden mb-6">
+        <div className="md:hidden mb-6 px-4">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-base font-bold text-slate-800">{monthLabel}</h3>
             <div className="flex items-center gap-2">
@@ -301,11 +303,9 @@ export default function JadwalAjarPage() {
           </div>
         </div>
 
-        {/* Body: Kalender Desktop + List */}
-        <div className="flex flex-col md:flex-row gap-6 lg:gap-8 items-start">
+        <div className="flex flex-col md:flex-row gap-6 lg:gap-8 items-start px-4 md:px-0">
 
-          {/* Kalender Grid - Desktop Only */}
-          <div className="hidden md:block w-[300px] lg:w-[320px] bg-white rounded-[2rem] p-6 md:p-7 shadow-sm border border-slate-100 shrink-0">
+          <div className="hidden md:block w-[300px] lg:w-[320px] bg-white rounded-[2rem] p-6 md:p-7 shadow-sm border border-slate-100 shrink-0 sticky top-8">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-slate-800">{monthLabel}</h2>
               <div className="flex items-center gap-2">
@@ -338,126 +338,149 @@ export default function JadwalAjarPage() {
             </div>
           </div>
 
-          {/* List Jadwal */}
-          <div className="flex-1 w-full space-y-3">
+          <div className="flex-1 w-full space-y-3 md:space-y-4">
             <div className="hidden md:block mb-1">
-              <h3 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">Jadwal Terdaftar</h3>
+              <h3 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">Jadwal Asistensi Anda</h3>
             </div>
 
-            {isLoading && (
-              <div className="flex justify-center py-10">
-                <div className="w-6 h-6 border-2 border-[#941C2F] border-t-transparent rounded-full animate-spin" />
+            {isSemesterLoading && (
+              <div className="flex flex-col items-center justify-center py-12 md:py-20 bg-white rounded-2xl md:rounded-3xl border border-dashed border-slate-200">
+                <div className="w-8 h-8 border-4 border-[#941C2F]/20 border-t-[#941C2F] rounded-full animate-spin mb-4" />
+                <p className="text-sm font-medium text-slate-500">Memuat data semester...</p>
               </div>
             )}
 
-            {error && !isLoading && (
-              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-sm text-red-600 font-semibold">
-                {error}
+            {!isSemesterLoading && isLoading && (
+              <div className="flex flex-col items-center justify-center py-12 md:py-20 bg-white rounded-2xl md:rounded-3xl border border-dashed border-slate-200">
+                <div className="w-8 h-8 border-4 border-[#941C2F]/20 border-t-[#941C2F] rounded-full animate-spin mb-4" />
+                <p className="text-sm font-medium text-slate-500">Memuat jadwal bulanan...</p>
               </div>
             )}
 
-            {!isLoading && !error && filtered.length > 0 && filtered.map(s => {
+            {error && !isLoading && !isSemesterLoading && (
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-sm text-red-600 font-semibold text-center">
+                Terjadi kesalahan: {error}
+              </div>
+            )}
+
+            {!isLoading && !isSemesterLoading && !error && filtered.length > 0 && filtered.map(s => {
               const status = deriveStatus(s.waktu);
               const timePart = s.waktu.split(', ')[1] ?? s.waktu;
+
               return (
-                <div key={s.id_sesi} className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all">
+                <div key={s.id_sesi} className="bg-white rounded-2xl md:rounded-[1.25rem] p-4 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all group">
 
-                  {/* Mobile */}
-                  <div className="flex items-center gap-3 md:hidden">
-                    <div className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
-                      <BookOpen size={20} strokeWidth={2} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <h3 className="font-bold text-[15px] text-[#1F2937] truncate">{s.mata_kuliah}</h3>
-                        {s.tipe_jadwal === 'PENGGANTI' && (
-                          <span className="shrink-0 text-[9px] font-bold bg-amber-50 text-amber-500 border border-amber-100 px-1.5 py-0.5 rounded-md tracking-wider">
-                            PENGGANTI
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <User size={10} className="text-slate-400" />
-                        <p className="text-[10px] font-bold text-slate-400 truncate">{s.pengajar}</p>
-                      </div>
-                    </div>
-                    <div className={`shrink-0 self-start mt-0.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold tracking-wider
-                      ${status === 'Berjalan' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}>
-                      {status}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 md:hidden">
-                    <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                      <Clock size={13} className="text-slate-400 shrink-0" />
-                      <span className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">{timePart}</span>
-                    </div>
-                    <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                      <MapPin size={13} className="text-slate-400 shrink-0" />
-                      <span className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">{s.ruangan}</span>
-                    </div>
-                  </div>
 
-                  {/* Desktop */}
-                  <div className="hidden md:flex md:items-center md:justify-between">
-                    <div className="flex items-center gap-4 min-w-0 w-2/5">
-                      <div className="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
-                        <BookOpen size={20} strokeWidth={2} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <h3 className="font-bold text-base text-[#1F2937] truncate">{s.mata_kuliah}</h3>
-                          {s.tipe_jadwal === 'PENGGANTI' && (
-                            <span className="shrink-0 text-[9px] font-bold bg-amber-50 text-amber-500 border border-amber-100 px-1.5 py-0.5 rounded-md tracking-wider">
-                              PENGGANTI
-                            </span>
-                          )}
+                  <div className="flex flex-col gap-3 md:hidden">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-white
+                           ${s.tipe_jadwal === 'PENGGANTI' ? 'bg-gradient-to-br from-amber-400 to-amber-600' : 'bg-gradient-to-br from-[#941C2F] to-[#b3273e]'}`}>
+                          <BookOpen size={22} strokeWidth={1.5} />
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <User size={12} className="text-slate-400" />
-                          <p className="text-xs font-bold text-slate-400 truncate">{s.pengajar}</p>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <h3 className="font-bold text-[15px] text-[#1F2937] leading-tight truncate">{s.mata_kuliah}</h3>
+                            {s.tipe_jadwal === 'PENGGANTI' && (
+                              <span className="shrink-0 text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded-md tracking-wider">
+                                PENGGANTI
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-slate-500 mb-1">
+                            {s.nama_kelas && (
+                              <span className="text-xs font-semibold shrink-0">{s.nama_kelas} -</span>
+                            )}
+                            <User size={12} className="shrink-0" />
+                            <p className="text-xs font-semibold truncate">{s.pengajar}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center gap-2">
-                        <Clock size={13} className="text-slate-400 shrink-0" />
-                        <span className="text-[13px] font-semibold text-slate-700 whitespace-nowrap">{timePart}</span>
-                      </div>
-                      <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center gap-2">
-                        <MapPin size={13} className="text-slate-400 shrink-0" />
-                        <span className="text-[13px] font-semibold text-slate-700 whitespace-nowrap">{s.ruangan}</span>
-                      </div>
-                      <div className={`shrink-0 px-3 py-2 rounded-lg text-xs font-bold tracking-wider
+                      <div className={`shrink-0 ml-3 px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wider
                         ${status === 'Berjalan' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}>
                         {status}
                       </div>
                     </div>
+
+                    <div className="flex flex-col gap-1.5 mt-1 pt-3 border-t border-slate-100">
+                      <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                        <Clock size={13} className="text-slate-400 shrink-0" />
+                        <span className="text-xs font-semibold text-slate-700">{timePart}</span>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                        <MapPin size={13} className="text-slate-400 shrink-0" />
+                        <span className="text-xs font-semibold text-slate-700 truncate">{s.ruangan}</span>
+                      </div>
+                    </div>
                   </div>
 
+
+                  <div className="hidden md:flex md:items-start md:justify-between">
+                    <div className="flex items-start gap-4 min-w-0 flex-1">
+                      <div className={`w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center text-white shadow-inner mt-0.5
+                         ${s.tipe_jadwal === 'PENGGANTI' ? 'bg-gradient-to-br from-amber-400 to-amber-600' : 'bg-gradient-to-br from-[#941C2F] to-[#b3273e]'}`}>
+                        <BookOpen size={24} strokeWidth={1.5} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-bold text-base text-[#1F2937] truncate">{s.mata_kuliah}</h3>
+                          {s.tipe_jadwal === 'PENGGANTI' && (
+                            <span className="shrink-0 text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100 px-2 py-0.5 rounded-md tracking-wider">
+                              PENGGANTI
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1 text-slate-500 mb-2.5">
+                          {s.nama_kelas && (
+                            <span className="text-[13px] font-semibold shrink-0">{s.nama_kelas} -</span>
+                          )}
+                          <User size={13} className="shrink-0" />
+                          <p className="text-[13px] font-semibold truncate">{s.pengajar}</p>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors">
+                            <Clock size={13} className="text-slate-400 shrink-0" />
+                            <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{timePart}</span>
+                          </div>
+                          <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors max-w-[200px]">
+                            <MapPin size={13} className="text-slate-400 shrink-0" />
+                            <span className="text-xs font-semibold text-slate-700 whitespace-nowrap truncate">{s.ruangan}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start shrink-0 ml-4">
+                      <div className={`px-3 py-2 rounded-xl text-[11px] uppercase font-bold tracking-widest
+                        ${status === 'Berjalan' ? 'bg-blue-50 text-blue-500 border border-blue-100' : 'bg-emerald-50 text-emerald-500 border border-emerald-100'}`}>
+                        {status}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
             })}
 
-            {!isLoading && !error && filtered.length === 0 && (
-              <div className="bg-white rounded-2xl p-6 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
-                <div className="mx-auto mb-3 w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                  <BookOpen size={22} />
+            {!isLoading && !isSemesterLoading && !error && filtered.length === 0 && (
+              <div className="bg-white rounded-[2rem] p-8 md:p-14 border border-dashed border-slate-200 text-center shadow-sm">
+                <div className="mx-auto mb-4 w-12 h-12 md:w-16 md:h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                  <BookOpen size={28} />
                 </div>
-                <p className="text-sm md:text-base font-semibold text-slate-700">Hari ini tidak ada sesi jadwal.</p>
+                <p className="text-sm md:text-base font-semibold text-slate-700">Tidak ada jadwal.</p>
                 <p className="text-xs md:text-sm text-slate-500 mt-1">
                   {viewMode === 'PERSONAL' 
-                    ? 'Saat ini Anda tidak memiliki sesi kelas yang dijadwalkan.' 
-                    : 'Tidak ada sesi kelas yang dijadwalkan untuk seluruh asisten.'}
+                    ? 'Saat ini Anda tidak memiliki sesi kelas yang dijadwalkan pada tanggal ini.' 
+                    : 'Tidak ada sesi kelas yang dijadwalkan untuk seluruh asisten pada tanggal ini.'}
                 </p>
               </div>
             )}
 
-            <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 md:mt-2">
-              Menampilkan {filtered.length} jadwal pada {selectedDate} {monthLabel}.
+            <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 mt-4 md:mt-6 text-center md:text-left">
+              Menampilkan {filtered.length} jadwal pada {selectedDayLabel}, {selectedDate} {monthLabel}.
             </p>
           </div>
         </div>
-
       </div>
     </div>
   );
