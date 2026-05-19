@@ -1,6 +1,8 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, Filter, Clock, MapPin, BookOpen, X } from 'lucide-react';
+import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
+import { AsdosLoadingState, AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 
 type HistoryItem = {
   id: string; subject: string; date: string;
@@ -8,21 +10,51 @@ type HistoryItem = {
   status: 'BERJALAN' | 'SELESAI'; materi: string;
 };
 
-const mockHistory: HistoryItem[] = [
-  { id: '1', subject: 'Jaringan Komputer', date: 'SENIN, 13 MEI 2024', checkIn: '13:20', checkOut: '--:--', room: 'R. M301', status: 'BERJALAN', materi: 'Sesi sedang berlangsung. Materi belum diisi.' },
-  { id: '2', subject: 'Jaringan Komputer', date: 'KAMIS, 09 MEI 2024', checkIn: '13:15', checkOut: '16:05', room: 'R. M301', status: 'SELESAI', materi: 'Subnetting & Routing Basic: Implementasi pada Packet Tracer.' },
-  { id: '3', subject: 'Jaringan Komputer', date: 'SENIN, 06 MEI 2024', checkIn: '13:30', checkOut: '16:10', room: 'R. M301', status: 'SELESAI', materi: 'Pengenalan Topologi Jaringan dan Konfigurasi Dasar Switch.' },
-  { id: '4', subject: 'Basis Data', date: 'KAMIS, 02 MEI 2024', checkIn: '13:10', checkOut: '15:55', room: 'R. Lab Komp A', status: 'SELESAI', materi: 'Normalisasi Database (1NF, 2NF, 3NF) dan Studi Kasus.' },
-];
-
 const statusCfg = {
   BERJALAN: { bg: 'bg-blue-50',    text: 'text-blue-500',    label: 'Berjalan' },
   SELESAI:  { bg: 'bg-emerald-50', text: 'text-emerald-500', label: 'Selesai'  },
 };
 
+function isActivePresensi(item: PresensiResponseDTO) {
+  const checkout = item.waktu_checkout;
+  return !checkout || checkout === '' || checkout === 'null' || String(checkout).startsWith('0001');
+}
+
+function formatDate(value: string) {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).toUpperCase();
+}
+
+function formatTime(value?: string) {
+  if (!value || value === 'null' || String(value).startsWith('0001')) return '--:--';
+  return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
+
+function mapPresensiToHistory(item: PresensiResponseDTO): HistoryItem {
+  const active = isActivePresensi(item);
+  return {
+    id: item.id_presensi,
+    subject: item.nama_mata_kuliah,
+    date: formatDate(item.tanggal_mengajar || item.waktu_checkin),
+    checkIn: formatTime(item.waktu_checkin),
+    checkOut: active ? '--:--' : formatTime(item.waktu_checkout),
+    room: item.nama_ruangan,
+    status: active ? 'BERJALAN' : 'SELESAI',
+    materi: item.deskripsi_materi || (active ? 'Sesi sedang berlangsung. Materi belum diisi.' : 'Materi tidak tersedia.'),
+  };
+}
+
 export default function RiwayatKehadiranPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'BERJALAN' | 'SELESAI'>('ALL');
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
@@ -30,7 +62,25 @@ export default function RiwayatKehadiranPage() {
   const [sheetStartY, setSheetStartY] = useState(0);
   const [sheetDragY, setSheetDragY] = useState(0);
 
-  const filtered = mockHistory.filter(item =>
+  useEffect(() => {
+    async function fetchHistory() {
+      setIsLoading(true);
+      setFetchError(null);
+      const res = await getMyPresensi();
+
+      if (res.success && res.data) {
+        setHistory(res.data.map(mapPresensiToHistory));
+      } else {
+        setFetchError(res.message || 'Gagal memuat riwayat kehadiran.');
+      }
+
+      setIsLoading(false);
+    }
+
+    fetchHistory();
+  }, []);
+
+  const filtered = history.filter(item =>
     (item.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.room.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (filterStatus === 'ALL' || item.status === filterStatus)
@@ -64,14 +114,13 @@ export default function RiwayatKehadiranPage() {
   };
 
   return (
-    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 pb-8 pt-2 min-h-screen font-sans">
+    <AsdosPageShell>
 
-      <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4 md:gap-6">
-        <div>
-          <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">Rekap Mengajar</p>
-          <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Riwayat Kehadiran</h2>
-          <p className="text-sm text-slate-500 mt-1 md:text-base">Log aktivitas mengajar Anda.</p>
-        </div>
+      <AsdosPageHeader
+        eyebrow="Rekap Mengajar"
+        title="Riwayat Kehadiran"
+        description="Log aktivitas mengajar Anda."
+        action={
         <div className="flex gap-3 relative z-20 w-full md:w-auto md:min-w-[380px]">
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
@@ -102,10 +151,15 @@ export default function RiwayatKehadiranPage() {
             )}
           </div>
         </div>
-      </div>
+        }
+      />
 
       <div className="space-y-3 pb-8">
-        {filtered.length > 0 ? filtered.map(item => {
+        {isLoading ? (
+          <AsdosLoadingState message="Memuat riwayat kehadiran..." />
+        ) : fetchError ? (
+          <AsdosState variant="error" message={fetchError} />
+        ) : filtered.length > 0 ? filtered.map(item => {
           const cfg = statusCfg[item.status];
           return (
             <div key={item.id} onClick={() => handleOpenSheet(item)}
@@ -165,13 +219,7 @@ export default function RiwayatKehadiranPage() {
             </div>
           );
         }) : (
-          <div className="bg-white rounded-2xl p-6 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
-            <div className="mx-auto mb-3 w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-              <BookOpen size={22} />
-            </div>
-            <p className="text-sm md:text-base font-semibold text-slate-700">Riwayat tidak ditemukan.</p>
-            <p className="text-xs md:text-sm text-slate-500 mt-1">Coba gunakan kata kunci atau filter lain.</p>
-          </div>
+          <AsdosState icon={<BookOpen size={22} />} title="Riwayat tidak ditemukan." message="Coba gunakan kata kunci atau filter lain." />
         )}
         <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 md:mt-2">
           Menampilkan {filtered.length} riwayat kehadiran.
@@ -265,6 +313,6 @@ export default function RiwayatKehadiranPage() {
           </div>
         </>
       )}
-    </div>
+    </AsdosPageShell>
   );
 }

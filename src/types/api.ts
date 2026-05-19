@@ -1,4 +1,3 @@
-// src/types/api.ts
 export interface APIResponse<T = unknown> {
   success: boolean;
   message: string;
@@ -9,6 +8,7 @@ export interface ActionResponse<T = unknown> {
   success: boolean;
   message: string;
   data?: T;
+  error?: unknown;
 }
 
 export type UserRole = 'asdos' | 'koordinator';
@@ -19,8 +19,6 @@ export interface UserData {
   id_asisten?: string | null;
   id_koordinator?: string | null;
 }
-
-// --- Pergantian Kelas ---
 
 export interface SubstituteSessionDetail {
   id: string;
@@ -35,7 +33,7 @@ export interface SubstituteSessionDetail {
   id_asdos1: string | null;
   id_asdos2: string | null;
   substitute_teacher: string;
-  session: {
+  session?: {
     id_sesi: string;
     nama_kelas: string;
     mata_kuliah: string;
@@ -47,8 +45,6 @@ export interface SubstituteSessionDetail {
   created_at: string;
   updated_at: string;
 }
-
-// --- Data Master ---
 
 export interface KelasItem {
   id: string;
@@ -83,8 +79,6 @@ export interface SemesterItem {
   created_at: string;
   updated_at: string;
 }
-
-// --- Manajemen Jadwal ---
 
 export interface SessionTimeline {
   id_sesi: string;

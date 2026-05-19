@@ -4,9 +4,7 @@ import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle, Loader
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 import { submitCheckIn } from '@/lib/actions/presensi';
 import { toast } from 'sonner';
-
-
-
+import { AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 
 export default function CheckInPage() {
   const [step, setStep] = useState(1);
@@ -20,12 +18,10 @@ export default function CheckInPage() {
   const [sheetStartY, setSheetStartY] = useState(0);
   const [sheetDragY, setSheetDragY] = useState(0);
   const [qrToken, setQrToken] = useState<string>('');
-
   const [cameraStatus, setCameraStatus] = useState<'idle' | 'requesting' | 'active' | 'denied' | 'scanning'>('idle');
   const [scanMessage, setScanMessage] = useState<string>('');
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string>('');
-
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -252,7 +248,7 @@ export default function CheckInPage() {
   }
 
   return (
-    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 pb-8 pt-2 min-h-screen font-sans">
+    <AsdosPageShell>
       {isSheetOpen && (
         <>
           <div
@@ -651,6 +647,6 @@ export default function CheckInPage() {
           100% { top: 8%; }
         }
       `}</style>
-    </div>
+    </AsdosPageShell>
   );
 }

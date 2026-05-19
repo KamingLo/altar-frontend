@@ -1,16 +1,28 @@
 'use client';
-import React, { useState } from 'react';
-import { Check, ArrowLeft, Clock, BookOpen, Send, Link2, X, AlertCircle } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Check, ArrowLeft, Clock, BookOpen, Send, Link2, X, AlertCircle, Loader2 } from 'lucide-react';
+import { getMyPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/actions/presensi';
+import { toast } from 'sonner';
+import { AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 
-const mockOnlineSessions = [
-  { id: 1, sessionName: 'SESI 1', subject: 'Basis Data', platform: 'Online', time: '07:30 - 10:00', status: 'Aktif' },
-  { id: 2, sessionName: 'SESI 2', subject: 'Algoritma Pemrograman', platform: 'Online', time: '10:30 - 13:00', status: 'Aktif' },
-  { id: 3, sessionName: 'SESI 3', subject: 'Sistem Operasi', platform: 'Online', time: '13:30 - 16:00', status: 'Mendatang' },
-];
+function isActivePresensi(item: PresensiResponseDTO) {
+  const checkout = item.waktu_checkout;
+  return !checkout || checkout === '' || checkout === 'null' || String(checkout).startsWith('0001');
+}
+
+function formatTimeRange(item: PresensiResponseDTO) {
+  const checkin = item.waktu_checkin
+    ? new Date(item.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+    : '-';
+  return `${checkin} WIB`;
+}
 
 export default function PresensiKelasOnlinePage() {
   const [step, setStep] = useState(1);
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [presensiList, setPresensiList] = useState<PresensiResponseDTO[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedPresensiId, setSelectedPresensiId] = useState<string | null>(null);
   const [link, setLink] = useState('');
   const [materi, setMateri] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -20,11 +32,31 @@ export default function PresensiKelasOnlinePage() {
   const [sheetDragY, setSheetDragY] = useState(0);
 
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-  const selectedSession = mockOnlineSessions.find(s => s.id === selectedSessionId);
+  const activeOnlinePresensi = useMemo(
+    () => presensiList.filter(item => isActivePresensi(item)),
+    [presensiList],
+  );
+  const selectedSession = activeOnlinePresensi.find(s => s.id_presensi === selectedPresensiId);
+
+  useEffect(() => {
+    async function fetchPresensi() {
+      setIsLoading(true);
+      const res = await getMyPresensi();
+      if (res.success && res.data) {
+        const activeItems = res.data.filter(item => isActivePresensi(item));
+        setPresensiList(res.data);
+        if (activeItems.length > 0) setSelectedPresensiId(activeItems[0].id_presensi);
+      } else {
+        toast.error(res.message || 'Gagal mengambil data presensi');
+      }
+      setIsLoading(false);
+    }
+    fetchPresensi();
+  }, []);
 
   const handleReset = () => {
     setStep(1);
-    setSelectedSessionId(null);
+    setSelectedPresensiId(activeOnlinePresensi[0]?.id_presensi ?? null);
     setLink('');
     setMateri('');
   };
@@ -56,13 +88,38 @@ export default function PresensiKelasOnlinePage() {
     else setSheetDragY(0);
   };
 
-  const handleConfirmSend = () => {
-    handleCloseSheet();
-    setTimeout(() => setStep(3), 300);
+  const handleConfirmSend = async () => {
+    if (!selectedSession) return;
+
+    setIsSubmitting(true);
+    const res = await submitCheckOut({
+      id_presensi: selectedSession.id_presensi,
+      deskripsi_materi: materi,
+      qr_token: 'ONLINE_CLASS',
+      link_video: link,
+    });
+
+    if (res.success) {
+      toast.success('Laporan berhasil dikirim!');
+      handleCloseSheet();
+      setTimeout(() => setStep(3), 300);
+    } else {
+      toast.error(res.message || 'Gagal mengirim laporan');
+    }
+    setIsSubmitting(false);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80vh]">
+        <Loader2 className="w-10 h-10 text-[#941C2F] animate-spin mb-4" />
+        <p className="text-slate-500 font-medium">Memuat data presensi online...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 pb-8 pt-2 min-h-screen font-sans">
+    <AsdosPageShell>
 
       {isSheetOpen && (
         <>
@@ -106,10 +163,10 @@ export default function PresensiKelasOnlinePage() {
 
                 <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-5 mb-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] space-y-3">
                   {[
-                    { label: 'Mata Kuliah', value: selectedSession?.subject ?? '-' },
-                    { label: 'Sesi',        value: selectedSession?.sessionName ?? '-' },
-                    { label: 'Platform',    value: selectedSession?.platform ?? '-' },
-                    { label: 'Waktu',       value: selectedSession?.time ?? '-' },
+                    { label: 'Mata Kuliah', value: selectedSession?.nama_mata_kuliah ?? '-' },
+                    { label: 'Kelas',       value: selectedSession?.nama_kelas ?? '-' },
+                    { label: 'Platform',    value: selectedSession?.tipe_absensi ?? 'Online' },
+                    { label: 'Waktu',       value: selectedSession ? formatTimeRange(selectedSession) : '-' },
                     { label: 'Link',        value: link, isLink: true },
                   ].map(({ label, value, isLink }, i, arr) => (
                     <React.Fragment key={label}>
@@ -141,15 +198,15 @@ export default function PresensiKelasOnlinePage() {
                     className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm active:scale-[0.98] transition-all hover:bg-slate-50">
                     Batal
                   </button>
-                  <button onClick={handleConfirmSend}
+                  <button onClick={handleConfirmSend} disabled={isSubmitting}
                     className="flex-1 py-3 rounded-xl bg-[#941C2F] text-white font-bold text-sm shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] flex items-center justify-center gap-2">
-                    <Send size={14} /> Kirim Laporan
+                    <Send size={14} /> {isSubmitting ? 'Mengirim...' : 'Kirim Laporan'}
                   </button>
                 </div>
                   <div className="flex flex-col gap-3 md:hidden">
-                    <button onClick={handleConfirmSend}
+                    <button onClick={handleConfirmSend} disabled={isSubmitting}
                       className="w-full py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-md shadow-[#941C2F]/20 flex items-center justify-center gap-2">
-                      <Send size={16} /> Kirim Laporan
+                      <Send size={16} /> {isSubmitting ? 'Mengirim...' : 'Kirim Laporan'}
                     </button>
                     <button onClick={handleCloseSheet}
                       className="w-full bg-slate-100 text-slate-600 font-bold py-3.5 rounded-xl active:scale-[0.98] hover:bg-slate-200 transition-all text-[15px]">
@@ -164,47 +221,44 @@ export default function PresensiKelasOnlinePage() {
 
       {step === 1 && (
         <>
-          <div className="mb-6 md:mb-8">
-            <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">Presensi Kelas Online</p>
-            <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Pilih Sesi Online</h2>
-            <p className="text-sm text-slate-500 mt-1 md:text-base">Pilih jadwal kelas online yang akan Anda laporkan hari ini.</p>
-          </div>
+          <AsdosPageHeader eyebrow="Presensi Kelas Online" title="Pilih Sesi Online" description="Pilih jadwal kelas online yang akan Anda laporkan hari ini." />
           <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-10 lg:p-12">
             <div className="flex justify-between items-center mb-4 md:mb-6 px-1">
               <h4 className="text-[11px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Sesi Tersedia Hari Ini</h4>
-              <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] md:text-xs font-bold px-2.5 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg">{mockOnlineSessions.length} Sesi</span>
+              <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] md:text-xs font-bold px-2.5 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg">{activeOnlinePresensi.length} Sesi</span>
             </div>
             <div className="space-y-3 mb-8 md:mb-10">
-              {mockOnlineSessions.map(s => {
-                const isSel = selectedSessionId === s.id;
-                const isAktif = s.status === 'Aktif';
-                const isMendatang = s.status === 'Mendatang';
+              {activeOnlinePresensi.length === 0 && (
+                <AsdosState icon={<AlertCircle size={28} />} title="Tidak ada presensi aktif." message="Silakan check-in terlebih dahulu sebelum mengirim laporan online." className="p-8" />
+              )}
+              {activeOnlinePresensi.map(s => {
+                const isSel = selectedPresensiId === s.id_presensi;
                 return (
-                  <div key={s.id} onClick={() => !isMendatang && setSelectedSessionId(s.id)}
+                  <div key={s.id_presensi} onClick={() => setSelectedPresensiId(s.id_presensi)}
                     className={`bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border-2 transition-all gap-3 md:gap-0
-                      ${isMendatang ? 'cursor-not-allowed opacity-50' : 'cursor-pointer active:scale-[0.99]'}
+                      cursor-pointer active:scale-[0.99]
                       ${isSel ? 'border-[#941C2F] shadow-md shadow-[#941C2F]/10' : 'border-transparent md:border-slate-100 md:hover:border-slate-200 md:hover:shadow-md'}`}>
                     <div className="flex items-center gap-3 md:gap-4 min-w-0 md:w-2/5">
                       <div className={`w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center transition-colors ${isSel ? 'bg-[#941C2F]/10 text-[#941C2F]' : 'bg-rose-50 text-[#941C2F]'}`}>
                         <BookOpen size={20} strokeWidth={2} />
                       </div>
                       <div className="min-w-0">
-                        <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{s.subject}</h3>
+                        <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{s.nama_mata_kuliah}</h3>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] md:text-xs font-bold text-slate-400 tracking-wider">{s.sessionName}</span>
+                          <span className="text-[10px] md:text-xs font-bold text-slate-400 tracking-wider">{s.nama_kelas}</span>
                           <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                          <div className={`w-1.5 h-1.5 rounded-full ${isAktif ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                          <span className={`text-[10px] md:text-xs font-semibold ${isAktif ? 'text-emerald-600' : 'text-slate-400'}`}>{s.status}</span>
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          <span className="text-[10px] md:text-xs font-semibold text-emerald-600">Aktif</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 md:gap-3 pt-3 border-t border-slate-100 md:border-none md:pt-0">
                       <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center gap-2">
                         <Clock size={13} className="text-slate-400 shrink-0" />
-                        <span className="text-xs md:text-[13px] font-semibold text-slate-700">{s.time}</span>
+                        <span className="text-xs md:text-[13px] font-semibold text-slate-700">{formatTimeRange(s)}</span>
                       </div>
                       <div className="flex-1 md:flex-none bg-[#941C2F]/10 border border-[#941C2F]/20 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center gap-2">
-                        <span className="text-xs md:text-[13px] font-bold text-[#941C2F]">{s.platform}</span>
+                        <span className="text-xs md:text-[13px] font-bold text-[#941C2F]">{s.tipe_absensi || 'Online'}</span>
                       </div>
                       <div className={`shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center transition-all ${isSel ? 'bg-[#941C2F] shadow-md' : 'bg-slate-100'}`}>
                         <Check size={13} strokeWidth={3} className={isSel ? 'text-white' : 'text-slate-300'} />
@@ -215,8 +269,8 @@ export default function PresensiKelasOnlinePage() {
               })}
             </div>
 
-            <div className={`hidden md:flex md:justify-end transition-all duration-300 ${selectedSessionId ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
-              <button onClick={() => setStep(2)} disabled={!selectedSessionId}
+            <div className={`hidden md:flex md:justify-end transition-all duration-300 ${selectedPresensiId ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+              <button onClick={() => setStep(2)} disabled={!selectedPresensiId}
                 className="bg-[#941C2F] text-white font-bold py-3 px-10 text-[15px] rounded-2xl shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] disabled:opacity-50">
                 Lanjut Isi Laporan
               </button>
@@ -224,8 +278,8 @@ export default function PresensiKelasOnlinePage() {
           </div>
 
           <div className="h-24 md:hidden" />
-          <div className={`md:hidden fixed bottom-0 left-0 right-0 px-4 pb-6 z-30 transition-all duration-300 ${selectedSessionId ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
-            <button onClick={() => setStep(2)} disabled={!selectedSessionId}
+          <div className={`md:hidden fixed bottom-0 left-0 right-0 px-4 pb-6 z-30 transition-all duration-300 ${selectedPresensiId ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+            <button onClick={() => setStep(2)} disabled={!selectedPresensiId}
               className="w-full bg-[#941C2F] text-white font-bold py-4 text-[15px] rounded-2xl shadow-xl shadow-[#941C2F]/30 active:scale-[0.98] transition-all disabled:opacity-50">
               Lanjut Isi Laporan
             </button>
@@ -253,18 +307,18 @@ export default function PresensiKelasOnlinePage() {
                   <BookOpen size={20} strokeWidth={2} />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{selectedSession.subject}</h3>
+                  <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{selectedSession.nama_mata_kuliah}</h3>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[10px] md:text-xs font-bold text-slate-400 tracking-wider">{selectedSession.sessionName}</span>
+                    <span className="text-[10px] md:text-xs font-bold text-slate-400 tracking-wider">{selectedSession.nama_kelas}</span>
                     <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                    <span className="text-[10px] md:text-xs font-bold text-[#941C2F]">{selectedSession.platform}</span>
+                    <span className="text-[10px] md:text-xs font-bold text-[#941C2F]">{selectedSession.tipe_absensi || 'Online'}</span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-2 pt-3 border-t border-slate-100 md:border-none md:pt-0">
                 <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center gap-2">
                   <Clock size={13} className="text-slate-400 shrink-0" />
-                  <span className="text-xs md:text-[13px] font-semibold text-slate-700">{selectedSession.time}</span>
+                  <span className="text-xs md:text-[13px] font-semibold text-slate-700">{formatTimeRange(selectedSession)}</span>
                 </div>
                 <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center gap-2">
                   <Clock size={13} className="text-emerald-500 shrink-0" />
@@ -330,8 +384,8 @@ export default function PresensiKelasOnlinePage() {
                 <div className="p-6 md:p-7 text-center">
                   <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-1">Detail Presensi Online</p>
                   <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-6 leading-snug">
-                    {selectedSession.subject}
-                    <span className="block text-sm font-medium text-slate-400 mt-0.5">{selectedSession.platform} · {selectedSession.sessionName}</span>
+                    {selectedSession.nama_mata_kuliah}
+                    <span className="block text-sm font-medium text-slate-400 mt-0.5">{selectedSession.tipe_absensi || 'Online'} · {selectedSession.nama_kelas}</span>
                   </h3>
                   <div className="border-t border-slate-100 pt-5 pb-5">
                     <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-1">Dikirim Pada</p>
@@ -349,6 +403,6 @@ export default function PresensiKelasOnlinePage() {
           </div>
         </>
       )}
-    </div>
+    </AsdosPageShell>
   );
 }

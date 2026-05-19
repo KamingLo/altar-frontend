@@ -5,8 +5,6 @@ import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem } from '@/typ
 
 type PaginatedResponse<T> = { items: T[]; total: number; page: number; limit: number; total_page: number };
 
-// ─── KELAS (/classes) — auth: Koordinator ─────────────────────────────────────
-
 export async function getKelasList(page = 1, search = '', limit = 10) {
   return apiClient.get<PaginatedResponse<KelasItem>>(
     `/classes?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
@@ -28,8 +26,6 @@ export async function deleteKelas(id: string) {
   const res = await apiClient.delete(`/classes/${id}`, { auth: true });
   return { success: res.success, message: res.message };
 }
-
-// ─── MATA KULIAH (/courses) — auth: Koordinator ───────────────────────────────
 
 export async function getMKList(page = 1, search = '', limit = 10) {
   return apiClient.get<PaginatedResponse<MataKuliahItem>>(
@@ -53,11 +49,9 @@ export async function deleteMK(id: string) {
   return { success: res.success, message: res.message };
 }
 
-// ─── RUANGAN (/rooms) — GET: public, lainnya: Koordinator ────────────────────
-
-export async function getRuanganList(page = 1, search = '') {
+export async function getRuanganList(page = 1, search = '', limit = 10) {
   return apiClient.get<PaginatedResponse<RuanganItem>>(
-    `/rooms?page=${page}&limit=10&search=${encodeURIComponent(search)}`,
+    `/rooms?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
     { auth: true, cache: 'no-store' },
   );
 }
@@ -77,7 +71,6 @@ export async function deleteRuangan(id: string) {
   return { success: res.success, message: res.message };
 }
 
-// ─── SEMESTER (/semesters) — public ──────────────────────────────────────────
 
 export async function getSemesterList(page = 1, search = '', limit = 10) {
   return apiClient.get<PaginatedResponse<SemesterItem>>(

@@ -38,10 +38,13 @@ async function request<T = unknown>(
   try {
     const res = await fetch(`${BASE_URL}${endpoint}`, fetchOptions);
 
-    let json: any = {};
+    let json: {
+      success?: boolean;
+      message?: string;
+      data?: unknown;
+      error?: unknown;
+    } = {};
     try { json = await res.json(); } catch { /* non-JSON response */ }
-
-    // Backend using success field in JSON, prioritize it even if res.ok is true
     const isSuccess = json?.success === true || (res.ok && json?.success !== false);
 
     if (!isSuccess) {

@@ -14,6 +14,7 @@ export interface CheckOutPayload {
   id_presensi: string;
   deskripsi_materi: string;
   qr_token: string;
+  link_video?: string;
 }
 
 export interface PresensiResponseDTO {

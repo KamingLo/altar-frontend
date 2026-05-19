@@ -5,6 +5,7 @@ import { getMyScheduleTimeline, getScheduleTimeline, type SessionFromAPI } from 
 import { getSemesterList } from '@/lib/actions/data-master';
 import type { SemesterItem } from '@/types/api';
 import { useJadwalStore } from '@/store/useJadwalStore';
+import { AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 
 const dayNamesGrid = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
 const dayNamesFull = ['MIN', 'SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB'];
@@ -182,7 +183,7 @@ export default function JadwalAjarPage() {
   const isSemesterLoading = semesterList.length === 0;
 
   return (
-    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 pb-8 pt-2 min-h-screen font-sans">
+    <AsdosPageShell>
       <div>
 
 
@@ -482,6 +483,6 @@ export default function JadwalAjarPage() {
           </div>
         </div>
       </div>
-    </div>
+    </AsdosPageShell>
   );
 }

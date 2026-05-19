@@ -4,6 +4,7 @@ import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle, Loader
 import { getMyPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 
 export default function CheckOutPage() {
   const [step, setStep] = useState(1);
@@ -12,18 +13,15 @@ export default function CheckOutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activePresensi, setActivePresensi] = useState<PresensiResponseDTO | null>(null);
   const [qrToken, setQrToken] = useState('');
-
   const [cameraStatus, setCameraStatus] = useState<'idle' | 'requesting' | 'active' | 'denied' | 'scanning'>('idle');
   const [scanMessage, setScanMessage] = useState<string>('');
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string>('');
-
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
   useEffect(() => {
@@ -34,11 +32,6 @@ export default function CheckOutPage() {
         console.log("Check-out Status Check:", res);
         
         if (res.success && res.data) {
-          // Deteksi sesi aktif:
-          // 1. waktu_checkout benar-benar null/undefined
-          // 2. waktu_checkout adalah string kosong ""
-          // 3. waktu_checkout adalah zero-time Go (diawali 0001)
-          // 4. waktu_checkout adalah string "null" (antisipasi error JSON)
           const active = res.data.find(p => {
             const checkout = p.waktu_checkout;
             return !checkout || 
@@ -264,7 +257,7 @@ export default function CheckOutPage() {
   }
 
   return (
-    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 pb-8 pt-2 min-h-screen font-sans">
+    <AsdosPageShell>
 
       {step === 1 && (
         <>
@@ -589,6 +582,6 @@ export default function CheckOutPage() {
           100% { top: 8%; }
         }
       `}</style>
-    </div>
+    </AsdosPageShell>
   );
 }
