@@ -28,7 +28,9 @@ export async function getSubstitutionDetail(id: string) {
 export async function createSubstitution(data: {
   id_session: string;
   id_ruangan: string;
-  id_asdos_pengganti: string | null;
+  id_dosen?: string | null;
+  id_asdos1?: string | null;
+  id_asdos2?: string | null;
   substitute_date: string;
   original_date: string;
   slot_option: number;

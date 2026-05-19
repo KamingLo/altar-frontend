@@ -29,13 +29,40 @@ export default function CheckOutPage() {
   useEffect(() => {
     async function fetchActivePresensi() {
       setIsLoading(true);
-      const res = await getMyPresensi();
-      if (res.success && res.data) {
-
-        const active = res.data.find(p => !p.waktu_checkout);
-        setActivePresensi(active || null);
+      try {
+        const res = await getMyPresensi();
+        console.log("Check-out Status Check:", res);
+        
+        if (res.success && res.data) {
+          // Deteksi sesi aktif:
+          // 1. waktu_checkout benar-benar null/undefined
+          // 2. waktu_checkout adalah string kosong ""
+          // 3. waktu_checkout adalah zero-time Go (diawali 0001)
+          // 4. waktu_checkout adalah string "null" (antisipasi error JSON)
+          const active = res.data.find(p => {
+            const checkout = p.waktu_checkout;
+            return !checkout || 
+                   checkout === "" || 
+                   checkout === "null" || 
+                   String(checkout).startsWith("0001");
+          });
+          
+          if (active) {
+            console.log("Found Active Session:", active);
+            setActivePresensi(active);
+          } else {
+            console.log("No Active Session Found in data:", res.data);
+            setActivePresensi(null);
+          }
+        } else {
+          console.error("Failed to fetch presensi or data is empty:", res);
+          setActivePresensi(null);
+        }
+      } catch (error) {
+        console.error("Error in fetchActivePresensi:", error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
     fetchActivePresensi();
   }, []);

@@ -31,6 +31,9 @@ export interface SubstituteSessionDetail {
   original_date: string;
   time_slot: string;
   room: string;
+  id_dosen: string | null;
+  id_asdos1: string | null;
+  id_asdos2: string | null;
   substitute_teacher: string;
   session: {
     id_sesi: string;
@@ -96,7 +99,7 @@ export interface SessionTimeline {
 
 export interface UnifiedJadwalResponse {
   id_sesi: string;
-  tipe: 'REGULER' | 'PENGGANTI';
+  tipe: 'REGULER' | 'REGULAR' | 'PENGGANTI' | 'SUBSTITUTE';
   tanggal: string;
   nama_kelas: string;
   mata_kuliah: string;
