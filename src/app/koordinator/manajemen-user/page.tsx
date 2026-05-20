@@ -64,7 +64,6 @@ export default function ManajemenAsdosPage() {
   const isFirstTabChange = useRef(true);
   const loadedTabsRef = useRef<Set<TabId>>(new Set());
 
-  // Two-step add wizard
   const [addStep, setAddStep] = useState<AddStep>('role_search');
   const [addRole, setAddRole] = useState<AddRole>('asdos');
   const [modalSearchQuery, setModalSearchQuery] = useState('');
@@ -120,7 +119,6 @@ export default function ManajemenAsdosPage() {
     setIsLoading(false);
   }, [setAsdos, setKoor, setUsers, setIsLoading]);
 
-  // Initial load — skip if data already cached in store this session
   useEffect(() => {
     if (loadedTabsRef.current.size > 0) return;
     const loadAll = async () => {
@@ -145,7 +143,7 @@ export default function ManajemenAsdosPage() {
       isFirstTabChange.current = false;
       return;
     }
-    // Use cached Zustand data when no search and tab was already loaded
+
     if (!searchQuery && loadedTabsRef.current.has(activeTab)) return;
     const timer = setTimeout(() => {
       loadTabData(activeTab, searchQuery, 1);
@@ -172,7 +170,7 @@ export default function ManajemenAsdosPage() {
         setModalForm({ username: item.username, email: item.identifier, nim: '', nip: '', phone_number: '' });
       }
     } else {
-      // Reset wizard state for add flow
+
       setAddStep('role_search');
       setAddRole(activeTab === 'koordinator' ? 'koordinator' : 'asdos');
       setModalSearchQuery('');
@@ -416,14 +414,30 @@ export default function ManajemenAsdosPage() {
 
       <div className="space-y-3 relative z-10 pb-24 md:pb-12">
         {isLoading && activeItems.length === 0 && (
-          [1, 2, 3].map(i => (
-            <div key={i} className="bg-white rounded-2xl md:rounded-xl p-3.5 md:p-5 border border-slate-100 animate-pulse flex items-center gap-3">
-              <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl bg-slate-100 shrink-0" />
-              <div className="flex-1 space-y-2 md:space-y-3">
-                <div className="h-4 bg-slate-100 rounded-lg w-2/5 md:w-1/4" />
-                <div className="h-3 bg-slate-100 rounded-lg w-1/3 md:w-1/6" />
-                <div className="h-5 bg-slate-100 rounded-full w-24 md:w-32 mt-1 md:hidden" />
+          [1, 2, 3, 4].map(i => (
+            <div
+              key={i}
+              className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex items-center justify-between border border-slate-100"
+            >
+
+              <div className="flex items-center space-x-3 md:space-x-4 min-w-0 md:w-1/3">
+                <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl shrink-0 animate-shimmer" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="h-4.5 bg-slate-100 rounded-lg w-28 md:w-36 animate-shimmer" />
+                  <div className="h-3.5 bg-slate-100 rounded-lg w-20 md:hidden animate-shimmer" />
+                </div>
               </div>
+
+              <div className="hidden md:flex flex-1 items-center px-4">
+                <div className="h-8 bg-slate-100/80 border border-slate-100 rounded-lg w-44 animate-shimmer" />
+              </div>
+
+              {activeTab !== 'user' && (
+                <div className="flex space-x-1 md:space-x-2 shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100/80 animate-shimmer" />
+                  <div className="w-10 h-10 rounded-xl bg-slate-100/80 animate-shimmer" />
+                </div>
+              )}
             </div>
           ))
         )}

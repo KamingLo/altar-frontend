@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next'
 import "./globals.css"
 import { Toaster } from 'sonner'
 
-// 1. Konfigurasi Viewport untuk iOS
 export const viewport: Viewport = {
   themeColor: '#000000',
   width: 'device-width',
@@ -11,7 +10,6 @@ export const viewport: Viewport = {
   userScalable: false,
 }
 
-// 2. Konfigurasi Metadata khusus Apple
 export const metadata: Metadata = {
   title: 'Altar.',
   description: 'Assistant Lecturer Tarumanagara',

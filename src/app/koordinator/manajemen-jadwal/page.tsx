@@ -555,7 +555,7 @@ export default function ManajemenJadwalPage() {
 
   if (isInitialLoad) {
     return (
-      <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-0 pb-28 md:pb-10 font-sans">
+      <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 min-h-screen pb-24 md:pb-12 font-sans">
 
         <div className="mb-6">
           <div className="h-3.5 w-20 rounded-full mb-2.5 animate-shimmer"></div>
@@ -628,7 +628,7 @@ export default function ManajemenJadwalPage() {
   }
 
   return (
-    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-0 md:pt-0 pb-28 md:pb-10 font-sans">
+    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 min-h-screen pb-24 md:pb-12 font-sans">
 
       <div className="shrink-0">
         <div className="mb-4 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between">

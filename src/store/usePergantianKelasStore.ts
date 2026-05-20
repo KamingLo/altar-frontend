@@ -1,26 +1,30 @@
 import { create } from 'zustand';
 import type { SubstituteSessionDetail } from '@/types/api';
-import type { SubstitutionStatus } from '@/lib/actions/pergantian-kelas';
 
 interface PergantianKelasState {
   substitutionList: SubstituteSessionDetail[];
-  total: number;
-  activeFilter: SubstitutionStatus | undefined;
   isLoading: boolean;
 
-  setSubstitutions: (list: SubstituteSessionDetail[], total: number, filter?: SubstitutionStatus) => void;
+  setSubstitutions: (list: SubstituteSessionDetail[]) => void;
+  updateStatusLocal: (id: string, status: SubstituteSessionDetail['status'], coordinatorReason?: string | null) => void;
   setIsLoading: (v: boolean) => void;
   reset: () => void;
 }
 
 export const usePergantianKelasStore = create<PergantianKelasState>()((set) => ({
   substitutionList: [],
-  total: 0,
-  activeFilter: undefined,
   isLoading: false,
 
-  setSubstitutions: (list, total, filter) =>
-    set({ substitutionList: list, total, activeFilter: filter }),
+  setSubstitutions: (list) => set({ substitutionList: list }),
+  updateStatusLocal: (id, status, coordinatorReason) =>
+    set((state) => ({
+      substitutionList: state.substitutionList.map((item) =>
+        item.id === id
+          ? { ...item, status, coordinator_reason: coordinatorReason !== undefined ? coordinatorReason : item.coordinator_reason }
+          : item
+      ),
+    })),
   setIsLoading: (v) => set({ isLoading: v }),
-  reset: () => set({ substitutionList: [], total: 0, activeFilter: undefined, isLoading: false }),
+  reset: () => set({ substitutionList: [], isLoading: false }),
 }));
+

@@ -47,3 +47,21 @@ export async function submitCheckOut(payload: CheckOutPayload) {
 export async function getMyPresensi() {
   return apiClient.get<PresensiResponseDTO[]>('/presensi/me', { auth: true, cache: 'no-store' });
 }
+
+export async function getAllPresensi(isVerified?: boolean, tipeAbsensi?: string) {
+  const params: string[] = [];
+  if (isVerified !== undefined) {
+    params.push(`is_verified=${isVerified}`);
+  }
+  if (tipeAbsensi !== undefined) {
+    params.push(`tipe_absensi=${tipeAbsensi}`);
+  }
+  const query = params.length > 0 ? `?${params.join('&')}` : '';
+  return apiClient.get<PresensiResponseDTO[]>(`/presensi${query}`, { auth: true, cache: 'no-store' });
+}
+
+export async function verifyPresensi(id: string, isVerified: boolean) {
+  const res = await apiClient.patch<null>(`/presensi/${id}/verify`, { is_verified: isVerified }, { auth: true });
+  return { success: res.success, message: res.message };
+}
+
