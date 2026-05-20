@@ -36,6 +36,15 @@ export const useAuthForm = () => {
       const result = await loginUser(formData);
       
       if (result.success) {
+        // Gunakan data user yang dikembalikan langsung dari action login
+        if (result.data?.user) {
+          setUser(result.data.user);
+          setLoadingStore(false);
+          router.push('/dashboard');
+          return;
+        }
+
+        // Fallback jika data user tidak disertakan (jarang terjadi dengan logic baru)
         const session = await getSession();
         
         if (session.success && session.data) {
@@ -43,11 +52,9 @@ export const useAuthForm = () => {
           setLoadingStore(false);
           router.push('/dashboard');
         } else {
-          // Pesan fallback jika data user kosong padahal login sukses
           setErrorMessage(session.message || 'Gagal mengambil profil akun.');
         }
       } else {
-        // Langsung tampilkan pesan dari backend Golang
         setErrorMessage(result.message);
       }
     } catch {

@@ -1,55 +1,70 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSession, logoutUser } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
+import type { UserRole } from '@/types/api';
 
 export const useAuth = () => {
   const router = useRouter();
-  const { user, loading, setUser, setLoading, clearUser } = useUserStore();
+  const { user, role, loading, setUser, setRole, setLoading, clearUser } = useUserStore();
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+
     const fetchUser = async () => {
       try {
         const res = await getSession();
-        
+
         if (res.success && res.data) {
-          // Sinkronisasi data user dari session ke Zustand
           setUser(res.data);
+          const derivedRole: UserRole | null = res.data.id_koordinator
+            ? 'koordinator'
+            : res.data.id_asisten
+            ? 'asdos'
+            : null;
+          setRole(derivedRole);
         } else {
-          // Jika session tidak valid, tendang ke halaman login
+          clearUser();
           router.push('/auth/login');
         }
       } catch {
-        // Jika server down atau fetch gagal, anggap tidak terautentikasi
+        clearUser();
         router.push('/auth/login');
       } finally {
         setLoading(false);
       }
     };
 
-    // Hanya fetch jika data user di store masih kosong
     if (!user) {
       fetchUser();
     } else {
+      if (!role) {
+        const derivedRole: UserRole | null = user.id_koordinator
+          ? 'koordinator'
+          : user.id_asisten
+          ? 'asdos'
+          : null;
+        setRole(derivedRole);
+      }
       setLoading(false);
     }
-  }, [router, setUser, setLoading, user]);
+  }, [router, setUser, setRole, setLoading, user, role, clearUser, isHydrated]);
 
   const handleLogout = async () => {
     try {
-      const result = await logoutUser();
-      if (result.success) {
-        clearUser();
-        router.push('/auth/login');
-      }
-    } catch {
-      // Tetap bersihkan user di sisi client jika logout gagal di server
+      await logoutUser();
+    } finally {
       clearUser();
       router.push('/auth/login');
     }
   };
 
-  return { user, loading, handleLogout };
+  return { user, role, loading: !isHydrated || loading, handleLogout };
 };
