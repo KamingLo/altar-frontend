@@ -95,7 +95,8 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
       <Link
         key={item.href}
         href={item.href}
-        title={collapsed ? item.title : undefined}
+        {...(collapsed ? { title: item.title } : {})}
+        suppressHydrationWarning
         className={`flex items-center rounded-2xl transition-all duration-200 group ${collapsed
           ? `justify-center px-0 py-3.5 ${active ? 'text-white' : 'text-white/70 hover:text-white'}`
           : `justify-between px-4 py-3 ${active ? 'text-white bg-white/15' : 'text-white/70 hover:text-white hover:bg-white/10'}`
@@ -248,6 +249,8 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
               <img src="/logo-sb.png" alt="Logo" className="h-9 w-auto object-contain" />
             </div>
             <button
+              type="button"
+              suppressHydrationWarning
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               title={isSidebarCollapsed ? 'Buka Sidebar' : 'Tutup Sidebar'}
               className="p-2 rounded-xl text-white/50 hover:text-white hover:bg-white/15 active:scale-90 transition-all duration-200 shrink-0"
@@ -262,8 +265,10 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
 
           <div className={`shrink-0 px-3 pb-6 pt-3 border-t border-white/10`}>
             <button
+              type="button"
+              suppressHydrationWarning
               onClick={openLogoutConfirm}
-              title={isSidebarCollapsed ? 'Keluar' : undefined}
+              {...(isSidebarCollapsed ? { title: 'Keluar' } : {})}
               className={`w-full flex items-center rounded-2xl text-white/70 transition-all duration-200 group ${isSidebarCollapsed
                 ? 'justify-center px-0 py-3.5 hover:text-white'
                 : 'justify-between px-4 py-3 hover:text-white hover:bg-red-500/20'
@@ -323,6 +328,8 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
               <Home size={26} strokeWidth={2.5} />
             </Link>
             <button
+              type="button"
+              suppressHydrationWarning
               onClick={() => setIsSidebarOpen(true)}
               className="text-[#941C2F] hover:scale-105 active:scale-90 active:bg-[#941C2F]/10 active:shadow-[0_0_20px_rgba(148,28,47,0.15)] rounded-full transition-all duration-200 p-2.5 flex items-center justify-center"
             >
@@ -351,6 +358,8 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
 
               <div className="shrink-0 px-3 pb-6 pt-3 border-t border-white/20">
                 <button
+                  type="button"
+                  suppressHydrationWarning
                   onClick={openLogoutConfirm}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-white/70 hover:text-white hover:bg-red-500/20 transition-all duration-300 group"
                 >
