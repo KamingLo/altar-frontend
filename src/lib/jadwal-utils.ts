@@ -2,15 +2,24 @@ export function toIsoDate(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+export function toIsoDateFromDate(date: Date): string {
+  return toIsoDate(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 export function todayIso(): string {
   const n = new Date();
-  return toIsoDate(n.getFullYear(), n.getMonth(), n.getDate());
+  return toIsoDateFromDate(n);
+}
+
+export function parseIsoDateLocal(iso: string): Date {
+  const [year, month, day] = sessionDateKey(iso).split('-').map(Number);
+  return new Date(year, month - 1, day);
 }
 
 export function addDaysIso(iso: string, days: number): string {
-  const d = new Date(`${iso}T12:00:00`);
+  const d = parseIsoDateLocal(iso);
   d.setDate(d.getDate() + days);
-  return toIsoDate(d.getFullYear(), d.getMonth(), d.getDate());
+  return toIsoDateFromDate(d);
 }
 
 export function getMonthBounds(year: number, month: number) {
@@ -26,7 +35,7 @@ export function semesterLabel(tahun: string, tipe: string) {
 
 /** Normalisasi tanggal dari API (YYYY-MM-DD atau ISO datetime) */
 export function sessionDateKey(tanggal: string): string {
-  return tanggal.slice(0, 10);
+  return tanggal.trim().slice(0, 10);
 }
 
 export type SessionTipe = 'REGULER' | 'PENGGANTI';

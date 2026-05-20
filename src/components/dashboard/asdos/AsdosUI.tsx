@@ -58,10 +58,35 @@ export function AsdosState({ icon, title, message, variant = 'empty', className 
 
 export function AsdosLoadingState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
-      <div className="w-9 h-9 border-4 border-[#941C2F]/20 border-t-[#941C2F] rounded-full animate-spin mb-3" />
-      <p className="text-sm font-medium text-slate-500">{message}</p>
+    <div className="space-y-3">
+      <AsdosListSkeleton count={3} />
+      <p className="sr-only">{message}</p>
     </div>
+  );
+}
+
+export function AsdosListSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => (
+        <div
+          key={i}
+          className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex items-center justify-between border border-slate-100"
+        >
+          <div className="flex items-center space-x-3 md:space-x-4 min-w-0 flex-1">
+            <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl shrink-0 animate-shimmer" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 bg-slate-100 rounded-lg w-32 md:w-44 animate-shimmer" />
+              <div className="h-3.5 bg-slate-100 rounded-lg w-24 md:w-32 animate-shimmer" />
+            </div>
+          </div>
+          <div className="hidden md:flex flex-1 justify-end gap-2">
+            <div className="h-8 bg-slate-100/80 border border-slate-100 rounded-lg w-24 animate-shimmer" />
+            <div className="h-8 bg-slate-100/80 border border-slate-100 rounded-lg w-20 animate-shimmer" />
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 

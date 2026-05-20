@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Search, Filter, Clock, MapPin, BookOpen, X } from 'lucide-react';
 import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { AsdosLoadingState, AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
+import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
 
 type HistoryItem = {
   id: string; subject: string; date: string;
@@ -11,8 +12,8 @@ type HistoryItem = {
 };
 
 const statusCfg = {
-  BERJALAN: { bg: 'bg-blue-50',    text: 'text-blue-500',    label: 'Berjalan' },
-  SELESAI:  { bg: 'bg-emerald-50', text: 'text-emerald-500', label: 'Selesai'  },
+  BERJALAN: { bg: 'bg-blue-50', text: 'text-blue-500', label: 'Berjalan' },
+  SELESAI: { bg: 'bg-emerald-50', text: 'text-emerald-500', label: 'Selesai' },
 };
 
 function isActivePresensi(item: PresensiResponseDTO) {
@@ -52,39 +53,66 @@ function mapPresensiToHistory(item: PresensiResponseDTO): HistoryItem {
 export default function RiwayatKehadiranPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'BERJALAN' | 'SELESAI'>('ALL');
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const {
+    items,
+    fetched,
+    visibleCount,
+    isLoading,
+    error,
+    setItems,
+    setLoading,
+    setError,
+    showMore,
+    resetVisible,
+  } = useRiwayatKehadiranStore();
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
   const [isSheetClosing, setIsSheetClosing] = useState(false);
   const [sheetStartY, setSheetStartY] = useState(0);
   const [sheetDragY, setSheetDragY] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     async function fetchHistory() {
-      setIsLoading(true);
-      setFetchError(null);
+      if (fetched) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
       const res = await getMyPresensi();
 
       if (res.success && res.data) {
-        setHistory(res.data.map(mapPresensiToHistory));
+        setItems(res.data);
       } else {
-        setFetchError(res.message || 'Gagal memuat riwayat kehadiran.');
+        setError(res.message || 'Gagal memuat riwayat kehadiran.');
       }
 
-      setIsLoading(false);
+      setLoading(false);
     }
 
     fetchHistory();
-  }, []);
+  }, [fetched, setError, setItems, setLoading]);
 
+  useEffect(() => {
+    resetVisible();
+
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [searchTerm, filterStatus, resetVisible]);
+
+  const history = items.map(mapPresensiToHistory);
   const filtered = history.filter(item =>
     (item.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.room.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (filterStatus === 'ALL' || item.status === filterStatus)
   );
+  const displayed = filtered.slice(0, visibleCount);
+  const hasMore = displayed.length < filtered.length;
 
   const handleOpenSheet = (item: HistoryItem) => {
     setSelectedItem(item);
@@ -121,45 +149,45 @@ export default function RiwayatKehadiranPage() {
         title="Riwayat Kehadiran"
         description="Log aktivitas mengajar Anda."
         action={
-        <div className="flex gap-3 relative z-20 w-full md:w-auto md:min-w-[380px]">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
-              <Search className="w-[18px] h-[18px] md:w-5 md:h-5" />
+          <div className="flex gap-3 relative z-20 w-full md:w-auto md:min-w-[380px]">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
+                <Search className="w-[18px] h-[18px] md:w-5 md:h-5" />
+              </div>
+              <input type="text" placeholder="Cari materi atau kelas..." value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]" />
             </div>
-            <input type="text" placeholder="Cari materi atau kelas..." value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]" />
-          </div>
-          <div className="relative shrink-0">
-            <button onClick={() => setShowFilterMenu(!showFilterMenu)}
-              className={`border p-3.5 md:p-4 rounded-2xl md:rounded-3xl active:scale-95 transition-all flex items-center justify-center
+            <div className="relative shrink-0">
+              <button onClick={() => setShowFilterMenu(!showFilterMenu)}
+                className={`border p-3.5 md:p-4 rounded-2xl md:rounded-3xl active:scale-95 transition-all flex items-center justify-center
                 ${filterStatus !== 'ALL' ? 'bg-red-50 border-[#941C2F] text-[#941C2F]' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
-              <Filter className="w-[18px] h-[18px] md:w-5 md:h-5" />
-            </button>
-            {showFilterMenu && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowFilterMenu(false)} />
-                <div className="absolute right-0 top-[110%] w-48 bg-white border border-slate-100 rounded-2xl shadow-xl z-20 py-2 overflow-hidden">
-                  {(['ALL', 'BERJALAN', 'SELESAI'] as const).map(s => (
-                    <button key={s} onClick={() => { setFilterStatus(s); setShowFilterMenu(false); }}
-                      className={`w-full text-left px-5 py-3 text-sm transition-colors ${filterStatus === s ? 'bg-slate-50 text-[#941C2F] font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
-                      {s === 'ALL' ? 'Semua Status' : s === 'BERJALAN' ? 'Sedang Berjalan' : 'Selesai'}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+                <Filter className="w-[18px] h-[18px] md:w-5 md:h-5" />
+              </button>
+              {showFilterMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowFilterMenu(false)} />
+                  <div className="absolute right-0 top-[110%] w-48 bg-white border border-slate-100 rounded-2xl shadow-xl z-20 py-2 overflow-hidden">
+                    {(['ALL', 'BERJALAN', 'SELESAI'] as const).map(s => (
+                      <button key={s} onClick={() => { setFilterStatus(s); setShowFilterMenu(false); }}
+                        className={`w-full text-left px-5 py-3 text-sm transition-colors ${filterStatus === s ? 'bg-slate-50 text-[#941C2F] font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                        {s === 'ALL' ? 'Semua Status' : s === 'BERJALAN' ? 'Sedang Berjalan' : 'Selesai'}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
         }
       />
 
       <div className="space-y-3 pb-8">
         {isLoading ? (
           <AsdosLoadingState message="Memuat riwayat kehadiran..." />
-        ) : fetchError ? (
-          <AsdosState variant="error" message={fetchError} />
-        ) : filtered.length > 0 ? filtered.map(item => {
+        ) : error ? (
+          <AsdosState variant="error" message={error} />
+        ) : displayed.length > 0 ? displayed.map(item => {
           const cfg = statusCfg[item.status];
           return (
             <div key={item.id} onClick={() => handleOpenSheet(item)}
@@ -222,8 +250,18 @@ export default function RiwayatKehadiranPage() {
           <AsdosState icon={<BookOpen size={22} />} title="Riwayat tidak ditemukan." message="Coba gunakan kata kunci atau filter lain." />
         )}
         <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 md:mt-2">
-          Menampilkan {filtered.length} riwayat kehadiran.
+          Menampilkan {displayed.length} dari {filtered.length} riwayat kehadiran.
         </p>
+        {hasMore && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={showMore}
+              className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:border-[#941C2F]/30 hover:text-[#941C2F] transition-all"
+            >
+              Show More
+            </button>
+          </div>
+        )}
       </div>
 
       {selectedItem && (
@@ -236,15 +274,18 @@ export default function RiwayatKehadiranPage() {
 
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none">
             <div
-              className="w-full max-w-md md:max-w-xl bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto"
-              style={{
+              className={`w-full max-w-md md:max-w-xl bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto transition-all duration-300
+                ${!isMobile && isSheetVisible && !isSheetClosing ? 'opacity-100 scale-100' : ''}
+                ${!isMobile && (!isSheetVisible || isSheetClosing) ? 'opacity-0 scale-95' : ''}
+              `}
+              style={isMobile ? {
                 transform: (!isSheetVisible || isSheetClosing)
                   ? 'translateY(100%)'
                   : `translateY(${sheetDragY}px)`,
                 transition: (!isSheetVisible || isSheetClosing || sheetDragY === 0)
                   ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
                   : 'none',
-              }}
+              } : {}}
             >
               <div
                 className="w-full flex md:hidden items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none shrink-0"

@@ -17,6 +17,17 @@ export interface CheckOutPayload {
   link_video?: string;
 }
 
+export interface OnlineAttendancePayload {
+  id_sesi: string;
+  waktu_mulai: string;
+  waktu_selesai: string; 
+  deskripsi_materi: string;
+  link_video: string;
+  id_sesi_pengganti?: string;
+  id_asdos_rekan?: string;
+  menggantikan?: boolean;
+}
+
 export interface PresensiResponseDTO {
   id_presensi: string;
   id_sesi: string;
@@ -44,6 +55,10 @@ export async function submitCheckOut(payload: CheckOutPayload) {
   return apiClient.post<PresensiResponseDTO>('/presensi/check-out', payload, { auth: true });
 }
 
+export async function submitOnlineAttendance(payload: OnlineAttendancePayload) {
+  return apiClient.post<PresensiResponseDTO>('/presensi/online', payload, { auth: true });
+}
+
 export async function getMyPresensi() {
   return apiClient.get<PresensiResponseDTO[]>('/presensi/me', { auth: true, cache: 'no-store' });
 }
@@ -64,4 +79,3 @@ export async function verifyPresensi(id: string, isVerified: boolean) {
   const res = await apiClient.patch<null>(`/presensi/${id}/verify`, { is_verified: isVerified }, { auth: true });
   return { success: res.success, message: res.message };
 }
-

@@ -5,9 +5,20 @@ import type { SubstituteSessionDetail } from '@/types/api';
 
 export type SubstitutionStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
-// Koordinator: lihat semua request, bisa filter by status
-export async function getAllSubstitutions(status?: SubstitutionStatus) {
-  const query = status ? `?status=${status}` : '';
+type SubstitutionListParams = {
+  status?: SubstitutionStatus;
+  page?: number;
+  limit?: number;
+};
+
+// Koordinator/asdos: lihat request, bisa filter by status + pagination
+export async function getAllSubstitutions(params?: SubstitutionStatus | SubstitutionListParams) {
+  const normalized: SubstitutionListParams = typeof params === 'string' ? { status: params } : params ?? {};
+  const queryParams = new URLSearchParams();
+  if (normalized.status) queryParams.set('status', normalized.status);
+  if (normalized.page) queryParams.set('page', String(normalized.page));
+  if (normalized.limit) queryParams.set('limit', String(normalized.limit));
+  const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
   return apiClient.get<{ items: SubstituteSessionDetail[]; total: number }>(
     `/substitute-sessions${query}`,
     { auth: true, cache: 'no-store' },
