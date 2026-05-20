@@ -38,6 +38,10 @@ export function normalizeSessionTipe(tipe: string): SessionTipe {
   return 'REGULER';
 }
 
+export function isSubstituteSessionId(id: string): boolean {
+  return id.startsWith('sub');
+}
+
 export function isPenggantiTipe(tipe: string): boolean {
   return normalizeSessionTipe(tipe) === 'PENGGANTI';
 }
