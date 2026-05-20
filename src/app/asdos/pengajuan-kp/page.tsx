@@ -4,12 +4,13 @@ import { CalendarPlus, Clock, CheckCircle2, XCircle, Check, X, Trash2, MapPin, C
 import { getAllSubstitutions, createSubstitution, deleteSubstitution } from '@/lib/actions/pergantian-kelas';
 import { getRuanganList } from '@/lib/actions/data-master';
 import { getSessionsByDate } from '@/lib/actions/jadwal';
-import type { SubstituteSessionDetail } from '@/types/api';
 import type { RuanganItem } from '@/types/api';
 import type { SessionFromAPI } from '@/lib/actions/jadwal';
 import { AsdosLoadingState, AsdosPageHeader, AsdosPageShell, AsdosPrimaryButton, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
+import { usePengajuanKpStore } from '@/store/usePengajuanKpStore';
 
 const DROPDOWN_LIMIT = 500;
+const HISTORY_LIMIT = 10;
 const SLOT_OPTIONS = [
   { value: 1, label: '07:30 – 09:10' },
   { value: 2, label: '09:30 – 11:10' },
@@ -40,9 +41,11 @@ function todayIso() {
 }
 
 export default function PengajuanKpPage() {
-  const [history, setHistory] = useState<SubstituteSessionDetail[]>([]);
+  const { items: history, total: historyTotal, loadedPages, setPage, removeItem, reset } = usePengajuanKpStore();
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
@@ -63,13 +66,22 @@ export default function PengajuanKpPage() {
   const [sessionList, setSessionList] = useState<SessionFromAPI[]>([]);
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState<string | null>(null);
-  const fetchHistory = useCallback(async () => {
-    setHistoryLoading(true);
+  const fetchHistory = useCallback(async (page = 1, append = false, force = false) => {
+    if (!force && loadedPages[page]) {
+      setHistoryLoading(false);
+      setLoadingMore(false);
+      return;
+    }
+
+    if (append) setLoadingMore(true);
+    else setHistoryLoading(true);
+
     setHistoryError(null);
     try {
-      const res = await getAllSubstitutions();
+      const res = await getAllSubstitutions({ page, limit: HISTORY_LIMIT });
       if (res.success && res.data) {
-        setHistory(res.data.items ?? []);
+        setPage(page, res.data.items ?? [], res.data.total ?? 0);
+        setCurrentPage(page);
       } else {
         setHistoryError(res.message || 'Gagal memuat riwayat.');
       }
@@ -77,8 +89,9 @@ export default function PengajuanKpPage() {
       setHistoryError(e instanceof Error ? e.message : 'Terjadi kesalahan jaringan.');
     } finally {
       setHistoryLoading(false);
+      setLoadingMore(false);
     }
-  }, []);
+  }, [loadedPages, setPage]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
   useEffect(() => {
@@ -91,19 +104,12 @@ export default function PengajuanKpPage() {
     setDropdownLoading(true);
     setDropdownError(null);
 
-    Promise.all([
-      getRuanganList(1, '', DROPDOWN_LIMIT),
-      originalDate ? getSessionsByDate(originalDate) : Promise.resolve(null),
-    ]).then(([ruanganRes, sessionRes]) => {
+    getRuanganList(1, '', DROPDOWN_LIMIT).then((ruanganRes) => {
       if (cancelled) return;
       if (!ruanganRes.success) {
         setDropdownError(ruanganRes.message || 'Gagal memuat daftar ruangan.');
       }
-      if (sessionRes && !sessionRes.success) {
-        setDropdownError(sessionRes.message || 'Gagal memuat daftar sesi.');
-      }
       setRuanganList(ruanganRes.success ? ruanganRes.data?.items ?? [] : []);
-      setSessionList(sessionRes?.success ? sessionRes.data ?? [] : []);
     }).catch((e: unknown) => {
       if (cancelled) return;
       setDropdownError(e instanceof Error ? e.message : 'Gagal memuat data form.');
@@ -193,7 +199,8 @@ export default function PengajuanKpPage() {
         setTimeout(() => {
           setIsSuccess(false);
           handleCloseSheet();
-          fetchHistory();
+          reset();
+          fetchHistory(1, false, true);
         }, 2000);
       } else {
         setSubmitError(res.message || 'Gagal mengajukan kelas pengganti.');
@@ -211,7 +218,7 @@ export default function PengajuanKpPage() {
     try {
       const res = await deleteSubstitution(id);
       if (res.success) {
-        fetchHistory();
+        removeItem(id);
       } else {
         alert(res.message || 'Gagal membatalkan pengajuan.');
       }
@@ -228,6 +235,7 @@ export default function PengajuanKpPage() {
     idSession.trim() !== '' &&
     idRuangan.trim() !== '' &&
     reason.trim() !== '';
+  const hasMoreHistory = history.length < historyTotal;
 
   return (
     <AsdosPageShell>
@@ -241,7 +249,7 @@ export default function PengajuanKpPage() {
           </AsdosPrimaryButton>
         }
       />
-      <div className="space-y-3 pb-28 md:pb-8 px-4 md:px-0">
+      <div className="space-y-3 pb-28 md:pb-8">
         {historyLoading && (
           <AsdosLoadingState message="Memuat riwayat..." />
         )}
@@ -263,7 +271,6 @@ export default function PengajuanKpPage() {
             <div key={item.id}
               className="bg-white rounded-2xl md:rounded-[1.25rem] p-4 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all group">
               
-              {/* Mobile View */}
               <div className="flex flex-col gap-3 md:hidden">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3 min-w-0">
@@ -320,7 +327,6 @@ export default function PengajuanKpPage() {
                 )}
               </div>
 
-              {/* Desktop View */}
               <div className="hidden md:block">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-4 min-w-0">
@@ -388,9 +394,22 @@ export default function PengajuanKpPage() {
 
 
         {!historyLoading && !historyError && history.length > 0 && (
-          <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 mt-2 text-center md:text-left">
-            Menampilkan {history.length} pengajuan kelas pengganti.
-          </p>
+          <>
+            <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 mt-2 text-center md:text-left">
+              Menampilkan {history.length} dari {historyTotal} pengajuan kelas pengganti.
+            </p>
+            {hasMoreHistory && (
+              <div className="flex justify-center pt-2">
+                <button
+                  onClick={() => fetchHistory(currentPage + 1, true)}
+                  disabled={loadingMore}
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:border-[#941C2F]/30 hover:text-[#941C2F] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                >
+                  {loadingMore ? 'Memuat...' : 'Show More'}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

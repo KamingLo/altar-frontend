@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Search, Filter, Clock, MapPin, BookOpen, X } from 'lucide-react';
 import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { AsdosLoadingState, AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
+import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
 
 type HistoryItem = {
   id: string; subject: string; date: string;
@@ -52,9 +53,18 @@ function mapPresensiToHistory(item: PresensiResponseDTO): HistoryItem {
 export default function RiwayatKehadiranPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'BERJALAN' | 'SELESAI'>('ALL');
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const {
+    items,
+    fetched,
+    visibleCount,
+    isLoading,
+    error,
+    setItems,
+    setLoading,
+    setError,
+    showMore,
+    resetVisible,
+  } = useRiwayatKehadiranStore();
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
@@ -64,27 +74,39 @@ export default function RiwayatKehadiranPage() {
 
   useEffect(() => {
     async function fetchHistory() {
-      setIsLoading(true);
-      setFetchError(null);
+      if (fetched) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
       const res = await getMyPresensi();
 
       if (res.success && res.data) {
-        setHistory(res.data.map(mapPresensiToHistory));
+        setItems(res.data);
       } else {
-        setFetchError(res.message || 'Gagal memuat riwayat kehadiran.');
+        setError(res.message || 'Gagal memuat riwayat kehadiran.');
       }
 
-      setIsLoading(false);
+      setLoading(false);
     }
 
     fetchHistory();
-  }, []);
+  }, [fetched, setError, setItems, setLoading]);
 
+  useEffect(() => {
+    resetVisible();
+  }, [searchTerm, filterStatus, resetVisible]);
+
+  const history = items.map(mapPresensiToHistory);
   const filtered = history.filter(item =>
     (item.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.room.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (filterStatus === 'ALL' || item.status === filterStatus)
   );
+  const displayed = filtered.slice(0, visibleCount);
+  const hasMore = displayed.length < filtered.length;
 
   const handleOpenSheet = (item: HistoryItem) => {
     setSelectedItem(item);
@@ -157,9 +179,9 @@ export default function RiwayatKehadiranPage() {
       <div className="space-y-3 pb-8">
         {isLoading ? (
           <AsdosLoadingState message="Memuat riwayat kehadiran..." />
-        ) : fetchError ? (
-          <AsdosState variant="error" message={fetchError} />
-        ) : filtered.length > 0 ? filtered.map(item => {
+        ) : error ? (
+          <AsdosState variant="error" message={error} />
+        ) : displayed.length > 0 ? displayed.map(item => {
           const cfg = statusCfg[item.status];
           return (
             <div key={item.id} onClick={() => handleOpenSheet(item)}
@@ -222,8 +244,18 @@ export default function RiwayatKehadiranPage() {
           <AsdosState icon={<BookOpen size={22} />} title="Riwayat tidak ditemukan." message="Coba gunakan kata kunci atau filter lain." />
         )}
         <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 md:mt-2">
-          Menampilkan {filtered.length} riwayat kehadiran.
+          Menampilkan {displayed.length} dari {filtered.length} riwayat kehadiran.
         </p>
+        {hasMore && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={showMore}
+              className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:border-[#941C2F]/30 hover:text-[#941C2F] transition-all"
+            >
+              Show More
+            </button>
+          </div>
+        )}
       </div>
 
       {selectedItem && (

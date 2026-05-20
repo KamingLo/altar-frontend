@@ -1,10 +1,10 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { Check, Scan, ArrowLeft, Clock, BookOpen, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { getMyPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
+import { AsdosListSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 
 export default function CheckOutPage() {
   const [step, setStep] = useState(1);
@@ -142,8 +142,9 @@ export default function CheckOutPage() {
 
       setCameraStatus('active');
       startDecodeLoop();
-    } catch (err: any) {
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+    } catch (err: unknown) {
+      const errorName = err instanceof DOMException ? err.name : '';
+      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
         setCameraStatus('denied');
         setScanMessage('Izin kamera ditolak. Aktifkan izin kamera di pengaturan browser wak.');
       } else {
@@ -203,11 +204,6 @@ export default function CheckOutPage() {
     e.target.value = '';
   }, []);
 
-  const handleSimulateScan = () => {
-    setQrToken('VALID_SIMULATED_QR_TOKEN_OUT');
-    setStep(2);
-  };
-
   const handleConfirmCheckOut = async () => {
     if (!activePresensi) return;
 
@@ -229,10 +225,15 @@ export default function CheckOutPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh]">
-        <Loader2 className="w-10 h-10 text-[#941C2F] animate-spin mb-4" />
-        <p className="text-slate-500 font-medium">Memeriksa status kehadiran...</p>
-      </div>
+      <AsdosPageShell>
+        <div className="px-4 md:px-0 py-6 md:py-0 space-y-4">
+          <div className="space-y-2">
+            <div className="h-3.5 w-36 rounded-lg animate-shimmer" />
+            <div className="h-8 w-56 rounded-xl animate-shimmer" />
+          </div>
+          <AsdosListSkeleton count={3} />
+        </div>
+      </AsdosPageShell>
     );
   }
 
