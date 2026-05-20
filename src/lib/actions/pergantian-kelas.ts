@@ -40,7 +40,7 @@ export async function createSubstitution(data: {
 
 // Asdos: batalkan request yang masih PENDING
 export async function deleteSubstitution(id: string) {
-  const res = await apiClient.delete(`/substitute-sessions/${id}`, { auth: true });
+  const res = await apiClient.delete(`/substitute-sessions/${id}`, undefined, { auth: true });
   return { success: res.success, message: res.message };
 }
 

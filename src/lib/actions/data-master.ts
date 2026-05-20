@@ -25,7 +25,7 @@ export async function updateKelas(id: string, data: { nama_kelas: string; jurusa
 }
 
 export async function deleteKelas(id: string) {
-  const res = await apiClient.delete(`/classes/${id}`, { auth: true });
+  const res = await apiClient.delete(`/classes/${id}`, undefined, { auth: true });
   return { success: res.success, message: res.message };
 }
 
@@ -49,16 +49,16 @@ export async function updateMK(id: string, data: { nama_mk: string; sks: number 
 }
 
 export async function deleteMK(id: string) {
-  const res = await apiClient.delete(`/courses/${id}`, { auth: true });
+  const res = await apiClient.delete(`/courses/${id}`, undefined, { auth: true });
   return { success: res.success, message: res.message };
 }
 
-// ─── RUANGAN (/rooms) — GET: public, lainnya: Koordinator ────────────────────
+// ─── RUANGAN (/rooms) — auth: Koordinator ────────────────────────────────────
 
-export async function getRuanganList(page = 1, search = '') {
+export async function getRuanganList(page = 1, search = '', limit = 10) {
   return apiClient.get<PaginatedResponse<RuanganItem>>(
-    `/rooms?page=${page}&limit=10&search=${encodeURIComponent(search)}`,
-    { cache: 'no-store' },
+    `/rooms?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
+    { auth: true, cache: 'no-store' },
   );
 }
 
@@ -73,16 +73,16 @@ export async function updateRuangan(id: string, data: { nama_ruangan: string; la
 }
 
 export async function deleteRuangan(id: string) {
-  const res = await apiClient.delete(`/rooms/${id}`, { auth: true });
+  const res = await apiClient.delete(`/rooms/${id}`, undefined, { auth: true });
   return { success: res.success, message: res.message };
 }
 
-// ─── SEMESTER (/semesters) — public ──────────────────────────────────────────
+// ─── SEMESTER (/semesters) — auth: Koordinator ───────────────────────────────
 
 export async function getSemesterList(page = 1, search = '', limit = 10) {
   return apiClient.get<PaginatedResponse<SemesterItem>>(
     `/semesters?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
-    { cache: 'no-store' },
+    { auth: true, cache: 'no-store' },
   );
 }
 
@@ -100,6 +100,6 @@ export async function updateSemester(
 }
 
 export async function deleteSemester(id: string) {
-  const res = await apiClient.delete(`/semesters/${id}`, { auth: true });
+  const res = await apiClient.delete(`/semesters/${id}`, undefined, { auth: true });
   return { success: res.success, message: res.message };
 }

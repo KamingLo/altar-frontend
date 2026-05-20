@@ -29,6 +29,33 @@ export function sessionDateKey(tanggal: string): string {
   return tanggal.slice(0, 10);
 }
 
+/** Sesi pengganti memakai prefix sub- dan endpoint /substitute-sessions */
+export function isSubstituteSessionId(id: string): boolean {
+  return /^sub-/i.test(id);
+}
+
+function resolveDatedSessionId(id: string, isoDate: string, prefix: 'ses' | 'sub'): string {
+  const re = new RegExp(`^${prefix}-(\\d{8})-(.+)$`, 'i');
+  const m = id.match(re);
+  if (!m) return id;
+  const ymd = isoDate.replace(/-/g, '');
+  if (m[1] === ymd) return id;
+  return `${prefix}-${ymd}-${m[2]}`;
+}
+
+/**
+ * Backend kadang memakai id format ses-YYYYMMDD-...
+ * Timeline bisa mengembalikan id dari instance lain; sesuaikan id ke tanggal baris.
+ */
+export function resolveSessionIdForDate(id: string, isoDate: string): string {
+  return resolveDatedSessionId(id, isoDate, 'ses');
+}
+
+/** Sama seperti ses-, untuk id sub-YYYYMMDD-... pada sesi pengganti */
+export function resolveSubstituteSessionIdForDate(id: string, isoDate: string): string {
+  return resolveDatedSessionId(id, isoDate, 'sub');
+}
+
 export type SessionTipe = 'REGULER' | 'PENGGANTI';
 
 /** Backend bisa mengirim REGULAR/REGULER atau SUBSTITUTE/PENGGANTI */

@@ -141,12 +141,12 @@ export async function updateKoor(id: string, data: { nip: string }) {
 }
 
 export async function deleteAsdos(id: string) {
-  const res = await apiClient.delete(`/asdos/${id}`, { auth: true });
+  const res = await apiClient.delete(`/asdos/${id}`, undefined, { auth: true });
   return { success: res.success, message: res.message };
 }
 
 export async function deleteKoor(id: string) {
-  const res = await apiClient.delete(`/koor/${id}`, { auth: true });
+  const res = await apiClient.delete(`/koor/${id}`, undefined, { auth: true });
   return { success: res.success, message: res.message };
 }
 

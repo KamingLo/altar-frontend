@@ -121,8 +121,13 @@ export async function editSesi(id: string, data: SessionBody, instanceDate?: str
   return { success: res.success, message: res.message };
 }
 
-/** DELETE /sessions/:id */
-export async function hapusSesi(id: string, instanceDate?: string) {
-  const res = await deleteSession(id, instanceDate);
+/** DELETE /sessions/:id atau /substitute-sessions/:id (sesi pengganti, id sub-...) */
+export async function hapusSesi(
+  id: string,
+  instanceDate?: string,
+  data?: SessionBody,
+  tipe?: string,
+) {
+  const res = await deleteSession(id, instanceDate, data, tipe);
   return { success: res.success, message: res.message };
 }

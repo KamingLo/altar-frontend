@@ -1,6 +1,13 @@
 'use server';
 
 import { apiClient } from '@/lib/api/client';
+import { isSessionExpiredMessage } from '@/lib/auth/jwt';
+import {
+  isPenggantiTipe,
+  isSubstituteSessionId,
+  resolveSessionIdForDate,
+  resolveSubstituteSessionIdForDate,
+} from '@/lib/jadwal-utils';
 import type { JadwalTimelineParams, SessionTimeline, UnifiedJadwalResponse } from '@/types/api';
 
 export interface SessionFromAPI {
@@ -64,10 +71,42 @@ export async function updateSession(id: string, data: SessionBody, instanceDate?
 }
 
 // Koordinator: hapus sesi jadwal (instanceDate = tanggal baris timeline yang dihapus)
-export async function deleteSession(id: string, instanceDate?: string) {
-  const q = instanceDate ? `?tanggal=${encodeURIComponent(instanceDate)}` : '';
-  const res = await apiClient.delete(`/sessions/${id}${q}`, { auth: true });
-  return { success: res.success, message: res.message };
+export async function deleteSession(
+  id: string,
+  instanceDate?: string,
+  data?: SessionBody,
+  tipe?: string,
+) {
+  // Sesi pengganti (id sub-...) → DELETE /substitute-sessions/:id
+  if (isSubstituteSessionId(id) || (tipe && isPenggantiTipe(tipe))) {
+    const ids = instanceDate
+      ? [...new Set([id, resolveSubstituteSessionIdForDate(id, instanceDate)])]
+      : [id];
+    let lastMessage = 'Gagal menghapus sesi pengganti.';
+    for (const subId of ids) {
+      const res = await apiClient.delete(`/substitute-sessions/${subId}`, undefined, { auth: true });
+      if (res.success) return { success: true, message: res.message };
+      if (isSessionExpiredMessage(res.message)) {
+        return { success: false, message: res.message };
+      }
+      lastMessage = res.message || lastMessage;
+    }
+    return { success: false, message: lastMessage };
+  }
+
+  if (!instanceDate) {
+    return { success: false, message: 'Tanggal sesi wajib untuk menghapus.' };
+  }
+
+  const sessionId = resolveSessionIdForDate(id, instanceDate);
+  const body = data ? { ...data, tanggal: instanceDate } : { tanggal: instanceDate };
+  const q = `?tanggal=${encodeURIComponent(instanceDate)}`;
+  const res = await apiClient.delete(`/sessions/${sessionId}${q}`, body, { auth: true });
+  if (res.success) return { success: true, message: res.message };
+  if (isSessionExpiredMessage(res.message)) {
+    return { success: false, message: res.message };
+  }
+  return { success: false, message: res.message || 'Gagal menghapus sesi.' };
 }
 
 // Asdos: timeline jadwal sendiri dalam date range

@@ -1,20 +1,18 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { decodeJwtPayload, isJwtExpired } from '@/lib/auth/jwt';
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const [, payload] = token.split('.');
-    // JWT uses base64url encoding — convert and add padding
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
-    const decoded = atob(padded);
-    return JSON.parse(decoded);
-  } catch {
-    return null;
+function loginRedirect(request: NextRequest, clearToken: boolean) {
+  const url = new URL('/auth/login', request.url);
+  if (clearToken) url.searchParams.set('expired', '1');
+  const response = NextResponse.redirect(url);
+  if (clearToken) {
+    response.cookies.delete('auth_token');
   }
+  return response;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const token = request.cookies.get('auth_token')?.value;
   const { pathname } = request.nextUrl;
 
@@ -23,28 +21,30 @@ export function middleware(request: NextRequest) {
   const isDashboard = pathname === '/dashboard';
   const isAuthPage =
     pathname.startsWith('/auth/login') || pathname.startsWith('/auth/register');
+  const isProtectedPath = isAsdosPath || isKoordinatorPath;
 
-  // /dashboard: redirect server-side ke dashboard yang sesuai
+  if (token && isJwtExpired(token) && (isProtectedPath || isDashboard)) {
+    return loginRedirect(request, true);
+  }
+
   if (isDashboard) {
     if (!token) {
-      return NextResponse.redirect(new URL('/auth/login', request.url));
+      return loginRedirect(request, false);
     }
     const payload = decodeJwtPayload(token);
     if (!payload) {
-      return NextResponse.redirect(new URL('/auth/login', request.url));
+      return loginRedirect(request, true);
     }
     return NextResponse.redirect(
-      new URL(payload.id_koordinator ? '/koordinator' : '/asdos', request.url)
+      new URL(payload.id_koordinator ? '/koordinator' : '/asdos', request.url),
     );
   }
 
-  // Unauthenticated: redirect ke login untuk halaman yang dilindungi
-  if ((isAsdosPath || isKoordinatorPath) && !token) {
-    return NextResponse.redirect(new URL('/auth/login', request.url));
+  if (isProtectedPath && !token) {
+    return loginRedirect(request, false);
   }
 
-  // Authenticated: redirect dari auth pages ke dashboard yang sesuai
-  if (isAuthPage && token) {
+  if (isAuthPage && token && !isJwtExpired(token)) {
     const payload = decodeJwtPayload(token);
     if (payload?.id_koordinator) {
       return NextResponse.redirect(new URL('/koordinator', request.url));
@@ -52,11 +52,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/asdos', request.url));
   }
 
-  // Role mismatch: redirect ke dashboard yang benar
-  if (token && (isAsdosPath || isKoordinatorPath)) {
+  if (token && !isJwtExpired(token) && isProtectedPath) {
     const payload = decodeJwtPayload(token);
     if (!payload) {
-      return NextResponse.redirect(new URL('/auth/login', request.url));
+      return loginRedirect(request, true);
     }
 
     const isAsdos = !!payload.id_asisten;
@@ -64,13 +63,13 @@ export function middleware(request: NextRequest) {
 
     if (isAsdosPath && !isAsdos) {
       return NextResponse.redirect(
-        new URL(isKoordinator ? '/koordinator' : '/auth/login', request.url)
+        new URL(isKoordinator ? '/koordinator' : '/auth/login', request.url),
       );
     }
 
     if (isKoordinatorPath && !isKoordinator) {
       return NextResponse.redirect(
-        new URL(isAsdos ? '/asdos' : '/auth/login', request.url)
+        new URL(isAsdos ? '/asdos' : '/auth/login', request.url),
       );
     }
   }
