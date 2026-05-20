@@ -23,9 +23,9 @@ const SLOT_OPTIONS = [
 
 type KpStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 const statusConfig: Record<KpStatus, { icon: React.ElementType; bg: string; text: string; border: string; label: string }> = {
-  PENDING:  { icon: Clock,        bg: 'bg-slate-100',  text: 'text-slate-500',   border: 'border-slate-200',   label: 'Menunggu'  },
+  PENDING: { icon: Clock, bg: 'bg-slate-100', text: 'text-slate-500', border: 'border-slate-200', label: 'Menunggu' },
   VERIFIED: { icon: CheckCircle2, bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', label: 'Disetujui' },
-  REJECTED: { icon: XCircle,      bg: 'bg-rose-50',    text: 'text-rose-600',    border: 'border-rose-100',    label: 'Ditolak'   },
+  REJECTED: { icon: XCircle, bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-100', label: 'Ditolak' },
 };
 
 function formatDate(iso: string) {
@@ -53,11 +53,21 @@ export default function PengajuanKpPage() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [sheetStartY, setSheetStartY] = useState(0);
   const [sheetDragY, setSheetDragY] = useState(0);
-  const [originalDate, setOriginalDate] = useState('');  
+  const [isMobile, setIsMobile] = useState(false);
+
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeleteVisible, setIsDeleteVisible] = useState(false);
+  const [isDeleteClosing, setIsDeleteClosing] = useState(false);
+  const [deleteDragY, setDeleteDragY] = useState(0);
+  const [deleteStartY, setDeleteStartY] = useState(0);
+  const [targetDeleteId, setTargetDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [originalDate, setOriginalDate] = useState('');
   const [substituteDate, setSubstituteDate] = useState('');
-  const [idSession, setIdSession] = useState('');        
-  const [idRuangan, setIdRuangan] = useState('');        
-  const [slotOption, setSlotOption] = useState(1);       
+  const [idSession, setIdSession] = useState('');
+  const [idRuangan, setIdRuangan] = useState('');
+  const [slotOption, setSlotOption] = useState(1);
   const [reason, setReason] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -96,6 +106,11 @@ export default function PengajuanKpPage() {
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
   useEffect(() => {
     setClientToday(todayIso());
+
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -181,6 +196,28 @@ export default function PengajuanKpPage() {
     else setSheetDragY(0);
   };
 
+  const handleOpenDelete = (id: string) => {
+    setTargetDeleteId(id);
+    setIsDeleteOpen(true);
+    setIsDeleteClosing(false);
+    setDeleteDragY(0);
+    setDeleteError(null);
+    setTimeout(() => setIsDeleteVisible(true), 10);
+  };
+
+  const handleCloseDelete = () => {
+    if (deletingId) return;
+    setIsDeleteClosing(true);
+    setIsDeleteVisible(false);
+    setTimeout(() => {
+      setIsDeleteOpen(false);
+      setIsDeleteClosing(false);
+      setDeleteDragY(0);
+      setTargetDeleteId(null);
+      setDeleteError(null);
+    }, 300);
+  };
+
   const handleSubmit = async () => {
     setSubmitLoading(true);
     setSubmitError(null);
@@ -212,18 +249,24 @@ export default function PengajuanKpPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Yakin mau batalkan pengajuan ini?')) return;
-    setDeletingId(id);
+  const handleDelete = (id: string) => {
+    handleOpenDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!targetDeleteId) return;
+    setDeletingId(targetDeleteId);
+    setDeleteError(null);
     try {
-      const res = await deleteSubstitution(id);
+      const res = await deleteSubstitution(targetDeleteId);
       if (res.success) {
-        removeItem(id);
+        removeItem(targetDeleteId);
+        handleCloseDelete();
       } else {
-        alert(res.message || 'Gagal membatalkan pengajuan.');
+        setDeleteError(res.message || 'Gagal membatalkan pengajuan.');
       }
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Terjadi kesalahan jaringan.');
+      setDeleteError(e instanceof Error ? e.message : 'Terjadi kesalahan jaringan.');
     } finally {
       setDeletingId(null);
     }
@@ -270,7 +313,7 @@ export default function PengajuanKpPage() {
           return (
             <div key={item.id}
               className="bg-white rounded-2xl md:rounded-[1.25rem] p-4 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all group">
-              
+
               <div className="flex flex-col gap-3 md:hidden">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3 min-w-0">
@@ -318,7 +361,7 @@ export default function PengajuanKpPage() {
                     )}
                   </div>
                 </div>
-                
+
                 {item.status === 'REJECTED' && item.coordinator_reason && (
                   <div className="bg-rose-50 border border-rose-100 px-3 py-2 rounded-lg">
                     <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-0.5">Alasan Ditolak</p>
@@ -431,15 +474,18 @@ export default function PengajuanKpPage() {
           />
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none">
             <div
-              className="w-full max-w-md md:max-w-xl bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto"
-              style={{
+              className={`w-full max-w-md md:max-w-xl bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto transition-all duration-300
+                ${!isMobile && isSheetVisible && !isSheetClosing ? 'opacity-100 scale-100' : ''}
+                ${!isMobile && (!isSheetVisible || isSheetClosing) ? 'opacity-0 scale-95' : ''}
+              `}
+              style={isMobile ? {
                 transform: (!isSheetVisible || isSheetClosing)
                   ? 'translateY(100%)'
                   : `translateY(${sheetDragY}px)`,
                 transition: (!isSheetVisible || isSheetClosing || sheetDragY === 0)
                   ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
                   : 'none',
-              }}
+              } : {}}
             >
               <div
                 className="w-full flex md:hidden items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none shrink-0"
@@ -476,7 +522,7 @@ export default function PengajuanKpPage() {
                         <X size={18} />
                       </button>
                     </div>
-                    
+
                     {dropdownLoading ? (
                       <div className="flex items-center justify-center py-10">
                         <div className="w-7 h-7 border-4 border-[#941C2F]/20 border-t-[#941C2F] rounded-full animate-spin" />
@@ -612,6 +658,132 @@ export default function PengajuanKpPage() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {isDeleteOpen && (
+        <>
+          <div
+            onClick={handleCloseDelete}
+            className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out
+              ${isDeleteVisible && !isDeleteClosing ? 'opacity-100' : 'opacity-0'}`}
+          />
+
+          <div className="hidden md:flex fixed inset-0 z-50 items-center justify-center pointer-events-auto">
+            <div
+              className={`bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden transition-all duration-300 ${isDeleteVisible && !isDeleteClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+                }`}
+            >
+              <div className="p-7 pb-5">
+                <div className="flex items-center justify-center w-14 h-14 bg-rose-50 rounded-2xl mx-auto mb-5 text-[#941C2F]">
+                  <Trash2 size={24} />
+                </div>
+                <h2 className="text-[20px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">
+                  Batalkan Pengajuan?
+                </h2>
+                <p className="text-sm text-slate-500 text-center leading-relaxed">
+                  Apakah Anda yakin ingin membatalkan pengajuan kelas pengganti ini? Tindakan ini tidak dapat dibatalkan.
+                </p>
+
+                {deleteError && (
+                  <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold mt-4 flex items-center gap-2 text-left">
+                    <span>⚠️</span>
+                    <span className="flex-1">{deleteError}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 pb-6 flex gap-3">
+                <button
+                  onClick={handleCloseDelete}
+                  disabled={!!deletingId}
+                  className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={!!deletingId}
+                  className="flex-1 py-3 rounded-xl bg-[#941C2F] text-white font-bold text-sm shadow-md shadow-[#941C2F]/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {deletingId ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    'Ya, Batalkan'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="md:hidden fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
+            <div
+              className="w-full max-w-md bg-white rounded-t-[28px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden pointer-events-auto"
+              style={{
+                transform: (!isDeleteVisible || isDeleteClosing)
+                  ? 'translateY(100%)'
+                  : `translateY(${deleteDragY}px)`,
+                transition: (!isDeleteVisible || isDeleteClosing || deleteDragY === 0)
+                  ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
+                  : 'none',
+              }}
+            >
+              <div
+                className="w-full flex items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none shrink-0"
+                onTouchStart={(e) => setDeleteStartY(e.touches[0].clientY)}
+                onTouchMove={(e) => {
+                  const delta = e.touches[0].clientY - deleteStartY;
+                  if (delta > 0) setDeleteDragY(delta);
+                }}
+                onTouchEnd={() => {
+                  if (deleteDragY > 100) handleCloseDelete();
+                  else setDeleteDragY(0);
+                }}
+              >
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+              </div>
+
+              <div className="px-6 pt-4 pb-8">
+                <div className="flex items-center justify-center w-14 h-14 bg-rose-50 rounded-2xl mx-auto mb-5 text-[#941C2F]">
+                  <Trash2 size={24} />
+                </div>
+                <h2 className="text-[22px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">
+                  Batalkan Pengajuan?
+                </h2>
+                <p className="text-sm text-slate-500 text-center leading-relaxed mb-6">
+                  Apakah Anda yakin ingin membatalkan pengajuan kelas pengganti ini? Tindakan ini tidak dapat dibatalkan.
+                </p>
+
+                {deleteError && (
+                  <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold mb-6 flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span className="flex-1">{deleteError}</span>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={confirmDelete}
+                    disabled={!!deletingId}
+                    className="w-full py-4 rounded-2xl bg-[#941C2F] text-white font-bold text-[15px] shadow-md shadow-[#941C2F]/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {deletingId ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      'Ya, Batalkan'
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCloseDelete}
+                    disabled={!!deletingId}
+                    className="w-full py-4 rounded-2xl bg-slate-100 text-slate-600 font-bold text-[15px] hover:bg-slate-200 active:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </>
