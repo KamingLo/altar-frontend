@@ -14,7 +14,9 @@ import {
   getSemesterList,
 } from '@/lib/actions/data-master';
 import { getAsdosList } from '@/lib/actions/manajemen';
-import { dedupeSessions } from '@/lib/jadwal-utils';
+import { getLecturerList, type LecturerItem } from '@/lib/actions/lecturer';
+import { deleteSubstitution } from '@/lib/actions/pergantian-kelas';
+import { dedupeSessions, isSubstituteSessionId, isPenggantiTipe } from '@/lib/jadwal-utils';
 import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem, SessionTimeline } from '@/types/api';
 import type { AsdosListItem } from '@/lib/actions/manajemen';
 
@@ -26,6 +28,7 @@ export type DropdownData = {
   ruanganList: RuanganItem[];
   semesterList: SemesterItem[];
   asdosList: AsdosListItem[];
+  lecturerList: LecturerItem[];
 };
 
 function normalizeAsdosList(data: unknown): AsdosListItem[] {
@@ -57,26 +60,27 @@ export async function fetchSessions(params: {
   };
 }
 
-/** Data dropdown form — kelas, MK, ruangan, semester, asdos dari DB */
+/** Data dropdown form — kelas, MK, ruangan, semester, asdos, dosen dari DB */
 export async function fetchDropdownData(): Promise<{
   success: boolean;
   message: string;
   data: DropdownData;
 }> {
-  const [kelasRes, mkRes, ruanganRes, semesterRes, asdosRes] = await Promise.all([
+  const [kelasRes, mkRes, ruanganRes, semesterRes, asdosRes, lecturerRes] = await Promise.all([
     getKelasList(1, '', DROPDOWN_LIMIT),
     getMKList(1, '', DROPDOWN_LIMIT),
     getRuanganList(1, '', DROPDOWN_LIMIT),
     getSemesterList(1, '', DROPDOWN_LIMIT),
     getAsdosList(1, '', DROPDOWN_LIMIT),
+    getLecturerList(1, '', DROPDOWN_LIMIT),
   ]);
 
-  const failed = [kelasRes, mkRes, ruanganRes, semesterRes, asdosRes].find(r => !r.success);
+  const failed = [kelasRes, mkRes, ruanganRes, semesterRes, asdosRes, lecturerRes].find(r => !r.success);
   if (failed) {
     return {
       success: false,
       message: failed.message || 'Gagal memuat data form dari server.',
-      data: { kelasList: [], mkList: [], ruanganList: [], semesterList: [], asdosList: [] },
+      data: { kelasList: [], mkList: [], ruanganList: [], semesterList: [], asdosList: [], lecturerList: [] },
     };
   }
 
@@ -89,6 +93,7 @@ export async function fetchDropdownData(): Promise<{
       ruanganList: ruanganRes.data?.items ?? [],
       semesterList: semesterRes.data?.items ?? [],
       asdosList: normalizeAsdosList(asdosRes.data),
+      lecturerList: lecturerRes.data?.items ?? [],
     },
   };
 }
@@ -121,8 +126,17 @@ export async function editSesi(id: string, data: SessionBody, instanceDate?: str
   return { success: res.success, message: res.message };
 }
 
-/** DELETE /sessions/:id */
-export async function hapusSesi(id: string, instanceDate?: string) {
+/** DELETE /sessions/:id atau /substitute-sessions/:id */
+export async function hapusSesi(
+  id: string,
+  instanceDate?: string,
+  payload?: SessionBody,
+  tipe?: string,
+) {
+  if (isSubstituteSessionId(id) || (tipe && isPenggantiTipe(tipe))) {
+    const res = await deleteSubstitution(id);
+    return { success: res.success, message: res.message };
+  }
   const res = await deleteSession(id, instanceDate);
   return { success: res.success, message: res.message };
 }

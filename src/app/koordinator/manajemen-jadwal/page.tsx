@@ -2,12 +2,15 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertCircle,
   BookOpen,
   CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
   Filter,
+  Loader2,
   MapPin,
   Plus,
   Search,
@@ -25,6 +28,7 @@ import {
 } from '@/lib/actions/manajemen-jadwal';
 import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem, SessionTimeline } from '@/types/api';
 import type { AsdosListItem } from '@/lib/actions/manajemen';
+import type { LecturerItem } from '@/lib/actions/lecturer';
 import {
   HARI_OPTIONS,
   JAM_OPTIONS,
@@ -35,6 +39,7 @@ import {
   findByDisplayLabel,
   getMonthBounds,
   isPenggantiTipe,
+  isSubstituteSessionId,
   normalizeSessionTipe,
   pengajarDisplayName,
   semesterLabel,
@@ -42,8 +47,29 @@ import {
   sessionRowKey,
   toIsoDate,
 } from '@/lib/jadwal-utils';
+import { CustomSelect } from '@/components/ui/CustomSelect';
+import { isSessionExpiredMessage } from '@/lib/auth/jwt';
+
+function redirectIfSessionExpired(message: string | undefined): boolean {
+  if (typeof window !== 'undefined' && isSessionExpiredMessage(message)) {
+    window.location.href = '/auth/login?expired=1';
+    return true;
+  }
+  return false;
+}
 
 const dayNamesGrid = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
+const FILTER_TIPE_OPTIONS = [
+  { value: 'ALL', label: 'Semua Tipe' },
+  { value: 'REGULER', label: 'Reguler' },
+  { value: 'PENGGANTI', label: 'Pengganti' },
+];
+const HARI_SELECT_OPTIONS = HARI_OPTIONS.map(h => ({ value: String(h.value), label: h.label }));
+const JAM_SELECT_OPTIONS = JAM_OPTIONS.map(j => ({
+  value: String(j.value),
+  label: j.label,
+  description: j.range,
+}));
 const dayNamesFull = ['MIN', 'SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB'];
 
 type TipeFilter = 'ALL' | 'REGULER' | 'PENGGANTI';
@@ -57,6 +83,7 @@ type SessionForm = {
   opsi_jam: number;
   id_asdos1: string;
   id_asdos2: string;
+  id_dosen: string;
 };
 
 const emptyForm = (tanggal = ''): SessionForm => ({
@@ -68,6 +95,7 @@ const emptyForm = (tanggal = ''): SessionForm => ({
   opsi_jam: 1,
   id_asdos1: '',
   id_asdos2: '',
+  id_dosen: '',
 });
 
 export default function ManajemenJadwalPage() {
@@ -75,8 +103,11 @@ export default function ManajemenJadwalPage() {
   const [selectedSemesterId, setSelectedSemesterId] = useState('');
   const [sessions, setSessions] = useState<SessionTimeline[]>([]);
   const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [semesterError, setSemesterError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
@@ -84,7 +115,6 @@ export default function ManajemenJadwalPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipe, setFilterTipe] = useState<TipeFilter>('ALL');
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -93,7 +123,7 @@ export default function ManajemenJadwalPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingSession, setEditingSession] = useState<SessionTimeline | null>(null);
   const [form, setForm] = useState<SessionForm>(emptyForm);
-  const [formError, setFormError] = useState('');
+  const [instructorType, setInstructorType] = useState<'DOSEN' | 'ASDOS'>('DOSEN');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dropdownLoading, setDropdownLoading] = useState(false);
 
@@ -101,12 +131,12 @@ export default function ManajemenJadwalPage() {
   const [mkList, setMkList] = useState<MataKuliahItem[]>([]);
   const [ruanganList, setRuanganList] = useState<RuanganItem[]>([]);
   const [asdosList, setAsdosList] = useState<AsdosListItem[]>([]);
+  const [lecturerList, setLecturerList] = useState<LecturerItem[]>([]);
 
   const [deleteTarget, setDeleteTarget] = useState<SessionTimeline | null>(null);
   const [isDeleteVisible, setIsDeleteVisible] = useState(false);
   const [isDeleteClosing, setIsDeleteClosing] = useState(false);
   const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
 
   const [sheetDragY, setSheetDragY] = useState(0);
   const [sheetStartY, setSheetStartY] = useState(0);
@@ -114,6 +144,11 @@ export default function ManajemenJadwalPage() {
   const [deleteSheetStartY, setDeleteSheetStartY] = useState(0);
 
   const initialSemesterLoaded = useRef(false);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' = 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  }, []);
 
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const gridOffset = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7;
@@ -130,6 +165,35 @@ export default function ManajemenJadwalPage() {
 
   const selectedSemester = semesters.find(s => s.id === selectedSemesterId);
 
+  const semesterOptions = useMemo(
+    () => semesters.map(s => ({ value: s.id, label: semesterLabel(s.tahun_ajaran, s.tipe_semester) })),
+    [semesters],
+  );
+  const kelasOptions = useMemo(
+    () => kelasList.map(k => ({ value: k.id, label: k.nama_kelas, description: k.jurusan })),
+    [kelasList],
+  );
+  const mkOptions = useMemo(
+    () => mkList.map(m => ({ value: m.id, label: m.nama_mk, description: `${m.sks} SKS` })),
+    [mkList],
+  );
+  const ruanganOptions = useMemo(
+    () => ruanganList.map(r => ({ value: r.id, label: r.nama_ruangan, description: `Lantai ${r.lantai}` })),
+    [ruanganList],
+  );
+  const asdosOptions = useMemo(
+    () => asdosList.map(a => ({ value: a.id_asdos, label: a.username, description: a.nim })),
+    [asdosList],
+  );
+  const asdos2Options = useMemo(
+    () => asdosOptions.filter(a => a.value !== form.id_asdos1),
+    [asdosOptions, form.id_asdos1],
+  );
+  const lecturerOptions = useMemo(
+    () => lecturerList.map(l => ({ value: l.id, label: l.nama, description: l.nip })),
+    [lecturerList],
+  );
+
   const refreshSessions = useCallback(async () => {
     if (!selectedSemesterId) return;
     setLoading(true);
@@ -143,10 +207,14 @@ export default function ManajemenJadwalPage() {
       setSessions(res.items);
     } else {
       setSessions([]);
-      setFetchError(res.message);
+      setFetchError(res.message || 'Gagal memuat sesi jadwal.');
+      if (!redirectIfSessionExpired(res.message)) {
+        showToast(res.message);
+      }
     }
     setLoading(false);
-  }, [selectedSemesterId, rangeStart, rangeEnd]);
+    setIsInitialLoad(false);
+  }, [selectedSemesterId, rangeStart, rangeEnd, showToast]);
 
   useEffect(() => {
     (async () => {
@@ -158,11 +226,15 @@ export default function ManajemenJadwalPage() {
           setSelectedSemesterId(res.items[0].id);
           initialSemesterLoaded.current = true;
         }
-      } else if (!res.success) {
-        setSemesterError(res.message);
+      } else {
+        setIsInitialLoad(false);
+        if (!res.success && !redirectIfSessionExpired(res.message)) {
+          setSemesterError(res.message || 'Gagal memuat data semester.');
+          showToast(res.message);
+        }
       }
     })();
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     if (!selectedSemesterId) return;
@@ -174,15 +246,17 @@ export default function ManajemenJadwalPage() {
     const res = await fetchDropdownData();
     setDropdownLoading(false);
     if (!res.success) {
-      setFormError(res.message);
+      if (redirectIfSessionExpired(res.message)) return null;
+      showToast(res.message);
       return null;
     }
     setKelasList(res.data.kelasList);
     setMkList(res.data.mkList);
     setRuanganList(res.data.ruanganList);
     setAsdosList(res.data.asdosList);
+    setLecturerList(res.data.lecturerList);
     return res.data;
-  }, []);
+  }, [showToast]);
 
   const hasActiveSearch = Boolean(searchTerm.trim()) || filterTipe !== 'ALL';
 
@@ -210,16 +284,6 @@ export default function ManajemenJadwalPage() {
     });
   }, [sessions, searchTerm, filterTipe, selectedIso, hasActiveSearch]);
 
-  const monthStats = useMemo(() => {
-    let reguler = 0;
-    let pengganti = 0;
-    for (const s of sessions) {
-      if (normalizeSessionTipe(s.tipe) === 'PENGGANTI') pengganti++;
-      else reguler++;
-    }
-    return { total: sessions.length, reguler, pengganti };
-  }, [sessions]);
-
   const handlePrevMonth = () => {
     if (currentMonth === 0) {
       setCurrentYear(y => y - 1);
@@ -236,15 +300,6 @@ export default function ManajemenJadwalPage() {
     setSelectedDate('1');
   };
 
-  const matchAsdos = (pengajar: string, asdos: AsdosListItem[]) => {
-    const name = pengajarDisplayName(pengajar).toLowerCase();
-    return (
-      asdos.find(a => a.username.toLowerCase() === name) ??
-      asdos.find(a => pengajar.toLowerCase().includes(a.username.toLowerCase())) ??
-      asdos.find(a => name.includes(a.username.toLowerCase()))
-    );
-  };
-
   const buildPayload = () => ({
     id_kelas: form.id_kelas,
     id_mk: form.id_mk,
@@ -255,7 +310,7 @@ export default function ManajemenJadwalPage() {
     opsi_jam: form.opsi_jam,
     id_asdos1: form.id_asdos1 || null,
     id_asdos2: form.id_asdos2 || null,
-    id_dosen: null,
+    id_dosen: form.id_dosen || null,
   });
 
   const prefillFromSession = (session: SessionTimeline, lists: {
@@ -263,12 +318,26 @@ export default function ManajemenJadwalPage() {
     mk: MataKuliahItem[];
     ruangan: RuanganItem[];
     asdos: AsdosListItem[];
+    lecturers: LecturerItem[];
   }): SessionForm => {
     const tanggal = sessionDateKey(session.tanggal);
     const kelas = findByDisplayLabel(lists.kelas, session.nama_kelas, k => k.nama_kelas);
     const mk = findByDisplayLabel(lists.mk, session.mata_kuliah, m => m.nama_mk);
     const ruangan = findByDisplayLabel(lists.ruangan, session.ruangan, r => r.nama_ruangan);
-    const asdos1 = matchAsdos(session.pengajar, lists.asdos);
+
+    const pengajar = pengajarDisplayName(session.pengajar);
+    let name1 = pengajar;
+    let name2 = '';
+    if (pengajar.includes(' & ')) {
+      const parts = pengajar.split(' & ');
+      name1 = parts[0].trim();
+      name2 = parts[1].trim();
+    }
+
+    const dosen = lists.lecturers.find(l => l.nama.toLowerCase() === name1.toLowerCase());
+    const asdos1 = dosen ? undefined : lists.asdos.find(a => a.username.toLowerCase() === name1.toLowerCase());
+    const asdos2 = name2 ? lists.asdos.find(a => a.username.toLowerCase() === name2.toLowerCase()) : undefined;
+
     return {
       tanggal,
       id_kelas: kelas?.id ?? '',
@@ -277,7 +346,8 @@ export default function ManajemenJadwalPage() {
       opsi_hari: opsiHariFromTanggal(tanggal),
       opsi_jam: opsiJamFromWaktu(session.waktu),
       id_asdos1: asdos1?.id_asdos ?? '',
-      id_asdos2: '',
+      id_asdos2: asdos2?.id_asdos ?? '',
+      id_dosen: dosen?.id ?? '',
     };
   };
 
@@ -293,7 +363,6 @@ export default function ManajemenJadwalPage() {
     setModalType(type);
     setEditingId(session?.id_sesi ?? null);
     setEditingSession(session ?? null);
-    setFormError('');
     setIsClosing(false);
     setSheetDragY(0);
     setIsModalOpen(true);
@@ -301,6 +370,7 @@ export default function ManajemenJadwalPage() {
 
     if (type === 'add') {
       setForm(emptyForm(selectedIso));
+      setInstructorType('DOSEN');
     } else if (session) {
       setForm(emptyForm(sessionDateKey(session.tanggal)));
     }
@@ -310,16 +380,23 @@ export default function ManajemenJadwalPage() {
 
     if (type === 'add') {
       setForm(emptyForm(selectedIso));
+      setInstructorType('DOSEN');
     } else if (session) {
       const filled = prefillFromSession(session, {
         kelas: lists.kelasList,
         mk: lists.mkList,
         ruangan: lists.ruanganList,
         asdos: lists.asdosList,
+        lecturers: lists.lecturerList,
       });
       setForm(filled);
+      if (filled.id_dosen) {
+        setInstructorType('DOSEN');
+      } else {
+        setInstructorType('ASDOS');
+      }
       if (!filled.id_kelas || !filled.id_mk || !filled.id_ruangan) {
-        setFormError(
+        showToast(
           'Beberapa data tidak ditemukan di daftar. Pilih ulang kelas, mata kuliah, atau ruangan sebelum menyimpan.',
         );
       }
@@ -340,24 +417,23 @@ export default function ManajemenJadwalPage() {
 
   const handleSubmit = async () => {
     if (!selectedSemesterId) {
-      setFormError('Pilih semester terlebih dahulu.');
+      showToast('Pilih semester terlebih dahulu.');
       return;
     }
     if (!form.tanggal) {
-      setFormError('Tanggal sesi wajib diisi.');
+      showToast('Tanggal sesi wajib diisi.');
       return;
     }
     if (!form.id_kelas || !form.id_mk || !form.id_ruangan) {
-      setFormError('Kelas, mata kuliah, dan ruangan wajib diisi.');
+      showToast('Kelas, mata kuliah, dan ruangan wajib diisi.');
       return;
     }
     if (modalType === 'edit' && !editingId) {
-      setFormError('Sesi tidak valid untuk diedit.');
+      showToast('Sesi tidak valid untuk diedit.');
       return;
     }
 
     setIsSubmitting(true);
-    setFormError('');
     const payload = buildPayload();
     const instanceDate =
       modalType === 'edit' && editingSession
@@ -370,16 +446,18 @@ export default function ManajemenJadwalPage() {
     setIsSubmitting(false);
 
     if (!res.success) {
-      setFormError(res.message || 'Gagal menyimpan sesi.');
+      if (redirectIfSessionExpired(res.message)) return;
+      const detail = (res as any).error && typeof (res as any).error === 'string' ? ` (${(res as any).error})` : '';
+      showToast((res.message || 'Gagal menyimpan sesi.') + detail);
       return;
     }
+    showToast(res.message || 'Sesi berhasil disimpan.', 'success');
     handleCloseModal();
     await refreshSessions();
   };
 
   const handleDeleteOpen = (session: SessionTimeline) => {
     setDeleteTarget(session);
-    setDeleteError('');
     setIsDeleteClosing(false);
     setDeleteSheetDragY(0);
     setTimeout(() => setIsDeleteVisible(true), 10);
@@ -396,15 +474,56 @@ export default function ManajemenJadwalPage() {
   };
 
   const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !selectedSemesterId) return;
     setIsDeleteSubmitting(true);
-    setDeleteError('');
-    const res = await hapusSesi(deleteTarget.id_sesi, sessionDateKey(deleteTarget.tanggal));
+
+    const instanceDate = sessionDateKey(deleteTarget.tanggal);
+    const isSubstitute =
+      isSubstituteSessionId(deleteTarget.id_sesi) || isPenggantiTipe(deleteTarget.tipe);
+
+    let deletePayload: Parameters<typeof hapusSesi>[2];
+    if (!isSubstitute) {
+      let lists = { kelasList, mkList, ruanganList, asdosList, lecturerList };
+      if (!kelasList.length) {
+        const loaded = await loadDropdownData();
+        if (loaded) lists = { ...loaded, lecturerList: loaded.lecturerList };
+      }
+      const filled = prefillFromSession(deleteTarget, {
+        kelas: lists.kelasList,
+        mk: lists.mkList,
+        ruangan: lists.ruanganList,
+        asdos: lists.asdosList,
+        lecturers: lists.lecturerList,
+      });
+      if (filled.id_kelas && filled.id_mk && filled.id_ruangan) {
+        deletePayload = {
+          id_kelas: filled.id_kelas,
+          id_mk: filled.id_mk,
+          id_semester: selectedSemesterId,
+          id_ruangan: filled.id_ruangan,
+          tanggal: instanceDate,
+          opsi_hari: filled.opsi_hari,
+          opsi_jam: filled.opsi_jam,
+          id_asdos1: filled.id_asdos1 || null,
+          id_asdos2: filled.id_asdos2 || null,
+          id_dosen: filled.id_dosen || null,
+        };
+      }
+    }
+
+    const res = await hapusSesi(
+      deleteTarget.id_sesi,
+      instanceDate,
+      deletePayload,
+      deleteTarget.tipe,
+    );
     setIsDeleteSubmitting(false);
     if (!res.success) {
-      setDeleteError(res.message || 'Gagal menghapus sesi.');
+      if (redirectIfSessionExpired(res.message)) return;
+      showToast(res.message || 'Gagal menghapus sesi.');
       return;
     }
+    showToast(res.message || 'Sesi berhasil dihapus.', 'success');
     handleCloseDelete();
     await refreshSessions();
   };
@@ -434,361 +553,381 @@ export default function ManajemenJadwalPage() {
   const selectClass =
     'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-white focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none disabled:opacity-60';
 
-  return (
-    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-0 md:pt-0 pb-28 md:pb-10 font-sans">
-      {/* Header + kontrol atas */}
-      <div className="shrink-0">
-      <div className="mb-4 md:mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">
-            Koordinator
-          </p>
-          <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Manajemen Jadwal</h2>
-          <p className="text-sm text-slate-500 mt-1 md:text-base max-w-lg">
-            Kelola sesi jadwal mengajar per semester — data langsung dari server.
-          </p>
+  if (isInitialLoad) {
+    return (
+      <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-0 pb-28 md:pb-10 font-sans">
+
+        <div className="mb-6">
+          <div className="h-3.5 w-20 rounded-full mb-2.5 animate-shimmer"></div>
+          <div className="h-8 w-64 rounded-xl mb-3 animate-shimmer"></div>
+          <div className="h-4 w-96 max-w-full rounded-lg mb-4 animate-shimmer"></div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto md:min-w-[320px]">
-          <div className="relative flex-1">
-            <CalendarDays className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-[#941C2F] pointer-events-none" />
-            <select
-              value={selectedSemesterId}
-              onChange={e => setSelectedSemesterId(e.target.value)}
-              disabled={!semesters.length}
-              className={`${selectClass} pl-11 appearance-none cursor-pointer`}
-            >
-              {!semesters.length && <option value="">Belum ada semester</option>}
-              {semesters.map(s => (
-                <option key={s.id} value={s.id}>
-                  {semesterLabel(s.tahun_ajaran, s.tipe_semester)}
-                </option>
-              ))}
-            </select>
+
+        <div className="mb-5 md:mb-6 flex flex-col md:flex-row gap-3 relative z-20 w-full justify-between items-stretch md:items-center">
+
+          <div className="w-full sm:w-48 md:w-56 h-12 rounded-2xl animate-shimmer"></div>
+
+
+          <div className="flex gap-3 flex-1 md:max-w-[420px] md:ml-auto w-full">
+            <div className="flex-1 h-12 rounded-2xl animate-shimmer"></div>
+            <div className="w-12 h-12 rounded-2xl animate-shimmer"></div>
           </div>
+        </div>
+
+
+        <div className="flex flex-col md:flex-row gap-4 lg:gap-6 items-start">
+
+          <div className="w-full md:w-[300px] lg:w-[320px] shrink-0 flex flex-col">
+
+            <div className="hidden md:flex items-center h-7 mb-2 w-full">
+              <div className="h-3.5 w-32 rounded-md animate-shimmer"></div>
+            </div>
+            <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
+              <div className="flex justify-between items-center mb-6">
+                <div className="h-5 w-28 rounded-md animate-shimmer"></div>
+                <div className="flex gap-2">
+                  <div className="w-8 h-8 rounded-full animate-shimmer"></div>
+                  <div className="w-8 h-8 rounded-full animate-shimmer"></div>
+                </div>
+              </div>
+              <div className="grid grid-cols-7 gap-y-4 gap-x-1">
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <div key={`d-${i}`} className="h-3 w-6 rounded mx-auto animate-shimmer"></div>
+                ))}
+                {Array.from({ length: 31 }).map((_, i) => (
+                  <div key={`c-${i}`} className="w-9 h-9 rounded-xl mx-auto flex items-center justify-center animate-shimmer"></div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+
+          <div className="flex-1 w-full space-y-4">
+            <div className="hidden md:flex justify-end h-7 mb-2 items-center">
+              <div className="h-6 w-16 rounded-md animate-shimmer"></div>
+            </div>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={`card-${i}`} className="bg-white rounded-2xl p-4 border border-slate-100 flex items-start gap-4">
+                <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl shrink-0 animate-shimmer"></div>
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="h-5 w-2/3 rounded animate-shimmer"></div>
+                  <div className="h-3.5 w-1/3 rounded animate-shimmer"></div>
+                  <div className="flex gap-2 pt-2.5">
+                    <div className="h-6 w-20 border border-slate-100 rounded-lg animate-shimmer"></div>
+                    <div className="h-6 w-20 border border-slate-100 rounded-lg animate-shimmer"></div>
+                    <div className="h-6 w-24 border border-slate-100 rounded-lg animate-shimmer"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-0 md:pt-0 pb-28 md:pb-10 font-sans">
+
+      <div className="shrink-0">
+        <div className="mb-4 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">
+              Koordinator
+            </p>
+            <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Manajemen Jadwal</h2>
+            <p className="text-sm text-slate-500 mt-1 md:text-base max-w-lg">
+              Kelola sesi jadwal mengajar per semester — data langsung dari server.
+            </p>
+          </div>
+
           <button
             type="button"
             onClick={() => handleOpenModal('add')}
             disabled={!selectedSemesterId}
-            className="hidden md:flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] hover:bg-[#7a1728] active:scale-[0.98] transition-all shadow-md shadow-[#941C2F]/20 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            className="hidden md:flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] hover:bg-[#7a1728] active:scale-[0.98] transition-all shadow-md shadow-[#941C2F]/20 disabled:opacity-50 disabled:cursor-not-allowed mt-4 md:mt-0"
           >
             <Plus className="w-5 h-5" strokeWidth={2.5} />
             Buat Sesi Baru
           </button>
         </div>
-      </div>
 
-      {/* Stats */}
-      {selectedSemesterId && (
-        <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
-          {[
-            { label: 'Total Bulan Ini', value: monthStats.total, accent: 'text-[#941C2F]', bg: 'bg-rose-50' },
-            { label: 'Reguler', value: monthStats.reguler, accent: 'text-blue-600', bg: 'bg-blue-50' },
-            { label: 'Pengganti', value: monthStats.pengganti, accent: 'text-amber-600', bg: 'bg-amber-50' },
-          ].map(stat => (
-            <div
-              key={stat.label}
-              className={`${stat.bg} rounded-2xl border border-white/80 px-3 py-3.5 md:px-5 md:py-4 shadow-sm`}
-            >
-              <p className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
-              <p className={`text-2xl md:text-3xl font-extrabold mt-0.5 tabular-nums ${stat.accent}`}>{stat.value}</p>
+
+        <div className="mb-5 md:mb-6 flex flex-col md:flex-row gap-3 relative z-20 w-full justify-between items-stretch md:items-center">
+
+          <div className="relative shrink-0 w-full sm:w-48 md:w-56 z-30">
+            <CustomSelect
+              value={selectedSemesterId}
+              onChange={setSelectedSemesterId}
+              options={semesterOptions}
+              placeholder="Semester"
+              disabled={!semesters.length}
+              icon={<CalendarDays className="w-[18px] h-[18px]" />}
+              triggerClassName="rounded-2xl py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+            />
+          </div>
+
+          <div className="flex gap-3 flex-1 md:max-w-[420px] md:ml-auto w-full">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Cari MK, kelas, ruangan, pengajar..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-[#941C2F] focus:ring-2 focus:ring-[#941C2F]/15 transition-all"
+              />
             </div>
-          ))}
-        </div>
-      )}
 
-      {semesterError && (
-        <div className="mb-6 rounded-2xl border border-red-100 bg-red-50 px-4 py-3.5 text-sm text-red-700 font-medium flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <span>{semesterError}</span>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="shrink-0 text-xs font-bold text-[#941C2F] underline"
-          >
-            Muat ulang
-          </button>
+            <div className="relative shrink-0">
+              <CustomSelect
+                variant="icon"
+                align="right"
+                value={filterTipe}
+                onChange={v => setFilterTipe(v as TipeFilter)}
+                options={FILTER_TIPE_OPTIONS}
+                placeholder="Filter tipe"
+                icon={<Filter className="w-[18px] h-[18px]" />}
+                triggerClassName={
+                  filterTipe !== 'ALL' ? 'bg-red-50 border-[#941C2F] text-[#941C2F]' : ''
+                }
+              />
+            </div>
+          </div>
         </div>
-      )}
 
-      {!semesters.length && !semesterError && (
-        <div className="mb-6 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3.5 text-sm text-amber-800 font-medium">
-          Belum ada semester tersedia. Pastikan backend sudah memiliki data semester aktif.
-        </div>
-      )}
 
-      {/* Search & filter */}
-      <div className="mb-5 flex gap-3 relative z-20">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Cari MK, kelas, ruangan, pengajar..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-          />
-        </div>
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setShowFilterMenu(!showFilterMenu)}
-            className={`border p-3.5 md:p-4 rounded-2xl md:rounded-3xl active:scale-95 transition-all flex items-center justify-center
-              ${filterTipe !== 'ALL' ? 'bg-red-50 border-[#941C2F] text-[#941C2F]' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
-          >
-            <Filter className="w-[18px] h-[18px] md:w-5 md:h-5" />
-          </button>
-          {showFilterMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowFilterMenu(false)} />
-              <div className="absolute right-0 top-[110%] w-52 bg-white border border-slate-100 rounded-2xl shadow-xl z-20 py-2 overflow-hidden">
-                {(['ALL', 'REGULER', 'PENGGANTI'] as const).map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => {
-                      setFilterTipe(t);
-                      setShowFilterMenu(false);
-                    }}
-                    className={`w-full text-left px-5 py-3 text-sm transition-colors ${filterTipe === t ? 'bg-slate-50 text-[#941C2F] font-bold' : 'text-slate-600 hover:bg-slate-50'}`}
-                  >
-                    {t === 'ALL' ? 'Semua Tipe' : t === 'REGULER' ? 'Reguler' : 'Pengganti'}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      <p className="text-[11px] font-medium text-slate-400 mb-3 -mt-2 px-0.5">
-        Rentang data: {rangeStart} – {rangeEnd}
-        {selectedSemester && (
-          <span className="text-slate-500">
-            {' '}
-            · {semesterLabel(selectedSemester.tahun_ajaran, selectedSemester.tipe_semester)}
+        <div className="md:hidden flex justify-between items-center mb-3 mt-1 px-1">
+          <h3 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">
+            {hasActiveSearch
+              ? `Hasil pencarian`
+              : `${selectedDayLabel}, ${selectedDate} ${monthLabel}`}
+          </h3>
+          <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] font-bold px-2.5 py-1 rounded-md">
+            {filtered.length} sesi
           </span>
-        )}
-      </p>
-
-      {/* Calendar mobile */}
-      <div className="md:hidden mb-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-base font-bold text-slate-800">{monthLabel}</h3>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={handlePrevMonth} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl text-slate-500 active:scale-95 shadow-sm">
-              <ChevronLeft className="w-[18px] h-[18px]" />
-            </button>
-            <button type="button" onClick={handleNextMonth} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl text-slate-500 active:scale-95 shadow-sm">
-              <ChevronRight className="w-[18px] h-[18px]" />
-            </button>
-          </div>
         </div>
-        <div className="flex gap-3 overflow-x-auto pb-3 [&::-webkit-scrollbar]:hidden snap-x">
-          {calendarDays.map(item => {
-            const sel = selectedDate === item.date;
-            return (
-              <button
-                key={item.date}
-                type="button"
-                onClick={() => setSelectedDate(item.date)}
-                className={`flex flex-col items-center min-w-[64px] py-3.5 rounded-2xl transition-all snap-center shrink-0 border
-                  ${sel ? 'bg-[#941C2F] text-white shadow-lg shadow-[#941C2F]/20 border-[#941C2F]' : 'bg-white text-slate-500 border-slate-100'}`}
-              >
-                <span className={`text-[10px] font-bold tracking-widest mb-1 ${sel ? 'text-white/80' : 'text-slate-400'}`}>
-                  {item.dayMobile}
-                </span>
-                <span className="text-xl font-bold mb-1">{item.date}</span>
-                <div className={`w-1 h-1 rounded-full ${sel ? 'bg-white' : hasSchedule(item.date) ? 'bg-[#941C2F]/50' : 'bg-transparent'}`} />
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex justify-between items-center mt-4 px-1">
-          <h4 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">
-            {hasActiveSearch ? 'Hasil Pencarian' : 'Sesi Terdaftar'}
-          </h4>
-          <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] font-bold px-2.5 py-1 rounded-md">{filtered.length} Sesi</span>
-        </div>
-      </div>
 
-      </div>
 
-      <div className="flex flex-col md:flex-row gap-4 lg:gap-6 items-start">
-        {/* Calendar desktop — tinggi natural, tidak ikut dipotong panel scroll */}
-        <div className="hidden md:block w-[300px] lg:w-[320px] bg-white rounded-[2rem] p-6 md:p-7 shadow-sm border border-slate-100 shrink-0 md:sticky md:top-24">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-bold text-slate-800">{monthLabel}</h2>
+        <div className="md:hidden mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-base font-bold text-slate-800">{monthLabel}</h3>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={handlePrevMonth} className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-all">
-                <ChevronLeft className="w-4 h-4" />
+              <button type="button" onClick={handlePrevMonth} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl text-slate-500 active:scale-95 shadow-sm">
+                <ChevronLeft className="w-[18px] h-[18px]" />
               </button>
-              <button type="button" onClick={handleNextMonth} className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-all">
-                <ChevronRight className="w-4 h-4" />
+              <button type="button" onClick={handleNextMonth} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl text-slate-500 active:scale-95 shadow-sm">
+                <ChevronRight className="w-[18px] h-[18px]" />
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-7 gap-y-4 gap-x-1">
-            {dayNamesGrid.map((day, i) => (
-              <div key={i} className="text-center text-[11px] font-bold text-[#8BA3CB] mb-2">
-                {day}
-              </div>
-            ))}
-            {Array.from({ length: gridOffset }).map((_, i) => (
-              <div key={`sp-${i}`} />
-            ))}
+          <div className="flex gap-3 overflow-x-auto pb-3 [&::-webkit-scrollbar]:hidden snap-x">
             {calendarDays.map(item => {
               const sel = selectedDate === item.date;
-              const hasItem = hasSchedule(item.date);
               return (
                 <button
                   key={item.date}
                   type="button"
                   onClick={() => setSelectedDate(item.date)}
-                  className="flex flex-col items-center justify-center group"
+                  className={`flex flex-col items-center min-w-[64px] py-3.5 rounded-2xl transition-all snap-center shrink-0 border
+                  ${sel ? 'bg-[#941C2F] text-white shadow-lg shadow-[#941C2F]/20 border-[#941C2F]' : 'bg-white text-slate-500 border-slate-100'}`}
                 >
-                  <div
-                    className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-200
-                    ${sel ? 'bg-[#941C2F] text-white shadow-md' : 'bg-transparent text-slate-700 group-hover:bg-slate-100'}`}
-                  >
-                    <span className="text-sm font-bold">{item.date}</span>
-                  </div>
-                  <div
-                    className={`w-1 h-1 rounded-full mt-1.5 transition-all
-                    ${sel && hasItem ? 'bg-[#941C2F]' : !sel && hasItem ? 'bg-[#941C2F]/50' : 'bg-transparent'}`}
-                  />
+                  <span className={`text-[10px] font-bold tracking-widest mb-1 ${sel ? 'text-white/80' : 'text-slate-400'}`}>
+                    {item.dayMobile}
+                  </span>
+                  <span className="text-xl font-bold mb-1">{item.date}</span>
+                  <div className={`w-1 h-1 rounded-full ${sel ? 'bg-white' : hasSchedule(item.date) ? 'bg-[#941C2F]/50' : 'bg-transparent'}`} />
                 </button>
               );
             })}
           </div>
         </div>
+      </div>
 
-        {/* Session list — hanya daftar kartu yang scroll */}
-        <div className="flex flex-col flex-1 min-w-0 w-full md:min-h-[320px]">
-          <div className="hidden md:flex justify-between items-center mb-2 shrink-0">
+      <div className="flex flex-col md:flex-row gap-4 lg:gap-6 items-start">
+
+        <div className="hidden md:flex flex-col w-[300px] lg:w-[320px] shrink-0 md:sticky md:top-24">
+          <div className="hidden md:flex items-center h-7 mb-2 w-full shrink-0">
             <h3 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">
               {hasActiveSearch
-                ? `Hasil pencarian · ${monthLabel}`
+                ? `Hasil pencarian`
                 : `${selectedDayLabel}, ${selectedDate} ${monthLabel}`}
             </h3>
+          </div>
+          <div className="w-full bg-white rounded-[2rem] p-6 md:p-7 shadow-sm border border-slate-100">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold text-slate-800">{monthLabel}</h2>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={handlePrevMonth} className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-all">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button type="button" onClick={handleNextMonth} className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-all">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-y-4 gap-x-1">
+              {dayNamesGrid.map((day, i) => (
+                <div key={i} className="text-center text-[11px] font-bold text-[#8BA3CB] mb-2">
+                  {day}
+                </div>
+              ))}
+              {Array.from({ length: gridOffset }).map((_, i) => (
+                <div key={`sp-${i}`} />
+              ))}
+              {calendarDays.map(item => {
+                const sel = selectedDate === item.date;
+                const hasItem = hasSchedule(item.date);
+                return (
+                  <button
+                    key={item.date}
+                    type="button"
+                    onClick={() => setSelectedDate(item.date)}
+                    className="flex flex-col items-center justify-center group"
+                  >
+                    <div
+                      className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-200
+                      ${sel ? 'bg-[#941C2F] text-white shadow-md' : 'bg-transparent text-slate-700 group-hover:bg-slate-100'}`}
+                    >
+                      <span className="text-sm font-bold">{item.date}</span>
+                    </div>
+                    <div
+                      className={`w-1 h-1 rounded-full mt-1.5 transition-all
+                      ${sel && hasItem ? 'bg-[#941C2F]' : !sel && hasItem ? 'bg-[#941C2F]/50' : 'bg-transparent'}`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+
+        <div className="flex flex-col flex-1 min-w-0 w-full md:min-h-[320px]">
+
+          <div className="hidden md:flex justify-end items-center h-7 mb-2 shrink-0">
             <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] font-bold px-2.5 py-1 rounded-md">
               {filtered.length} sesi
             </span>
           </div>
 
-          <div className="max-h-[min(52vh,480px)] md:max-h-[calc(100dvh-15rem)] overflow-y-auto overscroll-y-contain pr-1 space-y-3 scroll-smooth [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/80">
-          {loading && (
-            <div className="flex justify-center py-12">
-              <div className="w-7 h-7 border-2 border-[#941C2F] border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
+          <div className="space-y-3">
+            {loading && (
+              <div className="flex justify-center py-12">
+                <div className="w-7 h-7 border-2 border-[#941C2F] border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
 
-          {fetchError && !loading && (
-            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-sm text-red-600 font-semibold flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <span>{fetchError}</span>
-              <button
-                type="button"
-                onClick={() => refreshSessions()}
-                className="shrink-0 text-xs font-bold text-[#941C2F] underline"
-              >
-                Coba lagi
-              </button>
-            </div>
-          )}
-
-          {!loading &&
-            !fetchError &&
-            filtered.map(s => {
-              const timePart = s.waktu.includes(', ') ? s.waktu.split(', ')[1] : s.waktu;
-              return (
-                <div
-                  key={sessionRowKey(s)}
-                  className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all group"
-                >
-                  <div className="flex items-start gap-3 md:gap-4">
-                    <div className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
-                      <BookOpen size={20} strokeWidth={2} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{s.mata_kuliah}</h3>
-                        {isPenggantiTipe(s.tipe) && (
-                          <span className="shrink-0 text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded-md tracking-wider">
-                            PENGGANTI
-                          </span>
-                        )}
+            {!loading &&
+              filtered.map(s => {
+                const timePart = s.waktu.includes(', ') ? s.waktu.split(', ')[1] : s.waktu;
+                return (
+                  <div
+                    key={sessionRowKey(s)}
+                    className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all group"
+                  >
+                    <div className="flex items-start gap-3 md:gap-4">
+                      <div className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
+                        <BookOpen size={20} strokeWidth={2} />
                       </div>
-                      <p className="text-xs text-slate-500 font-medium mt-0.5">
-                        {s.nama_kelas}
-                        {hasActiveSearch && (
-                          <span className="text-slate-400"> · {sessionDateKey(s.tanggal)}</span>
-                        )}
-                      </p>
-                      <div className="flex flex-wrap gap-2 mt-2.5">
-                        <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700">
-                          <Clock size={12} className="text-slate-400" />
-                          {timePart}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{s.mata_kuliah}</h3>
+                          {isPenggantiTipe(s.tipe) && (
+                            <span className="shrink-0 text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded-md tracking-wider">
+                              PENGGANTI
+                            </span>
+                          )}
                         </div>
-                        <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700">
-                          <MapPin size={12} className="text-slate-400" />
-                          {s.ruangan}
-                        </div>
-                        <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700">
-                          <User size={12} className="text-slate-400" />
-                          {s.pengajar}
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                          {s.nama_kelas}
+                          {hasActiveSearch && (
+                            <span className="text-slate-400"> · {sessionDateKey(s.tanggal)}</span>
+                          )}
+                        </p>
+                        <div className="hidden md:flex flex-wrap gap-2 mt-2.5">
+                          <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700">
+                            <Clock size={12} className="text-slate-400 shrink-0" />
+                            {timePart}
+                          </div>
+                          <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700">
+                            <MapPin size={12} className="text-slate-400 shrink-0" />
+                            {s.ruangan}
+                          </div>
+                          <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700">
+                            <User size={12} className="text-slate-400 shrink-0" />
+                            {pengajarDisplayName(s.pengajar)}
+                          </div>
                         </div>
                       </div>
+                      <div className="flex flex-row md:flex-col gap-1 shrink-0">
+                        {!isPenggantiTipe(s.tipe) && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenModal('edit', s)}
+                            className="p-2 rounded-lg text-slate-400 hover:text-[#941C2F] hover:bg-rose-50 transition-colors"
+                            aria-label="Edit sesi"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOpen(s)}
+                          className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                          aria-label="Hapus sesi"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-row md:flex-col gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenModal('edit', s)}
-                        className="p-2 rounded-lg text-slate-400 hover:text-[#941C2F] hover:bg-rose-50 transition-colors"
-                        aria-label="Edit sesi"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteOpen(s)}
-                        className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                        aria-label="Hapus sesi"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                    <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-slate-100 md:hidden">
+                      <div className="flex w-full items-center gap-2.5 bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700">
+                        <Clock size={14} className="text-slate-400 shrink-0" />
+                        <span className="min-w-0 truncate">{timePart}</span>
+                      </div>
+                      <div className="flex w-full items-center gap-2.5 bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700">
+                        <MapPin size={14} className="text-slate-400 shrink-0" />
+                        <span className="min-w-0 truncate">{s.ruangan}</span>
+                      </div>
+                      <div className="flex w-full items-center gap-2.5 bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700">
+                        <User size={14} className="text-slate-400 shrink-0" />
+                        <span className="min-w-0 truncate">{pengajarDisplayName(s.pengajar)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
 
-          {!loading && !fetchError && filtered.length === 0 && (
-            <div className="bg-white rounded-2xl p-8 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
-              <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
-                <CalendarDays size={26} />
+            {!loading && !fetchError && filtered.length === 0 && (
+              <div className="bg-white rounded-2xl p-8 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
+                <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+                  <CalendarDays size={26} />
+                </div>
+                <p className="text-sm md:text-base font-semibold text-slate-700">Tidak ada sesi jadwal.</p>
+                <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-xs mx-auto">
+                  {hasActiveSearch
+                    ? 'Coba ubah kata kunci atau filter tipe sesi.'
+                    : 'Belum ada sesi pada tanggal ini.'}
+                </p>
               </div>
-              <p className="text-sm md:text-base font-semibold text-slate-700">Tidak ada sesi jadwal.</p>
-              <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-xs mx-auto">
-                {hasActiveSearch
-                  ? 'Coba ubah kata kunci atau filter tipe sesi.'
-                  : 'Belum ada sesi pada tanggal ini.'}
-              </p>
-            </div>
-          )}
+            )}
           </div>
 
           <p className="shrink-0 text-[11px] font-medium text-slate-400 px-1 pt-2 pb-0.5 border-t border-slate-100/80 mt-1">
             {hasActiveSearch
-              ? `Menampilkan ${filtered.length} sesi di ${monthLabel} (pencarian aktif)`
+              ? `Menampilkan ${filtered.length} sesi (pencarian aktif)`
               : `Menampilkan ${filtered.length} sesi pada ${selectedIso}`}
           </p>
         </div>
       </div>
 
-      {/* FAB mobile */}
+
       <button
         type="button"
         onClick={() => handleOpenModal('add')}
@@ -799,7 +938,7 @@ export default function ManajemenJadwalPage() {
         <Plus className="w-6 h-6" strokeWidth={2.5} />
       </button>
 
-      {/* Form modal */}
+
       {isModalOpen && (
         <>
           <div
@@ -846,51 +985,30 @@ export default function ManajemenJadwalPage() {
                     }}
                   >
                     <Field label="Kelas">
-                      <select
+                      <CustomSelect
                         value={form.id_kelas}
-                        onChange={e => setForm(f => ({ ...f, id_kelas: e.target.value }))}
-                        className={selectClass}
-                        required
-                      >
-                        <option value="">Pilih kelas</option>
-                        {kelasList.map(k => (
-                          <option key={k.id} value={k.id}>
-                            {k.nama_kelas} · {k.jurusan}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={v => setForm(f => ({ ...f, id_kelas: v }))}
+                        options={kelasOptions}
+                        placeholder="Pilih kelas"
+                      />
                     </Field>
 
                     <Field label="Mata Kuliah">
-                      <select
+                      <CustomSelect
                         value={form.id_mk}
-                        onChange={e => setForm(f => ({ ...f, id_mk: e.target.value }))}
-                        className={selectClass}
-                        required
-                      >
-                        <option value="">Pilih mata kuliah</option>
-                        {mkList.map(m => (
-                          <option key={m.id} value={m.id}>
-                            {m.nama_mk} ({m.sks} SKS)
-                          </option>
-                        ))}
-                      </select>
+                        onChange={v => setForm(f => ({ ...f, id_mk: v }))}
+                        options={mkOptions}
+                        placeholder="Pilih mata kuliah"
+                      />
                     </Field>
 
                     <Field label="Ruangan">
-                      <select
+                      <CustomSelect
                         value={form.id_ruangan}
-                        onChange={e => setForm(f => ({ ...f, id_ruangan: e.target.value }))}
-                        className={selectClass}
-                        required
-                      >
-                        <option value="">Pilih ruangan</option>
-                        {ruanganList.map(r => (
-                          <option key={r.id} value={r.id}>
-                            {r.nama_ruangan} · Lt.{r.lantai}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={v => setForm(f => ({ ...f, id_ruangan: v }))}
+                        options={ruanganOptions}
+                        placeholder="Pilih ruangan"
+                      />
                     </Field>
 
                     <Field label="Tanggal Sesi">
@@ -908,75 +1026,88 @@ export default function ManajemenJadwalPage() {
                       )}
                     </Field>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-3">
                       <Field label="Hari (otomatis dari tanggal)">
-                        <select
-                          value={form.opsi_hari}
-                          onChange={e => setForm(f => ({ ...f, opsi_hari: Number(e.target.value) }))}
-                          className={`${selectClass} bg-slate-50`}
-                        >
-                          {HARI_OPTIONS.map(h => (
-                            <option key={h.value} value={h.value}>
-                              {h.label}
-                            </option>
-                          ))}
-                        </select>
+                        <CustomSelect
+                          value={String(form.opsi_hari)}
+                          onChange={v => setForm(f => ({ ...f, opsi_hari: Number(v) }))}
+                          options={HARI_SELECT_OPTIONS}
+                          triggerClassName="bg-slate-50"
+                        />
                       </Field>
                       <Field label="Jam">
-                        <select
-                          value={form.opsi_jam}
-                          onChange={e => setForm(f => ({ ...f, opsi_jam: Number(e.target.value) }))}
-                          className={selectClass}
-                        >
-                          {JAM_OPTIONS.map(j => (
-                            <option key={j.value} value={j.value}>
-                              {j.label} ({j.range})
-                            </option>
-                          ))}
-                        </select>
+                        <CustomSelect
+                          value={String(form.opsi_jam)}
+                          onChange={v => setForm(f => ({ ...f, opsi_jam: Number(v) }))}
+                          options={JAM_SELECT_OPTIONS}
+                        />
                       </Field>
                     </div>
-
-                    <Field label="Asisten Dosen 1">
-                      <div className="relative">
-                        <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <select
-                          value={form.id_asdos1}
-                          onChange={e => setForm(f => ({ ...f, id_asdos1: e.target.value }))}
-                          className={`${selectClass} pl-11`}
-                        >
-                          <option value="">Opsional</option>
-                          {asdosList.map(a => (
-                            <option key={a.id_asdos} value={a.id_asdos}>
-                              {a.username} · {a.nim}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                    <Field label="Tipe Pengajar">
+                      <CustomSelect
+                        value={instructorType}
+                        onChange={v => {
+                          const type = v as 'DOSEN' | 'ASDOS';
+                          setInstructorType(type);
+                          if (type === 'DOSEN') {
+                            setForm(f => ({ ...f, id_asdos1: '', id_asdos2: '' }));
+                          } else {
+                            setForm(f => ({ ...f, id_dosen: '' }));
+                          }
+                        }}
+                        options={[
+                          { value: 'DOSEN', label: 'Dosen' },
+                          { value: 'ASDOS', label: 'Asisten Dosen (Asdos)' },
+                        ]}
+                        icon={instructorType === 'DOSEN' ? <User className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                      />
                     </Field>
 
-                    <Field label="Asisten Dosen 2">
-                      <div className="relative">
-                        <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <select
-                          value={form.id_asdos2}
-                          onChange={e => setForm(f => ({ ...f, id_asdos2: e.target.value }))}
-                          className={`${selectClass} pl-11`}
-                        >
-                          <option value="">Opsional</option>
-                          {asdosList
-                            .filter(a => a.id_asdos !== form.id_asdos1)
-                            .map(a => (
-                              <option key={a.id_asdos} value={a.id_asdos}>
-                                {a.username} · {a.nim}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                    </Field>
+                    {instructorType === 'DOSEN' ? (
+                      <Field label="Dosen Pengajar">
+                        <CustomSelect
+                          value={form.id_dosen}
+                          onChange={v => setForm(f => ({
+                            ...f,
+                            id_dosen: v,
+                            id_asdos1: '',
+                            id_asdos2: ''
+                          }))}
+                          options={[{ value: '', label: 'Pilih Dosen' }, ...lecturerOptions]}
+                          placeholder="Pilih Dosen"
+                          icon={<User className="w-4 h-4" />}
+                        />
+                      </Field>
+                    ) : (
+                      <>
+                        <Field label="Asisten Dosen 1">
+                          <CustomSelect
+                            value={form.id_asdos1}
+                            onChange={v => setForm(f => ({
+                              ...f,
+                              id_asdos1: v,
+                              id_dosen: ''
+                            }))}
+                            options={[{ value: '', label: 'Pilih Asdos 1' }, ...asdosOptions]}
+                            placeholder="Pilih Asdos 1"
+                            icon={<Users className="w-4 h-4" />}
+                          />
+                        </Field>
 
-                    {formError && (
-                      <p className="text-xs font-medium text-red-600 bg-red-50 rounded-lg px-3 py-2">{formError}</p>
+                        <Field label="Asisten Dosen 2">
+                          <CustomSelect
+                            value={form.id_asdos2}
+                            onChange={v => setForm(f => ({
+                              ...f,
+                              id_asdos2: v,
+                              id_dosen: ''
+                            }))}
+                            options={[{ value: '', label: 'Opsional (Asdos 2)' }, ...asdos2Options]}
+                            placeholder="Opsional"
+                            icon={<Users className="w-4 h-4" />}
+                          />
+                        </Field>
+                      </>
                     )}
                   </form>
                 )}
@@ -1004,7 +1135,7 @@ export default function ManajemenJadwalPage() {
         </>
       )}
 
-      {/* Delete confirm */}
+
       {deleteTarget && (
         <>
           <div
@@ -1036,9 +1167,6 @@ export default function ManajemenJadwalPage() {
                   Sesi <span className="font-semibold text-slate-700">{deleteTarget.mata_kuliah}</span> pada{' '}
                   {deleteTarget.tanggal} akan dihapus permanen.
                 </p>
-                {deleteError && (
-                  <p className="mt-3 text-xs font-medium text-red-600 bg-red-50 rounded-lg px-3 py-2">{deleteError}</p>
-                )}
                 <div className="mt-6 flex gap-3">
                   <button
                     type="button"
@@ -1062,6 +1190,24 @@ export default function ManajemenJadwalPage() {
           </div>
         </>
       )}
+
+
+      <div className="fixed top-6 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4">
+        <div
+          className={`
+            max-w-md w-full flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border transition-all duration-500
+            ${toast ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-12 opacity-0 scale-95'}
+            ${toast?.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-rose-50 border-rose-100 text-rose-800'}
+          `}
+        >
+          {toast?.type === 'success' ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
+          )}
+          <p className="text-sm font-bold leading-tight">{toast?.message}</p>
+        </div>
+      </div>
     </div>
   );
 }

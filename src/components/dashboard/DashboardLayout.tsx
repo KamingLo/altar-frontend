@@ -241,6 +241,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
       <div className="flex w-full h-screen overflow-hidden lg:max-w-none bg-[#EDF2F4] shadow-2xl lg:shadow-none">
 
         <aside
+          id="dashboard-sidebar-desktop"
           className={`hidden lg:flex flex-col h-full overflow-hidden shrink-0 bg-[#941C2F] shadow-[4px_0_24px_rgba(0,0,0,0.08)] transition-[width] duration-300 ease-in-out ${isSidebarCollapsed ? 'w-[72px]' : 'w-[280px]'}`}
         >
           <div className={`pt-10 pb-7 border-b border-white/10 flex items-center transition-all duration-300 shrink-0 ${isSidebarCollapsed ? 'justify-center px-3' : 'justify-between px-7'}`}>
@@ -305,7 +306,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             </div>
           )}
 
-          <div className="hidden lg:flex absolute top-7 left-7 z-20">
+          <div id="dashboard-home-button-desktop" className="hidden lg:flex absolute top-7 left-7 z-20">
             <Link
               href={homeHref}
               className="text-[#941C2F] bg-white/40 backdrop-blur-md hover:bg-white/60 hover:scale-105 active:scale-95 rounded-2xl p-3 shadow-sm border border-white/20 transition-all duration-200 flex items-center justify-center"
@@ -315,7 +316,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             </Link>
           </div>
 
-          <header className="lg:hidden absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-7 z-20 bg-transparent">
+          <header id="dashboard-header-mobile" className="lg:hidden absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-7 z-20 bg-transparent">
             <Link
               href={homeHref}
               className="text-[#941C2F] hover:scale-105 active:scale-90 active:bg-[#941C2F]/10 active:shadow-[0_0_20px_rgba(148,28,47,0.15)] rounded-full transition-all duration-200 p-2.5 flex items-center justify-center"
@@ -330,7 +331,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             </button>
           </header>
 
-          <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-6 lg:px-12 pt-24 lg:pt-24 pb-20">
+          <div id="dashboard-children-container" className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-6 lg:px-12 pt-24 lg:pt-24 pb-20">
             {children}
           </div>
 
