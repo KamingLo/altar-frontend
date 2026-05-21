@@ -1,10 +1,13 @@
 'use client';
 
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { useAuthForm } from '@/hooks/auth/useLoginForm';
 import React, { useEffect } from 'react';
 
 export default function LoginForm() {
+  const router = useRouter();
   const {
     view,
     formData,
@@ -96,14 +99,22 @@ export default function LoginForm() {
           : 'absolute top-0 left-0 opacity-0 pointer-events-none z-0'
           }`}
       >
-        <div className="text-left mb-6" style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.05s both' }}>
-          <h1 className="text-[38px] font-extrabold tracking-[-1px] leading-[1.1] mb-3">
-            <span className="text-[#0D1B2A]">Altar</span>
-            <span className="text-[#941C2F]">.</span>
-          </h1>
-          <p className="text-[14px] text-[#4B5563] leading-[1.6] font-medium max-w-[280px]">
-            Masukkan email yang telah terdaftar.
-          </p>
+        <div className="flex items-start justify-between mb-6" style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.05s both' }}>
+          <div className="text-left">
+            <h1 className="text-[38px] font-extrabold tracking-[-1px] leading-[1.1] mb-3">
+              <span className="text-[#0D1B2A]">Altar</span>
+              <span className="text-[#941C2F]">.</span>
+            </h1>
+            <p className="text-[14px] text-[#4B5563] leading-[1.6] font-medium max-w-[280px]">
+              Masukkan email yang telah terdaftar.
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/')}
+            className="hidden lg:flex shrink-0 w-9 h-9 items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-2xl active:scale-95 transition-all hover:bg-slate-50 shadow-sm"
+          >
+            <ArrowLeft size={18} />
+          </button>
         </div>
 
         <form
@@ -280,8 +291,8 @@ export default function LoginForm() {
 
       {renderToasts()}
 
-      <div className="hidden lg:flex h-screen w-full overflow-hidden items-center bg-[#EDF2F4] font-['Plus_Jakarta_Sans',sans-serif]">
-        <div className="relative w-[55%] h-full shrink-0">
+      <div className="hidden lg:flex min-h-screen w-full items-center bg-[#EDF2F4] font-['Plus_Jakarta_Sans',sans-serif]">
+        <div className="relative w-[55%] self-stretch shrink-0">
           <div
             className="absolute inset-0 bg-[url('/gedung-untar-fl.webp')] bg-cover bg-center bg-no-repeat z-0"
             style={{ animation: 'bgEntry 0.5s ease-out forwards' }}
@@ -296,8 +307,8 @@ export default function LoginForm() {
         </div>
       </div>
 
-      <div className="flex lg:hidden h-[100svh] w-full overflow-hidden justify-center bg-[#EDF2F4] font-['Plus_Jakarta_Sans',sans-serif]">
-        <div className="relative w-full max-w-[450px] md:max-w-[650px] h-[100svh] bg-[#EDF2F4] flex flex-col overflow-hidden mx-auto shadow-[0_0_40px_rgba(0,0,0,0.05)]">
+      <div className="flex lg:hidden min-h-[100svh] w-full justify-center bg-[#EDF2F4] font-['Plus_Jakarta_Sans',sans-serif]">
+        <div className="relative w-full max-w-[450px] md:max-w-[650px] min-h-[100svh] bg-[#EDF2F4] flex flex-col mx-auto shadow-[0_0_40px_rgba(0,0,0,0.05)]">
           <div className="absolute inset-0 z-0 pointer-events-none">
             <div
               className="absolute top-0 left-0 right-0 h-[68svh] bg-gray-300 bg-[url('/gedung-untar.png')] bg-cover bg-[center_top]"
@@ -309,6 +320,12 @@ export default function LoginForm() {
           </div>
 
           <div className="relative z-10 flex flex-col flex-1 px-8 py-[5svh]">
+            <button
+              onClick={() => router.push('/')}
+              className="self-end shrink-0 w-9 h-9 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-2xl active:scale-95 transition-all hover:bg-slate-50 shadow-sm"
+            >
+              <ArrowLeft size={18} />
+            </button>
             <div className="grow" />
             {renderFormArea()}
           </div>

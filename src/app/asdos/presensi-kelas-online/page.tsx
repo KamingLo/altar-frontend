@@ -4,7 +4,7 @@ import { Check, ArrowLeft, Clock, BookOpen, Send, Link2, X, AlertCircle } from '
 import { submitOnlineAttendance } from '@/lib/actions/presensi';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 import { toast } from 'sonner';
-import { AsdosListSkeleton, AsdosPageHeader, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
+import { AsdosOnlineSessionSkeleton, AsdosPageHeader, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 
 function todayIso() {
   return new Date().toISOString().split('T')[0];
@@ -130,13 +130,7 @@ export default function PresensiKelasOnlinePage() {
   if (isLoading) {
     return (
       <AsdosPageShell>
-        <div className="px-4 md:px-0 py-6 md:py-0 space-y-4">
-          <div className="space-y-2">
-            <div className="h-3.5 w-40 rounded-lg animate-shimmer" />
-            <div className="h-8 w-64 rounded-xl animate-shimmer" />
-          </div>
-          <AsdosListSkeleton count={3} />
-        </div>
+        <AsdosOnlineSessionSkeleton count={3} />
       </AsdosPageShell>
     );
   }

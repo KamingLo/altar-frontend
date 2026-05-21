@@ -3,7 +3,7 @@ import React from 'react';
 
 const HeroDesktop = () => {
   return (
-    <div className="h-screen w-full overflow-hidden flex items-center bg-[#EDF2F4] font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen w-full flex items-center bg-[#EDF2F4] font-['Plus_Jakarta_Sans',sans-serif]">
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -15,7 +15,7 @@ const HeroDesktop = () => {
       `}</style>
 
       <div
-        className="relative w-[55%] h-full shrink-0"
+        className="relative w-[55%] self-stretch shrink-0"
         style={{ animation: 'fadeUp 0.8s cubic-bezier(0.16,1,0.3,1) 0.05s both' }}
       >
         <div className="absolute inset-0 bg-[url('/gedung-untar-fl.webp')] bg-cover bg-center bg-no-repeat z-0" />
@@ -62,7 +62,7 @@ const HeroDesktop = () => {
 
 const HeroMobile = () => {
   return (
-    <div className="h-[100svh] w-full overflow-hidden flex bg-[#EDF2F4] font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-[100svh] w-full flex bg-[#EDF2F4] font-['Plus_Jakarta_Sans',sans-serif]">
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -73,7 +73,7 @@ const HeroMobile = () => {
         }
       `}</style>
 
-      <div className="relative w-full h-[100svh] bg-[#EDF2F4] flex flex-col overflow-hidden">
+      <div className="relative w-full min-h-[100svh] bg-[#EDF2F4] flex flex-col">
 
         <div
           className="relative w-full h-[58svh] shrink-0"

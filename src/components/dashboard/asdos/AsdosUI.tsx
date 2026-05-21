@@ -90,6 +90,80 @@ export function AsdosListSkeleton({ count = 4 }: { count?: number }) {
   );
 }
 
+export function AsdosQrScanSkeleton() {
+  return (
+    <>
+      <div className="mb-6 md:mb-8 space-y-2.5">
+        <div className="h-3 w-28 rounded-lg animate-shimmer" />
+        <div className="h-8 w-44 rounded-xl animate-shimmer" />
+        <div className="h-4 w-60 rounded-lg animate-shimmer" />
+      </div>
+
+      <div className="md:hidden flex flex-col items-center gap-4">
+        <div className="w-full max-w-[280px] aspect-square rounded-2xl animate-shimmer" />
+        <div className="w-full max-w-[280px] flex flex-col gap-3">
+          <div className="h-12 w-full rounded-xl animate-shimmer" />
+          <div className="h-12 w-full rounded-xl animate-shimmer" />
+        </div>
+      </div>
+
+      <div className="hidden md:flex bg-white rounded-[2rem] shadow-sm border border-slate-100 p-12 lg:p-16 items-start gap-16">
+        <div className="flex-1 pt-8 space-y-4">
+          <div className="h-8 w-52 rounded-xl animate-shimmer" />
+          <div className="space-y-2.5">
+            <div className="h-4 w-full rounded-lg animate-shimmer" />
+            <div className="h-4 w-5/6 rounded-lg animate-shimmer" />
+            <div className="h-4 w-4/6 rounded-lg animate-shimmer" />
+          </div>
+          <div className="flex gap-4 mt-8">
+            <div className="flex-1 h-12 rounded-xl animate-shimmer" />
+            <div className="flex-1 h-12 rounded-xl animate-shimmer" />
+          </div>
+        </div>
+        <div className="flex-1 flex justify-center">
+          <div className="w-full max-w-[320px] aspect-square rounded-2xl animate-shimmer" />
+        </div>
+      </div>
+    </>
+  );
+}
+
+export function AsdosOnlineSessionSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <>
+      <div className="mb-6 md:mb-8 space-y-2.5">
+        <div className="h-3 w-36 rounded-lg animate-shimmer" />
+        <div className="h-8 w-52 rounded-xl animate-shimmer" />
+        <div className="h-4 w-72 rounded-lg animate-shimmer" />
+      </div>
+
+      <div className="flex justify-between items-center mb-4 px-1">
+        <div className="h-3 w-32 rounded-lg animate-shimmer" />
+        <div className="h-6 w-14 rounded-lg animate-shimmer" />
+      </div>
+
+      <div className="space-y-3">
+        {Array.from({ length: count }, (_, i) => (
+          <div key={i} className="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 flex flex-col">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl shrink-0 animate-shimmer" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-36 rounded-lg animate-shimmer" />
+                <div className="h-3 w-24 rounded-lg animate-shimmer" />
+              </div>
+              <div className="w-7 h-7 rounded-full animate-shimmer shrink-0" />
+            </div>
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+              <div className="flex-1 h-8 rounded-lg animate-shimmer" />
+              <div className="flex-1 h-8 rounded-lg animate-shimmer" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 type AsdosPrimaryButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   icon?: React.ReactNode;
 };

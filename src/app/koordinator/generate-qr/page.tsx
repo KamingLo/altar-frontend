@@ -657,7 +657,7 @@ export default function GenerateQrPage() {
                 </div>
               ) : (
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[calc(100dvh-22rem)] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/80">
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:max-h-[calc(100dvh-22rem)] md:overflow-y-auto md:pr-1 md:[&::-webkit-scrollbar]:w-1.5 md:[&::-webkit-scrollbar-thumb]:rounded-full md:[&::-webkit-scrollbar-thumb]:bg-slate-300/80">
                   {todaySessions.map(s => {
                     const timePart = s.waktu.includes(', ') ? s.waktu.split(', ')[1] : s.waktu;
                     return (
@@ -709,7 +709,7 @@ export default function GenerateQrPage() {
       )}
 
       {mode === 'KIOSK' && (
-        <div className="fixed inset-0 text-slate-800 z-[9999] overflow-y-auto lg:overflow-hidden flex flex-col p-6 md:p-8 font-sans select-none animate-fade-in bg-[#EDF2F4]">
+        <div className="fixed inset-0 text-slate-800 z-[9999] overflow-y-auto lg:overflow-hidden flex flex-col p-6 pb-16 md:p-8 font-sans select-none animate-fade-in bg-[#EDF2F4]">
 
           <style>{`
             #dashboard-home-button-desktop,
@@ -745,22 +745,35 @@ export default function GenerateQrPage() {
             />
           </div>
 
-          <div className="relative z-10 flex flex-col h-full w-full">
+          <div className="relative z-10 flex flex-col min-h-full w-full">
 
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-5 shrink-0">
+            <div className="flex flex-row justify-between items-start pb-5 shrink-0">
               <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-lg md:text-xl font-black text-slate-800 tracking-wider">ALTAR PRESENSI KIOSK</h1>
-                </div>
+                <h1 className="text-lg md:text-xl font-black text-slate-800 tracking-wider">ALTAR PRESENSI KIOSK</h1>
                 <p className="text-xs text-slate-500 font-semibold mt-1">Sesi Presensi Asisten Aktif Kelas</p>
+                <div className="mt-2 lg:hidden">
+                  <p className="text-xl font-black font-mono tracking-tight text-[#941C2F]">
+                    {timeStr} <span className="text-[10px] font-extrabold text-slate-400 tracking-widest align-middle">WIB</span>
+                  </p>
+                  <p className="text-[10px] font-bold text-slate-400 tracking-wide mt-0.5">{dateStr}</p>
+                </div>
               </div>
 
-              <div className="mt-3 sm:mt-0 flex items-center gap-4 text-right">
-                <div className="hidden md:block">
+              <button
+                type="button"
+                onClick={openExitModal}
+                className="lg:hidden shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-xs shadow-sm active:scale-95 transition-all"
+              >
+                <Unlock className="w-3.5 h-3.5 text-slate-400" />
+                Keluar
+              </button>
+
+              <div className="hidden lg:flex items-center gap-4 text-right">
+                <div>
                   <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase">{dateStr}</p>
                   <p className="text-sm font-semibold text-slate-600 mt-0.5">Tahun Ajaran {selectedSemester?.tahun_ajaran || '—'}</p>
                 </div>
-                <div className="w-px h-10 bg-slate-200 hidden md:block" />
+                <div className="w-px h-10 bg-slate-200" />
                 <div>
                   <p className="text-2xl font-black font-mono tracking-tight text-[#941C2F]">{timeStr}</p>
                   <p className="text-[10px] font-extrabold text-slate-500 tracking-widest text-right">WIB</p>
@@ -770,13 +783,13 @@ export default function GenerateQrPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 lg:flex-1 lg:min-h-0 h-auto mt-6 md:mt-8 mb-4 items-stretch">
 
-              <div className="lg:col-span-7 bg-white border border-slate-100 rounded-[2.5rem] p-6 md:p-8 shadow-sm flex flex-col items-center justify-center relative overflow-hidden text-slate-800">
+              <div className="lg:col-span-7 lg:bg-white lg:border lg:border-slate-100 lg:rounded-[2.5rem] lg:p-8 lg:shadow-sm flex flex-col items-center justify-center relative overflow-hidden text-slate-800">
 
                 <div className="flex flex-col items-center max-w-sm w-full">
                   <h2 className="text-lg md:text-xl font-extrabold text-slate-800 text-center tracking-tight">SCAN QR CHECK-IN</h2>
                   <p className="text-xs text-slate-400 mt-1 mb-6 md:mb-8 text-center font-medium">Buka aplikasi asdos Anda dan scan kode QR ini</p>
 
-                  <div className="bg-transparent sm:bg-white p-0 sm:p-7 rounded-none sm:rounded-[3rem] shadow-none sm:shadow-lg border-0 sm:border sm:border-slate-150 flex items-center justify-center aspect-square max-w-[280px] sm:max-w-[320px] w-full relative">
+                  <div className="bg-transparent lg:bg-white p-0 lg:p-7 rounded-none lg:rounded-[3rem] shadow-none lg:shadow-lg border-0 lg:border lg:border-slate-150 flex items-center justify-center aspect-square max-w-[280px] sm:max-w-[320px] w-full relative">
                     {qrToken ? (
                       <img
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrToken)}`}
@@ -808,10 +821,11 @@ export default function GenerateQrPage() {
                       <span>{countdown} DETIK</span>
                     </div>
                   </div>
+
                 </div>
               </div>
 
-              <div className="lg:col-span-5 bg-white border border-slate-100 rounded-[2.5rem] p-6 md:p-8 shadow-sm flex flex-col lg:overflow-hidden lg:min-h-0 overflow-visible h-auto text-slate-800">
+              <div className="lg:col-span-5 lg:bg-white lg:border lg:border-slate-100 lg:rounded-[2.5rem] lg:p-8 lg:shadow-sm flex flex-col lg:overflow-hidden lg:min-h-0 overflow-visible h-auto text-slate-800">
                 <h2 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase mb-4">
                   Sesi Terdaftar Hari Ini ({todaySessions.length})
                 </h2>
@@ -870,7 +884,7 @@ export default function GenerateQrPage() {
               </div>
             </div>
 
-            <div className="flex justify-between items-center pt-4 shrink-0">
+            <div className="hidden lg:flex justify-between items-center pt-4 shrink-0">
               <p className="text-xs text-slate-500 font-medium">© Altar Kiosk System · locked secure session.</p>
               <button
                 type="button"

@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown } from 'lucide-react';
+import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown, GraduationCap, LayoutDashboard, ArrowLeftRight } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { logoutUser } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
@@ -43,7 +43,12 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { clearUser } = useUserStore();
+  const { user, clearUser } = useUserStore();
+
+  const hasDualRole = !!(user?.id_asisten && user?.id_koordinator);
+  const otherDashboardHref = homeHref === '/koordinator' ? '/asdos' : '/koordinator';
+  const otherDashboardLabel = homeHref === '/koordinator' ? 'Asdos' : 'Koor';
+  const homeDashboardLabel = homeHref === '/koordinator' ? 'Dash Koor' : 'Dash Asdos';
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
@@ -70,7 +75,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const handleLogout = async () => {
     await logoutUser();
     clearUser();
-    router.push('/auth/login');
+    router.replace('/auth/login');
   };
 
   const openLogoutConfirm = () => {
@@ -324,14 +329,33 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             </div>
           )}
 
-          <div id="dashboard-home-button-desktop" className="hidden lg:flex absolute top-7 left-7 z-20">
-            <Link
-              href={homeHref}
-              className="text-[#941C2F] bg-white/40 backdrop-blur-md hover:bg-white/60 hover:scale-105 active:scale-95 rounded-2xl p-3 shadow-sm border border-white/20 transition-all duration-200 flex items-center justify-center"
-              title="Dashboard Utama"
-            >
-              <Home size={22} strokeWidth={2.5} />
-            </Link>
+          <div id="dashboard-home-button-desktop" className="hidden lg:flex absolute top-7 left-7 z-20 gap-2">
+            {hasDualRole ? (
+              <>
+                <Link
+                  href="/koordinator"
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all duration-200 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/koordinator' ? 'bg-[#941C2F] text-white border-[#941C2F]/30 shadow-md shadow-[#941C2F]/20' : 'text-[#941C2F] bg-white border-slate-200/80 shadow-sm hover:shadow-md'}`}
+                >
+                  <LayoutDashboard size={16} strokeWidth={2.5} />
+                  Dash Koor
+                </Link>
+                <Link
+                  href="/asdos"
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all duration-200 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/asdos' ? 'bg-[#941C2F] text-white border-[#941C2F]/30 shadow-md shadow-[#941C2F]/20' : 'text-[#941C2F] bg-white border-slate-200/80 shadow-sm hover:shadow-md'}`}
+                >
+                  <GraduationCap size={16} strokeWidth={2.5} />
+                  Dash Asdos
+                </Link>
+              </>
+            ) : (
+              <Link
+                href={homeHref}
+                className="flex items-center gap-2 px-4 py-2.5 text-[#941C2F] bg-white border border-slate-200/80 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 rounded-2xl transition-all duration-200 text-sm font-bold"
+              >
+                <Home size={17} strokeWidth={2.5} />
+                {homeDashboardLabel}
+              </Link>
+            )}
           </div>
 
           <div id="dashboard-clock-desktop" className="hidden lg:flex absolute top-7 right-7 z-20 items-center gap-4 text-right">
@@ -391,7 +415,24 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
                 {renderMobileNav()}
               </div>
 
-              <div className="shrink-0 px-3 pb-6 pt-3 border-t border-white/20">
+              <div className="shrink-0 px-3 pb-6 pt-3 border-t border-white/20 space-y-1">
+                {hasDualRole && (
+                  <Link
+                    href={otherDashboardHref}
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300 group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-white/5 group-hover:bg-white/10 transition-all duration-300">
+                        <ArrowLeftRight size={18} className="text-white/60 group-hover:text-white transition-colors" />
+                      </div>
+                      <span className="font-semibold text-sm tracking-wide">
+                        Dashboard {otherDashboardLabel}
+                      </span>
+                    </div>
+                    <ChevronRight size={15} className="text-white/30 group-hover:text-white/60 transition-colors" />
+                  </Link>
+                )}
                 <button
                   onClick={openLogoutConfirm}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-white/70 hover:text-white hover:bg-red-500/20 transition-all duration-300 group"

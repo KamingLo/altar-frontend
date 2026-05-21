@@ -60,6 +60,7 @@ export default function ManajemenAsdosPage() {
   const [sheetDragY, setSheetDragY] = useState(0);
   const [deleteSheetStartY, setDeleteSheetStartY] = useState(0);
   const [deleteSheetDragY, setDeleteSheetDragY] = useState(0);
+  const [isMd, setIsMd] = useState(false);
 
   const isFirstTabChange = useRef(true);
   const loadedTabsRef = useRef<Set<TabId>>(new Set());
@@ -136,6 +137,14 @@ export default function ManajemenAsdosPage() {
 
   useEffect(() => {
     return () => { if (modalSearchTimerRef.current) clearTimeout(modalSearchTimerRef.current); };
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    setIsMd(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMd(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, []);
 
   useEffect(() => {
@@ -541,11 +550,11 @@ export default function ManajemenAsdosPage() {
           />
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none">
             <div
-              className="w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto"
-              style={{
+              className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto${isMd ? ` transition-all duration-300 ${isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}` : ''}`}
+              style={!isMd ? {
                 transform: (!isModalVisible || isClosing) ? 'translateY(100%)' : `translateY(${sheetDragY}px)`,
                 transition: (!isModalVisible || isClosing || sheetDragY === 0) ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
-              }}
+              } : undefined}
             >
               <div
                 className="w-full flex md:hidden items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none"
@@ -889,11 +898,11 @@ export default function ManajemenAsdosPage() {
           />
           <div className="fixed inset-0 z-[61] flex items-end md:items-center justify-center pointer-events-none">
             <div
-              className="w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col overflow-hidden pointer-events-auto"
-              style={{
+              className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col overflow-hidden pointer-events-auto${isMd ? ` transition-all duration-300 ${isDeleteModalVisible && !isDeleteClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}` : ''}`}
+              style={!isMd ? {
                 transform: (!isDeleteModalVisible || isDeleteClosing) ? 'translateY(100%)' : `translateY(${deleteSheetDragY}px)`,
                 transition: (!isDeleteModalVisible || isDeleteClosing || deleteSheetDragY === 0) ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
-              }}
+              } : undefined}
             >
               <div
                 className="w-full flex md:hidden items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none"

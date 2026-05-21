@@ -4,7 +4,7 @@ import { Check, Scan, ArrowLeft, Clock, BookOpen, AlertCircle, Loader2, Camera, 
 import { getMyPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { AsdosListSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
+import { AsdosQrScanSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 
 export default function CheckOutPage() {
   const [step, setStep] = useState(1);
@@ -225,13 +225,7 @@ export default function CheckOutPage() {
   if (isLoading) {
     return (
       <AsdosPageShell>
-        <div className="px-4 md:px-0 py-6 md:py-0 space-y-4">
-          <div className="space-y-2">
-            <div className="h-3.5 w-36 rounded-lg animate-shimmer" />
-            <div className="h-8 w-56 rounded-xl animate-shimmer" />
-          </div>
-          <AsdosListSkeleton count={3} />
-        </div>
+        <AsdosQrScanSkeleton />
       </AsdosPageShell>
     );
   }

@@ -4,7 +4,7 @@ import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle, Loader
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 import { submitCheckIn, getMyPresensi } from '@/lib/actions/presensi';
 import { toast } from 'sonner';
-import { AsdosListSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
+import { AsdosQrScanSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 import { decodeJwtPayload } from '@/lib/auth/jwt';
 
 const isSessionExpired = (waktu: string): boolean => {
@@ -343,13 +343,7 @@ export default function CheckInPage() {
   if (isLoading) {
     return (
       <AsdosPageShell>
-        <div className="px-4 md:px-0 py-6 md:py-0 space-y-4">
-          <div className="space-y-2">
-            <div className="h-3.5 w-32 rounded-lg animate-shimmer" />
-            <div className="h-8 w-52 rounded-xl animate-shimmer" />
-          </div>
-          <AsdosListSkeleton count={3} />
-        </div>
+        <AsdosQrScanSkeleton />
       </AsdosPageShell>
     );
   }
