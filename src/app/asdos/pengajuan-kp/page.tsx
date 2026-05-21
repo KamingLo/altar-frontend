@@ -8,6 +8,8 @@ import type { RuanganItem } from '@/types/api';
 import type { SessionFromAPI } from '@/lib/actions/jadwal';
 import { AsdosLoadingState, AsdosPageHeader, AsdosPageShell, AsdosPrimaryButton, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { usePengajuanKpStore } from '@/store/usePengajuanKpStore';
+import { CustomSelect } from '@/components/ui/CustomSelect';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 
 const DROPDOWN_LIMIT = 500;
 const HISTORY_LIMIT = 10;
@@ -48,18 +50,9 @@ export default function PengajuanKpPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isSheetVisible, setIsSheetVisible] = useState(false);
-  const [isSheetClosing, setIsSheetClosing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [sheetStartY, setSheetStartY] = useState(0);
-  const [sheetDragY, setSheetDragY] = useState(0);
-  const [isMobile, setIsMobile] = useState(false);
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [isDeleteVisible, setIsDeleteVisible] = useState(false);
-  const [isDeleteClosing, setIsDeleteClosing] = useState(false);
-  const [deleteDragY, setDeleteDragY] = useState(0);
-  const [deleteStartY, setDeleteStartY] = useState(0);
   const [targetDeleteId, setTargetDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -106,11 +99,6 @@ export default function PengajuanKpPage() {
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
   useEffect(() => {
     setClientToday(todayIso());
-
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -162,60 +150,32 @@ export default function PengajuanKpPage() {
 
   const handleOpenSheet = () => {
     setIsFormOpen(true);
-    setIsSheetClosing(false);
-    setSheetDragY(0);
     setSubmitError(null);
-    setTimeout(() => setIsSheetVisible(true), 10);
   };
 
   const handleCloseSheet = () => {
     if (isSuccess || submitLoading) return;
-    setIsSheetClosing(true);
-    setIsSheetVisible(false);
-    setTimeout(() => {
-      setIsFormOpen(false);
-      setIsSheetClosing(false);
-      setSheetDragY(0);
-      setOriginalDate('');
-      setSubstituteDate('');
-      setIdSession('');
-      setIdRuangan('');
-      setSlotOption(1);
-      setReason('');
-      setSubmitError(null);
-    }, 300);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => setSheetStartY(e.touches[0].clientY);
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const delta = e.touches[0].clientY - sheetStartY;
-    if (delta > 0) setSheetDragY(delta);
-  };
-  const handleTouchEnd = () => {
-    if (sheetDragY > 100) handleCloseSheet();
-    else setSheetDragY(0);
+    setIsFormOpen(false);
+    setOriginalDate('');
+    setSubstituteDate('');
+    setIdSession('');
+    setIdRuangan('');
+    setSlotOption(1);
+    setReason('');
+    setSubmitError(null);
   };
 
   const handleOpenDelete = (id: string) => {
     setTargetDeleteId(id);
     setIsDeleteOpen(true);
-    setIsDeleteClosing(false);
-    setDeleteDragY(0);
     setDeleteError(null);
-    setTimeout(() => setIsDeleteVisible(true), 10);
   };
 
   const handleCloseDelete = () => {
     if (deletingId) return;
-    setIsDeleteClosing(true);
-    setIsDeleteVisible(false);
-    setTimeout(() => {
-      setIsDeleteOpen(false);
-      setIsDeleteClosing(false);
-      setDeleteDragY(0);
-      setTargetDeleteId(null);
-      setDeleteError(null);
-    }, 300);
+    setIsDeleteOpen(false);
+    setTargetDeleteId(null);
+    setDeleteError(null);
   };
 
   const handleSubmit = async () => {
@@ -465,329 +425,204 @@ export default function PengajuanKpPage() {
         </div>
       </div>
 
-      {isFormOpen && (
-        <>
-          <div
-            onClick={handleCloseSheet}
-            className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out
-              ${isSheetVisible && !isSheetClosing ? 'opacity-100' : 'opacity-0'}`}
-          />
-          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none">
-            <div
-              className={`w-full max-w-md md:max-w-xl bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto transition-all duration-300
-                ${!isMobile && isSheetVisible && !isSheetClosing ? 'opacity-100 scale-100' : ''}
-                ${!isMobile && (!isSheetVisible || isSheetClosing) ? 'opacity-0 scale-95' : ''}
-              `}
-              style={isMobile ? {
-                transform: (!isSheetVisible || isSheetClosing)
-                  ? 'translateY(100%)'
-                  : `translateY(${sheetDragY}px)`,
-                transition: (!isSheetVisible || isSheetClosing || sheetDragY === 0)
-                  ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
-                  : 'none',
-              } : {}}
-            >
-              <div
-                className="w-full flex md:hidden items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none shrink-0"
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
-                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+      <BottomSheet
+        isOpen={isFormOpen}
+        onClose={handleCloseSheet}
+        title="Pengajuan Kelas Pengganti"
+        subtitle="Isi formulir untuk mengajukan kelas pengganti."
+      >
+        {isSuccess ? (
+          <div className="h-56 md:h-64 flex flex-col items-center justify-center text-center">
+            <div className="relative flex items-center justify-center mb-8">
+              <div className="absolute w-28 h-28 bg-[#941C2F]/5 rounded-full animate-ping" />
+              <div className="absolute w-20 h-20 bg-[#941C2F]/10 rounded-full" />
+              <div className="relative w-14 h-14 bg-[#941C2F] rounded-full flex items-center justify-center text-white shadow-lg shadow-[#941C2F]/30">
+                <Check size={28} strokeWidth={3} />
               </div>
-
-              <div className="px-5 pt-2 md:pt-6 pb-6 overflow-y-auto">
-                {isSuccess ? (
-                  <div className="h-56 md:h-64 flex flex-col items-center justify-center text-center">
-                    <div className="relative flex items-center justify-center mb-8">
-                      <div className="absolute w-28 h-28 bg-[#941C2F]/5 rounded-full animate-ping" />
-                      <div className="absolute w-20 h-20 bg-[#941C2F]/10 rounded-full" />
-                      <div className="relative w-14 h-14 bg-[#941C2F] rounded-full flex items-center justify-center text-white shadow-lg shadow-[#941C2F]/30">
-                        <Check size={28} strokeWidth={3} />
-                      </div>
-                    </div>
-                    <h2 className="text-xl font-extrabold text-[#1F2937] mb-1">Pengajuan Berhasil!</h2>
-                    <p className="text-sm text-slate-500">Formulir Kelas Pengganti Anda telah disubmit.</p>
+            </div>
+            <h2 className="text-xl font-extrabold text-[#1F2937] mb-1">Pengajuan Berhasil!</h2>
+            <p className="text-sm text-slate-500">Formulir Kelas Pengganti Anda telah disubmit.</p>
+          </div>
+        ) : (
+          <>
+            {dropdownLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <div className="w-7 h-7 border-4 border-[#941C2F]/20 border-t-[#941C2F] rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-4 pt-2">
+                {dropdownError && (
+                  <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold">
+                    ⚠️ {dropdownError}
                   </div>
+                )}
 
-                ) : (
-                  <>
-                    <div className="flex items-start justify-between mb-5">
-                      <div>
-                        <h2 className="text-[20px] font-extrabold text-[#1F2937] leading-7">Pengajuan Kelas Pengganti</h2>
-                        <p className="text-sm text-slate-500 mt-1 font-medium">Isi formulir untuk mengajukan kelas pengganti.</p>
-                      </div>
-                      <button onClick={handleCloseSheet}
-                        className="hidden md:flex shrink-0 w-9 h-9 items-center justify-center bg-slate-50 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors ml-4">
-                        <X size={18} />
-                      </button>
-                    </div>
+                <div>
+                  <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
+                    Tanggal Kelas Asli (yang Dibatalkan)
+                  </label>
+                  <input
+                    type="date"
+                    value={originalDate}
+                    onChange={e => setOriginalDate(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all"
+                  />
+                </div>
 
-                    {dropdownLoading ? (
-                      <div className="flex items-center justify-center py-10">
-                        <div className="w-7 h-7 border-4 border-[#941C2F]/20 border-t-[#941C2F] rounded-full animate-spin" />
+                {originalDate && (
+                  <div>
+                    <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
+                      Sesi yang Diganti
+                    </label>
+                    {sessionList.length === 0 ? (
+                      <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-400 italic">
+                        Tidak ada jadwal pada tanggal ini.
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        {dropdownError && (
-                          <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold">
-                            ⚠️ {dropdownError}
-                          </div>
-                        )}
-
-                        <div>
-                          <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                            Tanggal Kelas Asli (yang Dibatalkan)
-                          </label>
-                          <input
-                            type="date"
-                            value={originalDate}
-                            onChange={e => setOriginalDate(e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all"
-                          />
-                        </div>
-
-                        {originalDate && (
-                          <div>
-                            <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                              Sesi yang Diganti
-                            </label>
-                            {sessionList.length === 0 ? (
-                              <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-400 italic">
-                                Tidak ada jadwal pada tanggal ini.
-                              </div>
-                            ) : (
-                              <select
-                                value={idSession}
-                                onChange={e => setIdSession(e.target.value)}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all appearance-none"
-                              >
-                                <option value="">-- Pilih Sesi --</option>
-                                {sessionList.map(s => (
-                                  <option key={s.id_sesi} value={s.id_sesi}>
-                                    {s.mata_kuliah} · {s.nama_kelas} · {s.waktu.split(', ')[1] ?? s.waktu}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-                          </div>
-                        )}
-
-                        <div>
-                          <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                            Tanggal Kelas Pengganti
-                          </label>
-                          <input
-                            type="date"
-                            value={substituteDate}
-                            min={clientToday}
-                            onChange={e => setSubstituteDate(e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                              Slot Jam
-                            </label>
-                            <select
-                              value={slotOption}
-                              onChange={e => setSlotOption(Number(e.target.value))}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all appearance-none"
-                            >
-                              {SLOT_OPTIONS.map(s => (
-                                <option key={s.value} value={s.value}>{s.label}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                              Ruangan
-                            </label>
-                            <select
-                              value={idRuangan}
-                              onChange={e => setIdRuangan(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all appearance-none"
-                            >
-                              <option value="">-- Pilih --</option>
-                              {ruanganList.map(r => (
-                                <option key={r.id} value={r.id}>
-                                  {r.nama_ruangan} (Lt.{r.lantai})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                            Alasan Pengajuan
-                          </label>
-                          <textarea
-                            value={reason}
-                            onChange={e => setReason(e.target.value)}
-                            placeholder="Masukkan alasan Anda..."
-                            className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all resize-none h-28"
-                          />
-                        </div>
-
-                        {submitError && (
-                          <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold">
-                            ⚠️ {submitError}
-                          </div>
-                        )}
-                      </div>
+                      <CustomSelect
+                        value={idSession}
+                        onChange={setIdSession}
+                        options={sessionList.map(s => ({
+                          value: s.id_sesi,
+                          label: s.mata_kuliah,
+                          description: `${s.nama_kelas} · ${s.waktu.split(', ')[1] ?? s.waktu}`,
+                        }))}
+                        placeholder="-- Pilih Sesi --"
+                      />
                     )}
-                  </>
+                  </div>
                 )}
-              </div>
 
-              {!isSuccess && !dropdownLoading && (
-                <div className="sticky bottom-0 px-5 pb-6 md:pb-6 pt-4 border-t border-slate-100 bg-white">
+                <div>
+                  <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
+                    Tanggal Kelas Pengganti
+                  </label>
+                  <input
+                    type="date"
+                    value={substituteDate}
+                    min={clientToday}
+                    onChange={e => setSubstituteDate(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
+                      Slot Jam
+                    </label>
+                    <CustomSelect
+                      value={String(slotOption)}
+                      onChange={val => setSlotOption(Number(val))}
+                      options={SLOT_OPTIONS.map(s => ({
+                        value: String(s.value),
+                        label: s.label,
+                      }))}
+                      placeholder="-- Pilih Slot --"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
+                      Ruangan
+                    </label>
+                    <CustomSelect
+                      value={idRuangan}
+                      onChange={setIdRuangan}
+                      options={ruanganList.map(r => ({
+                        value: r.id,
+                        label: r.nama_ruangan,
+                        description: `Lantai ${r.lantai}`,
+                      }))}
+                      placeholder="-- Pilih --"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
+                    Alasan Pengajuan
+                  </label>
+                  <textarea
+                    value={reason}
+                    onChange={e => setReason(e.target.value)}
+                    placeholder="Masukkan alasan Anda..."
+                    className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all resize-none h-28"
+                  />
+                </div>
+
+                {submitError && (
+                  <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold">
+                    ⚠️ {submitError}
+                  </div>
+                )}
+
+                <div className="pt-4 border-t border-slate-100 bg-white">
                   <button
                     onClick={handleSubmit}
                     disabled={!isFormValid || submitLoading}
                     className="w-full py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] active:scale-[0.98] transition-all shadow-md shadow-[#941C2F]/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {submitLoading
-                      ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Mengirim...</>
-                      : 'Kirim Pengajuan'
-                    }
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      {isDeleteOpen && (
-        <>
-          <div
-            onClick={handleCloseDelete}
-            className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out
-              ${isDeleteVisible && !isDeleteClosing ? 'opacity-100' : 'opacity-0'}`}
-          />
-
-          <div className="hidden md:flex fixed inset-0 z-50 items-center justify-center pointer-events-auto">
-            <div
-              className={`bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden transition-all duration-300 ${isDeleteVisible && !isDeleteClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-                }`}
-            >
-              <div className="p-7 pb-5">
-                <div className="flex items-center justify-center w-14 h-14 bg-rose-50 rounded-2xl mx-auto mb-5 text-[#941C2F]">
-                  <Trash2 size={24} />
-                </div>
-                <h2 className="text-[20px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">
-                  Batalkan Pengajuan?
-                </h2>
-                <p className="text-sm text-slate-500 text-center leading-relaxed">
-                  Apakah Anda yakin ingin membatalkan pengajuan kelas pengganti ini? Tindakan ini tidak dapat dibatalkan.
-                </p>
-
-                {deleteError && (
-                  <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold mt-4 flex items-center gap-2 text-left">
-                    <span>⚠️</span>
-                    <span className="flex-1">{deleteError}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="px-6 pb-6 flex gap-3">
-                <button
-                  onClick={handleCloseDelete}
-                  disabled={!!deletingId}
-                  className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 active:scale-[0.98] transition-all disabled:opacity-50"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  disabled={!!deletingId}
-                  className="flex-1 py-3 rounded-xl bg-[#941C2F] text-white font-bold text-sm shadow-md shadow-[#941C2F]/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {deletingId ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    'Ya, Batalkan'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="md:hidden fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
-            <div
-              className="w-full max-w-md bg-white rounded-t-[28px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden pointer-events-auto"
-              style={{
-                transform: (!isDeleteVisible || isDeleteClosing)
-                  ? 'translateY(100%)'
-                  : `translateY(${deleteDragY}px)`,
-                transition: (!isDeleteVisible || isDeleteClosing || deleteDragY === 0)
-                  ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
-                  : 'none',
-              }}
-            >
-              <div
-                className="w-full flex items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none shrink-0"
-                onTouchStart={(e) => setDeleteStartY(e.touches[0].clientY)}
-                onTouchMove={(e) => {
-                  const delta = e.touches[0].clientY - deleteStartY;
-                  if (delta > 0) setDeleteDragY(delta);
-                }}
-                onTouchEnd={() => {
-                  if (deleteDragY > 100) handleCloseDelete();
-                  else setDeleteDragY(0);
-                }}
-              >
-                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
-              </div>
-
-              <div className="px-6 pt-4 pb-8">
-                <div className="flex items-center justify-center w-14 h-14 bg-rose-50 rounded-2xl mx-auto mb-5 text-[#941C2F]">
-                  <Trash2 size={24} />
-                </div>
-                <h2 className="text-[22px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">
-                  Batalkan Pengajuan?
-                </h2>
-                <p className="text-sm text-slate-500 text-center leading-relaxed mb-6">
-                  Apakah Anda yakin ingin membatalkan pengajuan kelas pengganti ini? Tindakan ini tidak dapat dibatalkan.
-                </p>
-
-                {deleteError && (
-                  <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold mb-6 flex items-center gap-2">
-                    <span>⚠️</span>
-                    <span className="flex-1">{deleteError}</span>
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={confirmDelete}
-                    disabled={!!deletingId}
-                    className="w-full py-4 rounded-2xl bg-[#941C2F] text-white font-bold text-[15px] shadow-md shadow-[#941C2F]/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {deletingId ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    {submitLoading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Mengirim...
+                      </>
                     ) : (
-                      'Ya, Batalkan'
+                      'Kirim Pengajuan'
                     )}
                   </button>
-                  <button
-                    onClick={handleCloseDelete}
-                    disabled={!!deletingId}
-                    className="w-full py-4 rounded-2xl bg-slate-100 text-slate-600 font-bold text-[15px] hover:bg-slate-200 active:scale-[0.98] transition-all disabled:opacity-50"
-                  >
-                    Batal
-                  </button>
                 </div>
               </div>
-            </div>
+            )}
+          </>
+        )}
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={isDeleteOpen}
+        onClose={handleCloseDelete}
+        maxWidthClassName="max-w-sm"
+      >
+        <div className="pt-4 pb-2">
+          <div className="flex items-center justify-center w-14 h-14 bg-rose-50 rounded-2xl mx-auto mb-5 text-[#941C2F]">
+            <Trash2 size={24} />
           </div>
-        </>
-      )}
+          <h2 className="text-[20px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">
+            Batalkan Pengajuan?
+          </h2>
+          <p className="text-sm text-slate-500 text-center leading-relaxed mb-6">
+            Apakah Anda yakin ingin membatalkan pengajuan kelas pengganti ini? Tindakan ini tidak dapat dibatalkan.
+          </p>
+
+          {deleteError && (
+            <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold mb-6 flex items-center gap-2 text-left">
+              <span>⚠️</span>
+              <span className="flex-1">{deleteError}</span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={confirmDelete}
+              disabled={!!deletingId}
+              className="w-full py-4 rounded-2xl bg-[#941C2F] text-white font-bold text-[15px] shadow-md shadow-[#941C2F]/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {deletingId ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                'Ya, Batalkan'
+              )}
+            </button>
+            <button
+              onClick={handleCloseDelete}
+              disabled={!!deletingId}
+              className="w-full py-4 rounded-2xl bg-slate-100 text-slate-600 font-bold text-[15px] hover:bg-slate-200 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              Batal
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
     </AsdosPageShell>
   );
 }

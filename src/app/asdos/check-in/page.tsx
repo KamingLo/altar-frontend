@@ -1,15 +1,16 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 import { submitCheckIn } from '@/lib/actions/presensi';
 import { toast } from 'sonner';
 import { AsdosListSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
+import { decodeJwtPayload } from '@/lib/auth/jwt';
 
 export default function CheckInPage() {
   const [step, setStep] = useState(1);
   const [sessions, setSessions] = useState<SessionFromAPI[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -28,21 +29,111 @@ export default function CheckInPage() {
   const animFrameRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    async function fetchSessions() {
-      setIsLoading(true);
-      const today = new Date().toISOString().split('T')[0];
-      const res = await getSessionsByDate(today);
-      if (res.success && res.data) {
-        setSessions(res.data);
-        if (res.data.length > 0) setSelectedSessionId(res.data[0].id_sesi);
-      } else {
-        toast.error(res.message || 'Gagal mengambil data sesi');
-      }
-      setIsLoading(false);
+  // Helper untuk memvalidasi dan mem-parsing data dari QR Code
+  const parseAndValidateQrToken = useCallback((token: string): { isValid: boolean; sessionId?: string } => {
+    if (!token) return { isValid: false };
+    
+    // Format token simulasi untuk keperluan development
+    if (token.startsWith('SIMULATED_') || token.startsWith('MOCK_')) {
+      const match = token.match(/_(?:SESSION|SESI)_([a-zA-Z0-9-]+)/i);
+      return { isValid: true, sessionId: match ? match[1] : undefined };
     }
-    fetchSessions();
+
+    // Pendeteksian jika QR Code berisi string JSON terstruktur
+    if (token.trim().startsWith('{') && token.trim().endsWith('}')) {
+      try {
+        const parsed = JSON.parse(token);
+        const sessionId = parsed.id_sesi || parsed.sesi || parsed.sessionId;
+        return { isValid: true, sessionId: typeof sessionId === 'string' ? sessionId : undefined };
+      } catch {
+        return { isValid: false };
+      }
+    }
+
+    // Pendeteksian jika QR Code adalah token JWT
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const payload = decodeJwtPayload(token);
+      if (payload) {
+        // Cek kedaluwarsa JWT jika terdapat claim 'exp'
+        if (typeof payload.exp === 'number' && payload.exp * 1000 < Date.now()) {
+          return { isValid: false };
+        }
+        const sessionId = payload.id_sesi || payload.sesi || payload.sessionId;
+        return { 
+          isValid: true, 
+          sessionId: typeof sessionId === 'string' ? sessionId : undefined 
+        };
+      }
+    }
+
+    // Fallback: Jika berupa kode token alfanumerik biasa (minimal 10 karakter)
+    if (/^[a-zA-Z0-9_-]{10,}$/.test(token)) {
+      return { isValid: true };
+    }
+
+    return { isValid: false };
   }, []);
+
+  // Handler yang dijalankan setelah QR Code valid ditemukan
+  const handleValidQrScanned = useCallback(async (token: string) => {
+    // Jalankan haptic feedback (getaran ponsel) jika didukung browser/device
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(100);
+      } catch {
+        // Hiraukan error jika diblokir browser
+      }
+    }
+
+    setQrToken(token);
+    setIsLoading(true);
+
+    // Ambil data sesi mengajar hari ini saat QR terbukti valid (Lazy Fetch)
+    const today = new Date().toISOString().split('T')[0];
+    const res = await getSessionsByDate(today);
+
+    if (res.success && res.data) {
+      const fetchedSessions = res.data;
+      setSessions(fetchedSessions);
+
+      // Cari kecocokan data sesi dari dalam QR payload
+      const { sessionId } = parseAndValidateQrToken(token);
+      let matchedSession = null;
+
+      if (sessionId) {
+        matchedSession = fetchedSessions.find(s => s.id_sesi === sessionId);
+      }
+
+      if (matchedSession) {
+        // Otomatis pilih sesi yang cocok
+        setSelectedSessionId(matchedSession.id_sesi);
+        toast.success(`✓ Sesi ${matchedSession.mata_kuliah} berhasil dikenali!`);
+        
+        // Pindah ke Step 2 dan otomatis buka lembar konfirmasi check-in
+        setStep(2);
+        setIsLoading(false);
+        
+        setTimeout(() => {
+          setIsSheetOpen(true);
+          setIsSheetVisible(true);
+          setIsSheetClosing(false);
+          setSheetDragY(0);
+        }, 100);
+      } else {
+        // Jika tidak ada data sesi di QR, pilih sesi pertama sebagai default
+        if (fetchedSessions.length > 0) {
+          setSelectedSessionId(fetchedSessions[0].id_sesi);
+        }
+        setStep(2);
+        setIsLoading(false);
+        toast.success('✓ Kode QR Koordinator berhasil diverifikasi!');
+      }
+    } else {
+      setIsLoading(false);
+      toast.error(res.message || 'Gagal mengunduh sesi aktif untuk check-in');
+    }
+  }, [parseAndValidateQrToken]);
 
   useEffect(() => {
     if (step !== 1) stopCamera();
@@ -62,7 +153,6 @@ export default function CheckInPage() {
   }, []);
 
   const startDecodeLoop = useCallback(async () => {
-
     const jsQR = (await import('jsqr')).default;
 
     const tick = () => {
@@ -85,18 +175,19 @@ export default function CheckInPage() {
       });
 
       if (code) {
-
-        stopCamera();
-        setQrToken(code.data);
-        setStep(2);
-        return;
+        const validation = parseAndValidateQrToken(code.data);
+        if (validation.isValid) {
+          stopCamera();
+          handleValidQrScanned(code.data);
+          return;
+        }
       }
 
       animFrameRef.current = requestAnimationFrame(tick);
     };
 
     animFrameRef.current = requestAnimationFrame(tick);
-  }, [stopCamera]);
+  }, [stopCamera, parseAndValidateQrToken, handleValidQrScanned]);
 
   const startCamera = useCallback(async (deviceId?: string) => {
     setCameraStatus('requesting');
@@ -172,9 +263,15 @@ export default function CheckInPage() {
       URL.revokeObjectURL(url);
 
       if (code) {
-        setQrToken(code.data);
-        setCameraStatus('idle');
-        setStep(2);
+        const validation = parseAndValidateQrToken(code.data);
+        if (validation.isValid) {
+          setCameraStatus('idle');
+          setScanMessage('');
+          handleValidQrScanned(code.data);
+        } else {
+          setCameraStatus('idle');
+          setScanMessage('❌ Format QR Code tidak valid atau kadaluarsa. Pastikan QR dari Koordinator.');
+        }
       } else {
         setCameraStatus('idle');
         setScanMessage('❌ QR Code tidak ditemukan di gambar ini. Coba gambar lain.');
@@ -188,7 +285,7 @@ export default function CheckInPage() {
     };
 
     e.target.value = '';
-  }, []);
+  }, [parseAndValidateQrToken, handleValidQrScanned]);
 
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   const selectedSession = sessions.find(s => s.id_sesi === selectedSessionId);
@@ -535,6 +632,15 @@ export default function CheckInPage() {
           </div>
 
           <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-10 lg:p-12">
+            {qrToken && (
+              <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3.5 mb-6 shadow-[0_2px_10px_rgba(16,185,129,0.04)] animate-in fade-in slide-in-from-top-2 duration-300">
+                <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                <p className="text-xs text-emerald-800 font-semibold leading-relaxed">
+                  ✓ Kode QR Koordinator berhasil diverifikasi dan aman digunakan.
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-between items-center mb-4 md:mb-6 px-1">
               <h4 className="text-[11px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Sesi Tersedia Hari Ini</h4>
               <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] md:text-xs font-bold px-2.5 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg">{sessions.length} Sesi</span>

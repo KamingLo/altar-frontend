@@ -705,7 +705,7 @@ export default function GenerateQrPage() {
       )}
 
       {mode === 'KIOSK' && (
-        <div className="fixed inset-0 text-slate-800 z-[9999] overflow-hidden flex flex-col p-6 md:p-8 font-sans select-none animate-fade-in bg-[#EDF2F4]">
+        <div className="fixed inset-0 text-slate-800 z-[9999] overflow-y-auto lg:overflow-hidden flex flex-col p-6 md:p-8 font-sans select-none animate-fade-in bg-[#EDF2F4]">
 
           <style>{`
             #dashboard-home-button-desktop,
@@ -762,7 +762,7 @@ export default function GenerateQrPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 flex-1 min-h-0 mt-6 md:mt-8 mb-4 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 lg:flex-1 lg:min-h-0 h-auto mt-6 md:mt-8 mb-4 items-stretch">
 
               <div className="lg:col-span-7 bg-white border border-slate-100 rounded-[2.5rem] p-6 md:p-8 shadow-sm flex flex-col items-center justify-center relative overflow-hidden text-slate-800">
 
@@ -770,7 +770,7 @@ export default function GenerateQrPage() {
                   <h2 className="text-lg md:text-xl font-extrabold text-slate-800 text-center tracking-tight">SCAN QR CHECK-IN</h2>
                   <p className="text-xs text-slate-400 mt-1 mb-6 md:mb-8 text-center font-medium">Buka aplikasi asdos Anda dan scan kode QR ini</p>
 
-                  <div className="bg-white p-7 rounded-[3rem] shadow-lg border border-slate-150 flex items-center justify-center aspect-square max-w-[280px] sm:max-w-[320px] w-full relative">
+                  <div className="bg-transparent sm:bg-white p-0 sm:p-7 rounded-none sm:rounded-[3rem] shadow-none sm:shadow-lg border-0 sm:border sm:border-slate-150 flex items-center justify-center aspect-square max-w-[280px] sm:max-w-[320px] w-full relative">
                     {qrToken ? (
                       <img
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrToken)}`}
@@ -805,7 +805,7 @@ export default function GenerateQrPage() {
                 </div>
               </div>
 
-              <div className="lg:col-span-5 bg-white border border-slate-100 rounded-[2.5rem] p-6 md:p-8 shadow-sm flex flex-col overflow-hidden min-h-0 text-slate-800">
+              <div className="lg:col-span-5 bg-white border border-slate-100 rounded-[2.5rem] p-6 md:p-8 shadow-sm flex flex-col lg:overflow-hidden lg:min-h-0 overflow-visible h-auto text-slate-800">
                 <h2 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase mb-4">
                   Sesi Terdaftar Hari Ini ({todaySessions.length})
                 </h2>
@@ -816,7 +816,7 @@ export default function GenerateQrPage() {
                     <p className="text-sm font-semibold text-slate-400">Belum ada sesi terdaftar</p>
                   </div>
                 ) : (
-                  <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 content-start pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200">
+                  <div className="flex-1 lg:overflow-y-auto overflow-visible grid grid-cols-1 sm:grid-cols-2 gap-3 content-start pr-1 lg:[&::-webkit-scrollbar]:w-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-slate-200">
                     {todaySessions.map(s => {
                       const timePart = s.waktu.includes(', ') ? s.waktu.split(', ')[1] : s.waktu;
                       return (

@@ -4,6 +4,8 @@ import { Search, Filter, Clock, MapPin, BookOpen, X } from 'lucide-react';
 import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { AsdosLoadingState, AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
+import { CustomSelect } from '@/components/ui/CustomSelect';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 
 type HistoryItem = {
   id: string; subject: string; date: string;
@@ -65,13 +67,7 @@ export default function RiwayatKehadiranPage() {
     showMore,
     resetVisible,
   } = useRiwayatKehadiranStore();
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
-  const [isSheetVisible, setIsSheetVisible] = useState(false);
-  const [isSheetClosing, setIsSheetClosing] = useState(false);
-  const [sheetStartY, setSheetStartY] = useState(0);
-  const [sheetDragY, setSheetDragY] = useState(0);
-  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     async function fetchHistory() {
@@ -98,11 +94,6 @@ export default function RiwayatKehadiranPage() {
 
   useEffect(() => {
     resetVisible();
-
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, [searchTerm, filterStatus, resetVisible]);
 
   const history = items.map(mapPresensiToHistory);
@@ -113,33 +104,6 @@ export default function RiwayatKehadiranPage() {
   );
   const displayed = filtered.slice(0, visibleCount);
   const hasMore = displayed.length < filtered.length;
-
-  const handleOpenSheet = (item: HistoryItem) => {
-    setSelectedItem(item);
-    setIsSheetClosing(false);
-    setSheetDragY(0);
-    setTimeout(() => setIsSheetVisible(true), 10);
-  };
-
-  const handleCloseSheet = () => {
-    setIsSheetClosing(true);
-    setIsSheetVisible(false);
-    setTimeout(() => {
-      setSelectedItem(null);
-      setIsSheetClosing(false);
-      setSheetDragY(0);
-    }, 300);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => setSheetStartY(e.touches[0].clientY);
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const delta = e.touches[0].clientY - sheetStartY;
-    if (delta > 0) setSheetDragY(delta);
-  };
-  const handleTouchEnd = () => {
-    if (sheetDragY > 100) handleCloseSheet();
-    else setSheetDragY(0);
-  };
 
   return (
     <AsdosPageShell>
@@ -158,26 +122,19 @@ export default function RiwayatKehadiranPage() {
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]" />
             </div>
-            <div className="relative shrink-0">
-              <button onClick={() => setShowFilterMenu(!showFilterMenu)}
-                className={`border p-3.5 md:p-4 rounded-2xl md:rounded-3xl active:scale-95 transition-all flex items-center justify-center
-                ${filterStatus !== 'ALL' ? 'bg-red-50 border-[#941C2F] text-[#941C2F]' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
-                <Filter className="w-[18px] h-[18px] md:w-5 md:h-5" />
-              </button>
-              {showFilterMenu && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowFilterMenu(false)} />
-                  <div className="absolute right-0 top-[110%] w-48 bg-white border border-slate-100 rounded-2xl shadow-xl z-20 py-2 overflow-hidden">
-                    {(['ALL', 'BERJALAN', 'SELESAI'] as const).map(s => (
-                      <button key={s} onClick={() => { setFilterStatus(s); setShowFilterMenu(false); }}
-                        className={`w-full text-left px-5 py-3 text-sm transition-colors ${filterStatus === s ? 'bg-slate-50 text-[#941C2F] font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
-                        {s === 'ALL' ? 'Semua Status' : s === 'BERJALAN' ? 'Sedang Berjalan' : 'Selesai'}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            <CustomSelect
+              value={filterStatus}
+              onChange={(val) => setFilterStatus(val as 'ALL' | 'BERJALAN' | 'SELESAI')}
+              options={[
+                { value: 'ALL', label: 'Semua Status' },
+                { value: 'BERJALAN', label: 'Sedang Berjalan' },
+                { value: 'SELESAI', label: 'Selesai' },
+              ]}
+              variant="icon"
+              icon={<Filter className="w-[18px] h-[18px] md:w-5 md:h-5" />}
+              align="right"
+              triggerClassName={filterStatus !== 'ALL' ? 'bg-red-50 border-[#941C2F] text-[#941C2F]' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}
+            />
           </div>
         }
       />
@@ -190,7 +147,7 @@ export default function RiwayatKehadiranPage() {
         ) : displayed.length > 0 ? displayed.map(item => {
           const cfg = statusCfg[item.status];
           return (
-            <div key={item.id} onClick={() => handleOpenSheet(item)}
+            <div key={item.id} onClick={() => setSelectedItem(item)}
               className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm border border-slate-100 cursor-pointer active:scale-[0.99] md:hover:shadow-md md:hover:border-slate-200 transition-all">
 
               <div className="flex items-center gap-3 md:hidden">
@@ -264,96 +221,60 @@ export default function RiwayatKehadiranPage() {
         )}
       </div>
 
-      {selectedItem && (
-        <>
-          <div
-            onClick={handleCloseSheet}
-            className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out
-              ${isSheetVisible && !isSheetClosing ? 'opacity-100' : 'opacity-0'}`}
-          />
+      <BottomSheet
+        isOpen={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+        title={selectedItem?.subject}
+        subtitle={selectedItem?.date}
+        headerAction={
+          selectedItem && (
+            <span className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg tracking-wider ${statusCfg[selectedItem.status].bg} ${statusCfg[selectedItem.status].text}`}>
+              {statusCfg[selectedItem.status].label}
+            </span>
+          )
+        }
+      >
+        {selectedItem && (
+          <div className="pt-2">
+            <div className="flex bg-white rounded-2xl border border-slate-100 p-4 md:p-6 mb-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] divide-x divide-slate-100">
+              {[{ label: 'Check-In', time: selectedItem.checkIn }, { label: 'Check-Out', time: selectedItem.checkOut }].map(({ label, time }) => (
+                <div key={label} className="flex-1 flex flex-col items-center justify-center">
+                  <p className="text-[9px] md:text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-2">{label}</p>
+                  <div className="flex items-center gap-1.5 text-slate-800">
+                    <Clock className="w-[14px] h-[14px] text-slate-400" />
+                    <span className="text-base md:text-xl font-bold">{time}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none">
-            <div
-              className={`w-full max-w-md md:max-w-xl bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto transition-all duration-300
-                ${!isMobile && isSheetVisible && !isSheetClosing ? 'opacity-100 scale-100' : ''}
-                ${!isMobile && (!isSheetVisible || isSheetClosing) ? 'opacity-0 scale-95' : ''}
-              `}
-              style={isMobile ? {
-                transform: (!isSheetVisible || isSheetClosing)
-                  ? 'translateY(100%)'
-                  : `translateY(${sheetDragY}px)`,
-                transition: (!isSheetVisible || isSheetClosing || sheetDragY === 0)
-                  ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
-                  : 'none',
-              } : {}}
-            >
-              <div
-                className="w-full flex md:hidden items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none shrink-0"
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
-                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+            <div className="mb-4">
+              <div className="flex items-center gap-1.5 mb-2 ml-1">
+                <MapPin className="w-3 h-3 md:w-4 md:h-4 text-slate-400" />
+                <h4 className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Lokasi / Ruangan</h4>
               </div>
-
-              <div className="px-5 pt-2 md:pt-6 pb-6 overflow-y-auto">
-                <div className="flex items-start justify-between mb-1 md:mb-2">
-                  <div className="pr-10">
-                    <h2 className="text-[20px] font-extrabold text-[#1F2937] leading-7">{selectedItem.subject}</h2>
-                    <p className="text-xs font-medium text-slate-400 mt-0.5">{selectedItem.date}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg tracking-wider ${statusCfg[selectedItem.status].bg} ${statusCfg[selectedItem.status].text}`}>
-                      {statusCfg[selectedItem.status].label}
-                    </span>
-                    <button onClick={handleCloseSheet}
-                      className="hidden md:flex w-9 h-9 items-center justify-center bg-slate-50 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors">
-                      <X size={18} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex bg-white rounded-2xl border border-slate-100 p-4 md:p-6 mt-5 mb-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] divide-x divide-slate-100">
-                  {[{ label: 'Check-In', time: selectedItem.checkIn }, { label: 'Check-Out', time: selectedItem.checkOut }].map(({ label, time }) => (
-                    <div key={label} className="flex-1 flex flex-col items-center justify-center">
-                      <p className="text-[9px] md:text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-2">{label}</p>
-                      <div className="flex items-center gap-1.5 text-slate-800">
-                        <Clock className="w-[14px] h-[14px] text-slate-400" />
-                        <span className="text-base md:text-xl font-bold">{time}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mb-4">
-                  <div className="flex items-center gap-1.5 mb-2 ml-1">
-                    <MapPin className="w-3 h-3 md:w-4 md:h-4 text-slate-400" />
-                    <h4 className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Lokasi / Ruangan</h4>
-                  </div>
-                  <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm font-semibold text-slate-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-                    {selectedItem.room}
-                  </div>
-                </div>
-
-                <div className="mb-6">
-                  <div className="flex items-center gap-1.5 mb-2 ml-1">
-                    <BookOpen className="w-3 h-3 md:w-4 md:h-4 text-slate-400" />
-                    <h4 className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Bahasan Materi</h4>
-                  </div>
-                  <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-6 text-sm md:text-base text-slate-600 shadow-[0_2px_10px_rgba(0,0,0,0.02)] leading-relaxed min-h-[80px]">
-                    {selectedItem.materi}
-                  </div>
-                </div>
-
-                <button onClick={handleCloseSheet}
-                  className="w-full md:hidden bg-slate-100 text-slate-600 font-bold py-3.5 rounded-xl active:scale-[0.98] hover:bg-slate-200 transition-all text-[15px]">
-                  Tutup
-                </button>
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm font-semibold text-slate-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                {selectedItem.room}
               </div>
             </div>
+
+            <div className="mb-6">
+              <div className="flex items-center gap-1.5 mb-2 ml-1">
+                <BookOpen className="w-3 h-3 md:w-4 md:h-4 text-slate-400" />
+                <h4 className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Bahasan Materi</h4>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-6 text-sm md:text-base text-slate-600 shadow-[0_2px_10px_rgba(0,0,0,0.02)] leading-relaxed min-h-[80px]">
+                {selectedItem.materi}
+              </div>
+            </div>
+
+            <button onClick={() => setSelectedItem(null)}
+              className="w-full md:hidden bg-slate-100 text-slate-600 font-bold py-3.5 rounded-xl active:scale-[0.98] hover:bg-slate-200 transition-all text-[15px]">
+              Tutup
+            </button>
           </div>
-        </>
-      )}
+        )}
+      </BottomSheet>
     </AsdosPageShell>
   );
 }
