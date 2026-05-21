@@ -12,8 +12,8 @@ export function ResetPasswordForm() {
   const [showConfirm, setShowConfirm] = React.useState(false);
 
   useEffect(() => {
-    if (message?.type === 'error') setShowErrorToast(true);
-    else setShowErrorToast(false);
+    const t = setTimeout(() => setShowErrorToast(message?.type === 'error'), 0);
+    return () => clearTimeout(t);
   }, [message]);
 
   useEffect(() => {
@@ -23,8 +23,8 @@ export function ResetPasswordForm() {
   }, [showErrorToast]);
 
   useEffect(() => {
-    if (message?.type === 'success') setShowSuccessToast(true);
-    else setShowSuccessToast(false);
+    const t = setTimeout(() => setShowSuccessToast(message?.type === 'success'), 0);
+    return () => clearTimeout(t);
   }, [message]);
 
   useEffect(() => {

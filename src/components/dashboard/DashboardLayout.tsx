@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown, GraduationCap, LayoutDashboard, ArrowLeftRight } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { logoutUser } from '@/lib/actions/auth/session';
@@ -103,7 +104,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const toggleGroup = (id: string) => {
     setOpenGroups(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
       return next;
     });
   };
@@ -269,7 +270,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
         >
           <div className={`pt-10 pb-7 border-b border-white/10 flex items-center transition-all duration-300 shrink-0 ${isSidebarCollapsed ? 'justify-center px-3' : 'justify-between px-7'}`}>
             <div className={`overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'}`}>
-              <img src="/logo-sb.png" alt="Logo" className="h-9 w-auto object-contain" />
+              <Image src="/logo-sb.png" alt="Logo" width={160} height={36} className="h-9 w-auto object-contain" style={{ width: 'auto' }} />
             </div>
             <button
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -409,7 +410,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
               className={`absolute top-0 left-0 w-[280px] h-full bg-[#941C2F] shadow-2xl flex flex-col overscroll-none overflow-x-hidden transition-transform duration-300 ease-in-out transform-gpu ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
             >
               <div className="pt-10 pb-6 px-6 border-b border-white/20 shrink-0">
-                <img src="/logo-sb.png" alt="Logo" className="h-8 w-auto object-contain" />
+                <Image src="/logo-sb.png" alt="Logo" width={160} height={32} className="h-8 w-auto object-contain" style={{ width: 'auto' }} />
               </div>
               <div className="flex-1 min-h-0 px-3 py-6 overflow-y-auto no-scrollbar">
                 {renderMobileNav()}

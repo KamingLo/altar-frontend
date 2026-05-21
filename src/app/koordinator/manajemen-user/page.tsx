@@ -2,12 +2,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   getAsdosList, getKoorList, getUserList, getAsdosDetail,
-  createAsdosAccount, createKoorAccount,
   createUser, assignKoor, assignAsdos,
   updateAsdos, updateKoor,
   deleteAsdos, deleteKoor,
 } from '@/lib/actions/manajemen';
-import type { AsdosListItem, KoorListItem, UserListItem } from '@/lib/actions/manajemen';
+import type { UserListItem } from '@/lib/actions/manajemen';
 import { useManajemenStore } from '@/store/useManajemenStore';
 
 type TabId = 'asdos' | 'koordinator' | 'user';
@@ -21,6 +20,12 @@ type ModalForm = {
   nip: string;
   phone_number: string;
 };
+
+const SearchIcon = () => <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
+const EditIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>;
+const DeleteIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
+const PhoneIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>;
+const UserIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
 
 export default function ManajemenAsdosPage() {
   const {
@@ -60,7 +65,9 @@ export default function ManajemenAsdosPage() {
   const [sheetDragY, setSheetDragY] = useState(0);
   const [deleteSheetStartY, setDeleteSheetStartY] = useState(0);
   const [deleteSheetDragY, setDeleteSheetDragY] = useState(0);
-  const [isMd, setIsMd] = useState(false);
+  const [isMd, setIsMd] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : false
+  );
 
   const isFirstTabChange = useRef(true);
   const loadedTabsRef = useRef<Set<TabId>>(new Set());
@@ -141,7 +148,6 @@ export default function ManajemenAsdosPage() {
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 768px)');
-    setIsMd(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMd(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
@@ -358,12 +364,6 @@ export default function ManajemenAsdosPage() {
     if (delta > 0) setDeleteSheetDragY(delta);
   };
   const handleDeleteTouchEnd = () => { if (deleteSheetDragY > 100) handleCloseDeleteModal(); else setDeleteSheetDragY(0); };
-
-  const SearchIcon = () => <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
-  const EditIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>;
-  const DeleteIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
-  const PhoneIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>;
-  const UserIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
 
   const isEmptyResult = !isLoading && activeItems.length === 0;
   const showAddButton = activeTab !== 'user';

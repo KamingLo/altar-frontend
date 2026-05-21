@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
-import { CalendarPlus, Clock, CheckCircle2, XCircle, Check, X, Trash2, MapPin, Calendar } from 'lucide-react';
+import { CalendarPlus, Clock, CheckCircle2, XCircle, Check, Trash2, MapPin, Calendar } from 'lucide-react';
 import { getSubstitutionDetail, createSubstitution, deleteSubstitution } from '@/lib/actions/pergantian-kelas';
 import { getRuanganList } from '@/lib/actions/data-master';
 import { getSessionsByDate } from '@/lib/actions/jadwal';

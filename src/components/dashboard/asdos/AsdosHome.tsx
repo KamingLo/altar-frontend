@@ -178,7 +178,7 @@ export default function AsdosHome() {
                       Dari: {notif.sender}
                     </p>
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      <p className="text-[11px] text-slate-600 leading-relaxed italic">"{notif.detail}"</p>
+                      <p className="text-[11px] text-slate-600 leading-relaxed italic">{'"'}{notif.detail}{'"'}</p>
                     </div>
                   </div>
                 </div>

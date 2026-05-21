@@ -4,7 +4,7 @@ import Link from 'next/link';
 import {
   FileText, QrCode, Users, CalendarSync,
   MapPin, LogOut, ChevronRight, TrendingUp, Clock, CheckCircle2,
-  Database, CalendarDays
+  CalendarDays
 } from 'lucide-react';
 import { useUserStore } from '@/store/useUserStore';
 

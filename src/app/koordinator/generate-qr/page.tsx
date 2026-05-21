@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, startTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   CalendarDays,
   Clock,
@@ -14,18 +14,12 @@ import {
   BookOpen,
   MapPin,
   User,
-  Users,
   CheckCircle2,
   AlertCircle,
-  HelpCircle,
-  Eye,
-  EyeOff,
   ChevronRight,
   ArrowRight,
   ShieldCheck,
-  ShieldAlert,
   Loader2,
-  Plus,
   Download
 } from 'lucide-react';
 import {
@@ -43,8 +37,6 @@ import { CustomSelect } from '@/components/ui/CustomSelect';
 const REFRESH_INTERVAL_SEC = 240; 
 
 export default function GenerateQrPage() {
-  const router = useRouter();
-
   const [semesters, setSemesters] = useState<SemesterItem[]>([]);
   const [selectedSemesterId, setSelectedSemesterId] = useState<string>('');
   const [todaySessions, setTodaySessions] = useState<UnifiedJadwalResponse[]>([]);
@@ -64,7 +56,6 @@ export default function GenerateQrPage() {
   const [mode, setMode] = useState<'NORMAL' | 'KIOSK'>('NORMAL');
   const [qrToken, setQrToken] = useState('');
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_SEC);
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isPinVisible, setIsPinVisible] = useState(false);
@@ -79,7 +70,6 @@ export default function GenerateQrPage() {
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [isConfirmStep, setIsConfirmStep] = useState(false);
-  const [showPin, setShowPin] = useState(false);
   const [pinError, setPinError] = useState('');
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
@@ -173,7 +163,6 @@ export default function GenerateQrPage() {
       if (res.success && res.data?.qr_token) {
         setQrToken(res.data.qr_token);
         setCountdown(REFRESH_INTERVAL_SEC);
-        setLastRefreshed(new Date());
       } else {
         showToast(res.message || 'Gagal menyegarkan kode QR.', 'error');
       }
@@ -254,6 +243,7 @@ export default function GenerateQrPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isPinModalOpen,
     isExitModalOpen,
@@ -280,7 +270,7 @@ export default function GenerateQrPage() {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-    } catch (error) {
+    } catch {
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrToken)}`;
       window.open(qrUrl, '_blank');
     }
@@ -369,7 +359,7 @@ export default function GenerateQrPage() {
       } else {
         openPinModal('VERIFY_ENTER');
       }
-    } catch (err) {
+    } catch {
       openExplanationModal();
     } finally {
       setIsKioskActionLoading(false);
@@ -388,7 +378,7 @@ export default function GenerateQrPage() {
       } else {
         openPinModal('VERIFY_CHANGE');
       }
-    } catch (err) {
+    } catch {
       openPinModal('SET');
     } finally {
       setIsKioskActionLoading(false);
@@ -443,7 +433,6 @@ export default function GenerateQrPage() {
           setQrToken(qrRes.data.qr_token);
           setMode('KIOSK');
           setCountdown(REFRESH_INTERVAL_SEC);
-          setLastRefreshed(new Date());
           closePinModal();
           showToast('Kiosk Mode Berhasil Diaktifkan!', 'success');
         } else {
@@ -791,9 +780,11 @@ export default function GenerateQrPage() {
 
                   <div className="bg-transparent lg:bg-white p-0 lg:p-7 rounded-none lg:rounded-[3rem] shadow-none lg:shadow-lg border-0 lg:border lg:border-slate-150 flex items-center justify-center aspect-square max-w-[280px] sm:max-w-[320px] w-full relative">
                     {qrToken ? (
-                      <img
+                      <Image
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrToken)}`}
                         alt="QR Code"
+                        width={300}
+                        height={300}
                         className="w-full h-full object-contain"
                       />
                     ) : (

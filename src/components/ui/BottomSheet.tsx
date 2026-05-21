@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -23,52 +23,46 @@ export function BottomSheet({
   headerAction,
   maxWidthClassName = 'max-w-md md:max-w-xl',
 }: BottomSheetProps) {
-  const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const [closing, setClosing] = useState(false);
 
-  const [isMobile, setIsMobile] = useState(false);
+  // Use lazy initializer so isMobile is correct on first render (no flash)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
   const [sheetDragY, setSheetDragY] = useState(0);
   const [sheetStartY, setSheetStartY] = useState(0);
 
-  // Synchronize state for enter/exit animations
   useEffect(() => {
-    let t: NodeJS.Timeout;
+    let t0: NodeJS.Timeout;
+    let t1: NodeJS.Timeout;
     if (isOpen) {
-      setMounted(true);
-      setClosing(false);
-      t = setTimeout(() => setVisible(true), 10);
+      // Reset closing flag, then trigger enter animation
+      t0 = setTimeout(() => setClosing(false), 0);
+      t1 = setTimeout(() => setVisible(true), 10);
     } else {
-      setVisible(false);
-      setClosing(true);
-      t = setTimeout(() => {
-        setMounted(false);
+      t0 = setTimeout(() => { setVisible(false); setClosing(true); }, 0);
+      t1 = setTimeout(() => {
         setClosing(false);
         setSheetDragY(0);
       }, 300);
     }
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t0); clearTimeout(t1); };
   }, [isOpen]);
 
-  // Handle window resizing to detect mobile screen
   useEffect(() => {
-    if (!mounted) return;
     const handleResize = () => setIsMobile(window.innerWidth < 768);
-    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [mounted]);
+  }, []);
 
-  // Touch handlers for mobile swipe-to-dismiss gesture
   const handleTouchStart = (e: React.TouchEvent) => {
     setSheetStartY(e.touches[0].clientY);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     const delta = e.touches[0].clientY - sheetStartY;
-    if (delta > 0) {
-      setSheetDragY(delta);
-    }
+    if (delta > 0) setSheetDragY(delta);
   };
 
   const handleTouchEnd = () => {
@@ -79,7 +73,8 @@ export function BottomSheet({
     }
   };
 
-  if (!mounted || typeof document === 'undefined') return null;
+  // Keep element in DOM during exit animation (closing=true)
+  if ((!isOpen && !closing) || typeof document === 'undefined') return null;
 
   return createPortal(
     <>

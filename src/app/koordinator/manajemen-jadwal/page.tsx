@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Clock,
   Filter,
-  Loader2,
   MapPin,
   Pencil,
   Plus,
@@ -110,7 +109,6 @@ export default function ManajemenJadwalPage() {
   const [sessions, setSessions] = useState<SessionTimeline[]>([]);
   const [loading, setLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [semesterError, setSemesterError] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -143,6 +141,16 @@ export default function ManajemenJadwalPage() {
   const [isDeleteVisible, setIsDeleteVisible] = useState(false);
   const [isDeleteClosing, setIsDeleteClosing] = useState(false);
   const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
+
+  const [isMd, setIsMd] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const handler = (e: MediaQueryListEvent) => setIsMd(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   const [masterModal, setMasterModal] = useState<{
     open: boolean;
@@ -231,7 +239,6 @@ export default function ManajemenJadwalPage() {
 
   useEffect(() => {
     (async () => {
-      setSemesterError(null);
       const res = await fetchSemesters();
       if (res.success && res.items.length) {
         setSemesters(res.items);
@@ -242,7 +249,6 @@ export default function ManajemenJadwalPage() {
       } else {
         setIsInitialLoad(false);
         if (!res.success && !redirectIfSessionExpired(res.message)) {
-          setSemesterError(res.message || 'Gagal memuat data semester.');
           showToast(res.message);
         }
       }
@@ -251,7 +257,8 @@ export default function ManajemenJadwalPage() {
 
   useEffect(() => {
     if (!selectedSemesterId) return;
-    refreshSessions();
+    const t = setTimeout(() => refreshSessions(), 0);
+    return () => clearTimeout(t);
   }, [selectedSemesterId, refreshSessions]);
 
   const loadDropdownData = useCallback(async (): Promise<DropdownData | null> => {
@@ -550,7 +557,8 @@ export default function ManajemenJadwalPage() {
 
     if (!res.success) {
       if (redirectIfSessionExpired(res.message)) return;
-      const detail = (res as any).error && typeof (res as any).error === 'string' ? ` (${(res as any).error})` : '';
+      const resError = (res as Record<string, unknown>).error;
+      const detail = typeof resError === 'string' ? ` (${resError})` : '';
       showToast((res.message || 'Gagal menyimpan sesi.') + detail);
       return;
     }
@@ -1071,11 +1079,17 @@ export default function ManajemenJadwalPage() {
           />
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none p-0 md:p-4">
             <div
-              className="w-full max-w-lg bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[80vh] overflow-hidden pointer-events-auto"
-              style={{
-                transform: !isModalVisible || isClosing ? 'translateY(100%)' : `translateY(${sheetDragY}px)`,
-                transition: !isModalVisible || isClosing || sheetDragY === 0 ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
-              }}
+              className={`w-full max-w-lg bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[80vh] overflow-hidden pointer-events-auto transition-all duration-300 ${
+                isMd ? (isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''
+              }`}
+              style={
+                !isMd
+                  ? {
+                      transform: !isModalVisible || isClosing ? 'translateY(100%)' : `translateY(${sheetDragY}px)`,
+                      transition: !isModalVisible || isClosing || sheetDragY === 0 ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
+                    }
+                  : {}
+              }
             >
               <div
                 className="w-full flex md:hidden items-center justify-center pt-4 pb-2 touch-none"
@@ -1288,14 +1302,20 @@ export default function ManajemenJadwalPage() {
           />
           <div className="fixed inset-0 z-[61] flex items-end md:items-center justify-center pointer-events-none">
             <div
-              className="w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl overflow-hidden pointer-events-auto mx-0 md:mx-4"
-              style={{
-                transform: !isDeleteVisible || isDeleteClosing ? 'translateY(100%)' : `translateY(${deleteSheetDragY}px)`,
-                transition:
-                  !isDeleteVisible || isDeleteClosing || deleteSheetDragY === 0
-                    ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
-                    : 'none',
-              }}
+              className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl overflow-hidden pointer-events-auto mx-0 md:mx-4 transition-all duration-300 ${
+                isMd ? (isDeleteVisible && !isDeleteClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''
+              }`}
+              style={
+                !isMd
+                  ? {
+                      transform: !isDeleteVisible || isDeleteClosing ? 'translateY(100%)' : `translateY(${deleteSheetDragY}px)`,
+                      transition:
+                        !isDeleteVisible || isDeleteClosing || deleteSheetDragY === 0
+                          ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
+                          : 'none',
+                    }
+                  : {}
+              }
             >
               <div
                 className="w-full flex md:hidden items-center justify-center pt-4 pb-2 touch-none"

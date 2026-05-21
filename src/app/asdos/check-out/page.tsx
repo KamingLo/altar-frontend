@@ -59,11 +59,6 @@ export default function CheckOutPage() {
     fetchActivePresensi();
   }, []);
 
-  useEffect(() => {
-    if (step !== 1) stopCamera();
-    return () => stopCamera();
-  }, [step]);
-
   const stopCamera = useCallback(() => {
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
@@ -75,6 +70,11 @@ export default function CheckOutPage() {
     }
     if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
+
+  useEffect(() => {
+    if (step !== 1) stopCamera();
+    return () => stopCamera();
+  }, [step, stopCamera]);
 
   const startDecodeLoop = useCallback(async () => {
     const jsQR = (await import('jsqr')).default;

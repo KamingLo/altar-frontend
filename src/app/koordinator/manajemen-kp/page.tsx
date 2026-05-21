@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useTransition } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   CalendarDays,
   Clock,
   MapPin,
   User,
   CheckCircle2,
-  AlertCircle,
   X,
   BookOpen,
   MessageSquare,
@@ -17,8 +16,6 @@ import {
   Search,
   Inbox,
   Loader2,
-  ArrowRight,
-  ChevronRight,
   FileText,
   Filter
 } from 'lucide-react';
@@ -39,8 +36,6 @@ export default function ManajemenKpPage() {
   const [activeTab, setActiveTab] = useState<TabId>('PENDING');
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-
   const [selectedRequest, setSelectedRequest] = useState<SubstituteSessionDetail | null>(null);
   const [modalType, setModalType] = useState<'APPROVE' | 'REJECT' | 'NONE'>('NONE');
   const [rejectionReason, setRejectionReason] = useState('');
@@ -63,7 +58,7 @@ export default function ManajemenKpPage() {
           toast.error(res.message || 'Gagal memuat data pengajuan.');
         }
       }
-    } catch (error) {
+    } catch {
       if (!silent) {
         setSubstitutions([]);
         toast.error('Terjadi kesalahan saat menghubungi server.');
@@ -134,7 +129,7 @@ export default function ManajemenKpPage() {
 
         fetchRequests(true);
       }
-    } catch (error) {
+    } catch {
       toast.error('Gagal memperbarui status pengajuan.');
 
       fetchRequests(true);
@@ -460,7 +455,7 @@ export default function ManajemenKpPage() {
                           <span className="font-extrabold text-[10px] tracking-wider uppercase text-slate-400 not-italic block mb-1">
                             ALASAN ASDOS:
                           </span>
-                          "{req.reason}"
+                          {'"'}{req.reason}{'"'}
                         </div>
                       </div>
 
@@ -471,7 +466,7 @@ export default function ManajemenKpPage() {
                             <span className="font-extrabold text-[10px] tracking-wider uppercase text-rose-500 block mb-1">
                               CATATAN PENOLAKAN:
                             </span>
-                            "{req.coordinator_reason}"
+                            {'"'}{req.coordinator_reason}{'"'}
                           </div>
                         </div>
                       )}

@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Clock, MapPin, BookOpen, X } from 'lucide-react';
+import { Search, Filter, Clock, MapPin, BookOpen } from 'lucide-react';
 import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { AsdosLoadingState, AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';

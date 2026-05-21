@@ -26,11 +26,8 @@ export default function LoginForm() {
   const [showSuccessToast, setShowSuccessToast] = React.useState(false);
 
   useEffect(() => {
-    if (errorMessage) {
-      setShowErrorToast(true);
-    } else {
-      setShowErrorToast(false);
-    }
+    const t = setTimeout(() => setShowErrorToast(!!errorMessage), 0);
+    return () => clearTimeout(t);
   }, [errorMessage]);
 
   useEffect(() => {
@@ -41,11 +38,8 @@ export default function LoginForm() {
   }, [showErrorToast]);
 
   useEffect(() => {
-    if (successMessage) {
-      setShowSuccessToast(true);
-    } else {
-      setShowSuccessToast(false);
-    }
+    const t = setTimeout(() => setShowSuccessToast(!!successMessage), 0);
+    return () => clearTimeout(t);
   }, [successMessage]);
 
   useEffect(() => {

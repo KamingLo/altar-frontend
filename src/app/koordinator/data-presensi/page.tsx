@@ -3,13 +3,10 @@
 import React, { useState, useEffect, useCallback, useTransition } from 'react';
 import {
   CalendarDays,
-  Clock,
   MapPin,
   User,
   CheckCircle2,
-  AlertCircle,
   X,
-  BookOpen,
   MessageSquare,
   Check,
   Search,
@@ -19,7 +16,6 @@ import {
   QrCode,
   ExternalLink,
   Filter,
-  CheckSquare,
   AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -72,7 +68,7 @@ export default function DataPresensiPage() {
           toast.error(res.message || 'Gagal memuat data presensi.');
         }
       }
-    } catch (error) {
+    } catch {
       if (!silent) {
         setPresensi([]);
         toast.error('Terjadi kesalahan saat menghubungkan ke server.');
@@ -134,7 +130,7 @@ export default function DataPresensiPage() {
           toast.error(res.message || 'Gagal memperbarui status presensi.');
           fetchPresensi(true); 
         }
-      } catch (error) {
+      } catch {
         toast.error('Gagal memproses verifikasi presensi.');
         fetchPresensi(true); 
       }
@@ -415,7 +411,7 @@ export default function DataPresensiPage() {
                             JURNAL MATERI
                           </span>
                           <span className="line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
-                            "{item.deskripsi_materi}"
+                            {'"'}{item.deskripsi_materi}{'"'}
                           </span>
                         </div>
                       </div>

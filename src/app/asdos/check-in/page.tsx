@@ -138,11 +138,6 @@ export default function CheckInPage() {
     }
   }, [parseAndValidateQrToken]);
 
-  useEffect(() => {
-    if (step !== 1) stopCamera();
-    return () => stopCamera();
-  }, [step]);
-
   const stopCamera = useCallback(() => {
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
@@ -155,6 +150,11 @@ export default function CheckInPage() {
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraStatus(prev => (prev === 'active' ? 'idle' : prev));
   }, []);
+
+  useEffect(() => {
+    if (step !== 1) stopCamera();
+    return () => stopCamera();
+  }, [step, stopCamera]);
 
   const startDecodeLoop = useCallback(async () => {
     const jsQR = (await import('jsqr')).default;

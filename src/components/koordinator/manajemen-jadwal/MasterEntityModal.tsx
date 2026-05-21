@@ -51,20 +51,34 @@ export function MasterEntityModal({ open, mode, resource, initialData, onClose, 
   const [dragY, setDragY] = useState(0);
   const startY = useRef(0);
 
-  const [form, setForm] = useState<Record<string, string>>({});
+  const [isMd, setIsMd] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const handler = (e: MediaQueryListEvent) => setIsMd(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const [form, setForm] = useState<Record<string, string>>(() =>
+    initialFormFor(resource, mode === 'edit' ? initialData ?? null : null)
+  );
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setClosing(false);
-    setDragY(0);
-    setError('');
-    setConfirmDelete(false);
-    setForm(initialFormFor(resource, mode === 'edit' ? initialData ?? null : null));
+    const t0 = setTimeout(() => {
+      setClosing(false);
+      setDragY(0);
+      setError('');
+      setConfirmDelete(false);
+      setForm(initialFormFor(resource, mode === 'edit' ? initialData ?? null : null));
+    }, 0);
     const id = setTimeout(() => setVisible(true), 10);
-    return () => clearTimeout(id);
+    return () => { clearTimeout(t0); clearTimeout(id); };
   }, [open, mode, resource, initialData]);
 
   const close = () => {
@@ -136,11 +150,17 @@ export function MasterEntityModal({ open, mode, resource, initialData, onClose, 
       />
       <div className="fixed inset-0 z-[81] flex items-end md:items-center justify-center pointer-events-none p-0 md:p-4">
         <div
-          className="w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-4rem)] md:max-h-[80vh] overflow-hidden pointer-events-auto"
-          style={{
-            transform: !visible || closing ? 'translateY(100%)' : `translateY(${dragY}px)`,
-            transition: !visible || closing || dragY === 0 ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
-          }}
+          className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-4rem)] md:max-h-[80vh] overflow-hidden pointer-events-auto transition-all duration-300 ${
+            isMd ? (visible && !closing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''
+          }`}
+          style={
+            !isMd
+              ? {
+                  transform: !visible || closing ? 'translateY(100%)' : `translateY(${dragY}px)`,
+                  transition: !visible || closing || dragY === 0 ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
+                }
+              : {}
+          }
         >
           <div
             className="w-full flex md:hidden items-center justify-center pt-4 pb-2 touch-none"
