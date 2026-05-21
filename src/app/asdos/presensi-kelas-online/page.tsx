@@ -259,7 +259,7 @@ export default function PresensiKelasOnlinePage() {
       {step === 1 && (
         <>
           <AsdosPageHeader eyebrow="Presensi Kelas Online" title="Pilih Sesi Mengajar" description="Pilih jadwal hari ini, lalu isi link, jam mengajar, dan materi." />
-          <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-10 lg:p-12">
+          <div>
             <div className="flex justify-between items-center mb-4 md:mb-6 px-1">
               <h4 className="text-[11px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Sesi Tersedia Hari Ini</h4>
               <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] md:text-xs font-bold px-2.5 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg">{onlineSessions.length} Sesi</span>
@@ -335,7 +335,7 @@ export default function PresensiKelasOnlinePage() {
             </button>
           </div>
 
-          <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-10 lg:p-12">
+          <div>
             <div className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border border-[#941C2F]/20 mb-6 md:mb-8 gap-3 md:gap-0">
               <div className="flex items-center gap-3 md:gap-4 min-w-0">
                 <div className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center bg-[#941C2F]/10 text-[#941C2F]">

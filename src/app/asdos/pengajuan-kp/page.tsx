@@ -1,18 +1,38 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarPlus, Clock, CheckCircle2, XCircle, Check, X, Trash2, MapPin, Calendar } from 'lucide-react';
-import { getAllSubstitutions, createSubstitution, deleteSubstitution } from '@/lib/actions/pergantian-kelas';
+import { getSubstitutionDetail, createSubstitution, deleteSubstitution } from '@/lib/actions/pergantian-kelas';
 import { getRuanganList } from '@/lib/actions/data-master';
 import { getSessionsByDate } from '@/lib/actions/jadwal';
-import type { RuanganItem } from '@/types/api';
+import type { RuanganItem, SubstituteSessionDetail } from '@/types/api';
 import type { SessionFromAPI } from '@/lib/actions/jadwal';
 import { AsdosLoadingState, AsdosPageHeader, AsdosPageShell, AsdosPrimaryButton, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { usePengajuanKpStore } from '@/store/usePengajuanKpStore';
+import { useUserStore } from '@/store/useUserStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 
 const DROPDOWN_LIMIT = 500;
-const HISTORY_LIMIT = 10;
+
+const storageKey = (userId?: string | null) => userId ? `pengajuan-kp-ids:${userId}` : null;
+
+const loadStoredIds = (userId?: string | null): string[] => {
+  const key = storageKey(userId);
+  if (!key || typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredIds = (userId: string | null | undefined, ids: string[]) => {
+  const key = storageKey(userId);
+  if (!key || typeof window === 'undefined') return;
+  window.localStorage.setItem(key, JSON.stringify(ids));
+};
 const SLOT_OPTIONS = [
   { value: 1, label: '07:30 – 09:10' },
   { value: 2, label: '09:30 – 11:10' },
@@ -43,11 +63,11 @@ function todayIso() {
 }
 
 export default function PengajuanKpPage() {
-  const { items: history, total: historyTotal, loadedPages, setPage, removeItem, reset } = usePengajuanKpStore();
+  const { items: history, setPage, removeItem, reset } = usePengajuanKpStore();
+  const { user } = useUserStore();
+  const userId = user?.id_asisten ?? user?.id ?? null;
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -69,32 +89,28 @@ export default function PengajuanKpPage() {
   const [sessionList, setSessionList] = useState<SessionFromAPI[]>([]);
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState<string | null>(null);
-  const fetchHistory = useCallback(async (page = 1, append = false, force = false) => {
-    if (!force && loadedPages[page]) {
-      setHistoryLoading(false);
-      setLoadingMore(false);
-      return;
-    }
-
-    if (append) setLoadingMore(true);
-    else setHistoryLoading(true);
-
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
     setHistoryError(null);
     try {
-      const res = await getAllSubstitutions({ page, limit: HISTORY_LIMIT });
-      if (res.success && res.data) {
-        setPage(page, res.data.items ?? [], res.data.total ?? 0);
-        setCurrentPage(page);
-      } else {
-        setHistoryError(res.message || 'Gagal memuat riwayat.');
+      const ids = loadStoredIds(userId);
+      if (ids.length === 0) {
+        setPage(1, [], 0);
+        return;
       }
+      const results = await Promise.all(
+        ids.map(id => getSubstitutionDetail(id).then(r => r.success && r.data ? r.data : null).catch(() => null))
+      );
+      const valid = results.filter((r): r is SubstituteSessionDetail => r !== null);
+      const validIds = valid.map(v => v.id);
+      if (validIds.length !== ids.length) saveStoredIds(userId, validIds);
+      setPage(1, valid, valid.length);
     } catch (e: unknown) {
       setHistoryError(e instanceof Error ? e.message : 'Terjadi kesalahan jaringan.');
     } finally {
       setHistoryLoading(false);
-      setLoadingMore(false);
     }
-  }, [loadedPages, setPage]);
+  }, [userId, setPage]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
   useEffect(() => {
@@ -192,12 +208,17 @@ export default function PengajuanKpPage() {
       });
 
       if (res.success) {
+        const newId = res.data?.id;
+        if (newId) {
+          const existing = loadStoredIds(userId);
+          saveStoredIds(userId, [newId, ...existing.filter(id => id !== newId)]);
+        }
         setIsSuccess(true);
         setTimeout(() => {
           setIsSuccess(false);
           handleCloseSheet();
           reset();
-          fetchHistory(1, false, true);
+          fetchHistory();
         }, 2000);
       } else {
         setSubmitError(res.message || 'Gagal mengajukan kelas pengganti.');
@@ -220,6 +241,7 @@ export default function PengajuanKpPage() {
     try {
       const res = await deleteSubstitution(targetDeleteId);
       if (res.success) {
+        saveStoredIds(userId, loadStoredIds(userId).filter(id => id !== targetDeleteId));
         removeItem(targetDeleteId);
         handleCloseDelete();
       } else {
@@ -238,7 +260,6 @@ export default function PengajuanKpPage() {
     idSession.trim() !== '' &&
     idRuangan.trim() !== '' &&
     reason.trim() !== '';
-  const hasMoreHistory = history.length < historyTotal;
 
   return (
     <AsdosPageShell>
@@ -397,22 +418,9 @@ export default function PengajuanKpPage() {
 
 
         {!historyLoading && !historyError && history.length > 0 && (
-          <>
-            <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 mt-2 text-center md:text-left">
-              Menampilkan {history.length} dari {historyTotal} pengajuan kelas pengganti.
-            </p>
-            {hasMoreHistory && (
-              <div className="flex justify-center pt-2">
-                <button
-                  onClick={() => fetchHistory(currentPage + 1, true)}
-                  disabled={loadingMore}
-                  className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:border-[#941C2F]/30 hover:text-[#941C2F] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-                >
-                  {loadingMore ? 'Memuat...' : 'Show More'}
-                </button>
-              </div>
-            )}
-          </>
+          <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 mt-2 text-center md:text-left">
+            Menampilkan {history.length} pengajuan kelas pengganti.
+          </p>
         )}
       </div>
 

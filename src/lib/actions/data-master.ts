@@ -13,8 +13,8 @@ export async function getKelasList(page = 1, search = '', limit = 10) {
 }
 
 export async function createKelas(data: { nama_kelas: string; jurusan: string; jumlah_siswa: number }) {
-  const res = await apiClient.post('/classes', data, { auth: true });
-  return { success: res.success, message: res.message };
+  const res = await apiClient.post<KelasItem>('/classes', data, { auth: true });
+  return { success: res.success, message: res.message, data: res.data };
 }
 
 export async function updateKelas(id: string, data: { nama_kelas: string; jurusan: string; jumlah_siswa: number }) {
@@ -35,8 +35,8 @@ export async function getMKList(page = 1, search = '', limit = 10) {
 }
 
 export async function createMK(data: { nama_mk: string; sks: number }) {
-  const res = await apiClient.post('/courses', data, { auth: true });
-  return { success: res.success, message: res.message };
+  const res = await apiClient.post<MataKuliahItem>('/courses', data, { auth: true });
+  return { success: res.success, message: res.message, data: res.data };
 }
 
 export async function updateMK(id: string, data: { nama_mk: string; sks: number }) {
@@ -57,8 +57,8 @@ export async function getRuanganList(page = 1, search = '', limit = 10) {
 }
 
 export async function createRuangan(data: { nama_ruangan: string; lantai: number; kapasitas: number }) {
-  const res = await apiClient.post('/rooms', data, { auth: true });
-  return { success: res.success, message: res.message };
+  const res = await apiClient.post<RuanganItem>('/rooms', data, { auth: true });
+  return { success: res.success, message: res.message, data: res.data };
 }
 
 export async function updateRuangan(id: string, data: { nama_ruangan: string; lantai: number; kapasitas: number }) {
@@ -80,8 +80,8 @@ export async function getSemesterList(page = 1, search = '', limit = 10) {
 }
 
 export async function createSemester(data: { tahun_ajaran: string; tipe_semester: 'Ganjil' | 'Genap' | 'Pendek' }) {
-  const res = await apiClient.post('/semesters', data, { auth: true });
-  return { success: res.success, message: res.message };
+  const res = await apiClient.post<SemesterItem>('/semesters', data, { auth: true });
+  return { success: res.success, message: res.message, data: res.data };
 }
 
 export async function updateSemester(

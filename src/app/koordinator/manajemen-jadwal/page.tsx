@@ -12,6 +12,7 @@ import {
   Filter,
   Loader2,
   MapPin,
+  Pencil,
   Plus,
   Search,
   User,
@@ -49,6 +50,11 @@ import {
 } from '@/lib/jadwal-utils';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { isSessionExpiredMessage } from '@/lib/auth/jwt';
+import {
+  MasterEntityModal,
+  type MasterItem,
+  type MasterResource,
+} from '@/components/koordinator/manajemen-jadwal/MasterEntityModal';
 
 function redirectIfSessionExpired(message: string | undefined): boolean {
   if (typeof window !== 'undefined' && isSessionExpiredMessage(message)) {
@@ -137,6 +143,13 @@ export default function ManajemenJadwalPage() {
   const [isDeleteVisible, setIsDeleteVisible] = useState(false);
   const [isDeleteClosing, setIsDeleteClosing] = useState(false);
   const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
+
+  const [masterModal, setMasterModal] = useState<{
+    open: boolean;
+    mode: 'create' | 'edit';
+    resource: MasterResource;
+    initialData: MasterItem | null;
+  }>({ open: false, mode: 'create', resource: 'kelas', initialData: null });
 
   const [sheetDragY, setSheetDragY] = useState(0);
   const [sheetStartY, setSheetStartY] = useState(0);
@@ -257,6 +270,96 @@ export default function ManajemenJadwalPage() {
     setLecturerList(res.data.lecturerList);
     return res.data;
   }, [showToast]);
+
+  const refreshSemesters = useCallback(async () => {
+    const res = await fetchSemesters();
+    if (res.success) {
+      setSemesters(res.items);
+      return res.items;
+    }
+    if (!redirectIfSessionExpired(res.message)) {
+      showToast(res.message || 'Gagal memuat daftar semester.');
+    }
+    return null;
+  }, [showToast]);
+
+  const openMasterCreate = (resource: MasterResource) => {
+    setMasterModal({ open: true, mode: 'create', resource, initialData: null });
+  };
+
+  const openMasterEdit = (resource: MasterResource, item: MasterItem | null) => {
+    if (!item) {
+      showToast('Pilih item terlebih dahulu untuk diedit.');
+      return;
+    }
+    setMasterModal({ open: true, mode: 'edit', resource, initialData: item });
+  };
+
+  const closeMasterModal = () =>
+    setMasterModal(m => ({ ...m, open: false }));
+
+  const handleMasterSuccess = async (
+    action: 'created' | 'updated' | 'deleted',
+    item: MasterItem | null,
+  ) => {
+    const resource = masterModal.resource;
+    const labelMap: Record<MasterResource, string> = {
+      kelas: 'Kelas',
+      mk: 'Mata Kuliah',
+      ruangan: 'Ruangan',
+      lecturer: 'Dosen',
+      semester: 'Semester',
+    };
+    const actionLabel = action === 'created' ? 'dibuat' : action === 'updated' ? 'diperbarui' : 'dihapus';
+    showToast(`${labelMap[resource]} berhasil ${actionLabel}.`, 'success');
+
+    if (resource === 'semester') {
+      await refreshSemesters();
+      if (action === 'created' && item) setSelectedSemesterId((item as { id: string }).id);
+      if (action === 'deleted' && item) {
+        const deletedId = (item as { id: string }).id;
+        if (selectedSemesterId === deletedId) setSelectedSemesterId('');
+      }
+      return;
+    }
+
+    await loadDropdownData();
+    if (!item) return;
+    const newId = (item as { id: string }).id;
+
+    if (action === 'created') {
+      switch (resource) {
+        case 'kelas':    setForm(f => ({ ...f, id_kelas: newId })); break;
+        case 'mk':       setForm(f => ({ ...f, id_mk: newId })); break;
+        case 'ruangan':  setForm(f => ({ ...f, id_ruangan: newId })); break;
+        case 'lecturer': setForm(f => ({ ...f, id_dosen: newId, id_asdos1: '', id_asdos2: '' })); break;
+      }
+    } else if (action === 'deleted') {
+      switch (resource) {
+        case 'kelas':    setForm(f => (f.id_kelas === newId ? { ...f, id_kelas: '' } : f)); break;
+        case 'mk':       setForm(f => (f.id_mk === newId ? { ...f, id_mk: '' } : f)); break;
+        case 'ruangan':  setForm(f => (f.id_ruangan === newId ? { ...f, id_ruangan: '' } : f)); break;
+        case 'lecturer': setForm(f => (f.id_dosen === newId ? { ...f, id_dosen: '' } : f)); break;
+      }
+    }
+  };
+
+  const selectedKelasItem = useMemo(
+    () => kelasList.find(k => k.id === form.id_kelas) ?? null,
+    [kelasList, form.id_kelas],
+  );
+  const selectedMkItem = useMemo(
+    () => mkList.find(m => m.id === form.id_mk) ?? null,
+    [mkList, form.id_mk],
+  );
+  const selectedRuanganItem = useMemo(
+    () => ruanganList.find(r => r.id === form.id_ruangan) ?? null,
+    [ruanganList, form.id_ruangan],
+  );
+  const selectedLecturerItem = useMemo(
+    () => lecturerList.find(l => l.id === form.id_dosen) ?? null,
+    [lecturerList, form.id_dosen],
+  );
 
   const hasActiveSearch = Boolean(searchTerm.trim()) || filterTipe !== 'ALL';
 
@@ -656,16 +759,37 @@ export default function ManajemenJadwalPage() {
 
         <div className="mb-5 md:mb-6 flex flex-col md:flex-row gap-3 relative z-20 w-full justify-between items-stretch md:items-center">
 
-          <div className="relative shrink-0 w-full sm:w-48 md:w-56 z-30">
-            <CustomSelect
-              value={selectedSemesterId}
-              onChange={setSelectedSemesterId}
-              options={semesterOptions}
-              placeholder="Semester"
-              disabled={!semesters.length}
-              icon={<CalendarDays className="w-[18px] h-[18px]" />}
-              triggerClassName="rounded-2xl py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-            />
+          <div className="relative shrink-0 w-full sm:w-auto md:w-auto z-30 flex items-center gap-2">
+            <div className="flex-1 sm:w-48 md:w-56">
+              <CustomSelect
+                value={selectedSemesterId}
+                onChange={setSelectedSemesterId}
+                options={semesterOptions}
+                placeholder="Semester"
+                disabled={!semesters.length}
+                icon={<CalendarDays className="w-[18px] h-[18px]" />}
+                triggerClassName="rounded-2xl py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => openMasterCreate('semester')}
+              className="shrink-0 w-11 h-11 md:w-12 md:h-12 flex items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-[#941C2F] active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+              aria-label="Buat semester baru"
+              title="Buat semester baru"
+            >
+              <Plus className="w-[18px] h-[18px]" strokeWidth={2.5} />
+            </button>
+            <button
+              type="button"
+              onClick={() => openMasterEdit('semester', selectedSemester ?? null)}
+              disabled={!selectedSemester}
+              className="shrink-0 w-11 h-11 md:w-12 md:h-12 flex items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-[#941C2F] active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-slate-500"
+              aria-label="Edit semester terpilih"
+              title="Edit semester terpilih"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
           </div>
 
           <div className="flex gap-3 flex-1 md:max-w-[420px] md:ml-auto w-full">
@@ -984,32 +1108,47 @@ export default function ManajemenJadwalPage() {
                       handleSubmit();
                     }}
                   >
-                    <Field label="Kelas">
+                    <FieldCRUD
+                      label="Kelas"
+                      onCreate={() => openMasterCreate('kelas')}
+                      onEdit={() => openMasterEdit('kelas', selectedKelasItem)}
+                      canEdit={!!selectedKelasItem}
+                    >
                       <CustomSelect
                         value={form.id_kelas}
                         onChange={v => setForm(f => ({ ...f, id_kelas: v }))}
                         options={kelasOptions}
                         placeholder="Pilih kelas"
                       />
-                    </Field>
+                    </FieldCRUD>
 
-                    <Field label="Mata Kuliah">
+                    <FieldCRUD
+                      label="Mata Kuliah"
+                      onCreate={() => openMasterCreate('mk')}
+                      onEdit={() => openMasterEdit('mk', selectedMkItem)}
+                      canEdit={!!selectedMkItem}
+                    >
                       <CustomSelect
                         value={form.id_mk}
                         onChange={v => setForm(f => ({ ...f, id_mk: v }))}
                         options={mkOptions}
                         placeholder="Pilih mata kuliah"
                       />
-                    </Field>
+                    </FieldCRUD>
 
-                    <Field label="Ruangan">
+                    <FieldCRUD
+                      label="Ruangan"
+                      onCreate={() => openMasterCreate('ruangan')}
+                      onEdit={() => openMasterEdit('ruangan', selectedRuanganItem)}
+                      canEdit={!!selectedRuanganItem}
+                    >
                       <CustomSelect
                         value={form.id_ruangan}
                         onChange={v => setForm(f => ({ ...f, id_ruangan: v }))}
                         options={ruanganOptions}
                         placeholder="Pilih ruangan"
                       />
-                    </Field>
+                    </FieldCRUD>
 
                     <Field label="Tanggal Sesi">
                       <input
@@ -1064,7 +1203,12 @@ export default function ManajemenJadwalPage() {
                     </Field>
 
                     {instructorType === 'DOSEN' ? (
-                      <Field label="Dosen Pengajar">
+                      <FieldCRUD
+                        label="Dosen Pengajar"
+                        onCreate={() => openMasterCreate('lecturer')}
+                        onEdit={() => openMasterEdit('lecturer', selectedLecturerItem)}
+                        canEdit={!!selectedLecturerItem}
+                      >
                         <CustomSelect
                           value={form.id_dosen}
                           onChange={v => setForm(f => ({
@@ -1077,7 +1221,7 @@ export default function ManajemenJadwalPage() {
                           placeholder="Pilih Dosen"
                           icon={<User className="w-4 h-4" />}
                         />
-                      </Field>
+                      </FieldCRUD>
                     ) : (
                       <>
                         <Field label="Asisten Dosen 1">
@@ -1192,6 +1336,15 @@ export default function ManajemenJadwalPage() {
       )}
 
 
+      <MasterEntityModal
+        open={masterModal.open}
+        mode={masterModal.mode}
+        resource={masterModal.resource}
+        initialData={masterModal.initialData}
+        onClose={closeMasterModal}
+        onSuccess={handleMasterSuccess}
+      />
+
       <div className="fixed top-6 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4">
         <div
           className={`
@@ -1216,6 +1369,49 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return (
     <div>
       <label className="block text-[13px] font-bold text-[#1F2937] mb-1.5 ml-1">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function FieldCRUD({
+  label,
+  onCreate,
+  onEdit,
+  canEdit,
+  children,
+}: {
+  label: string;
+  onCreate: () => void;
+  onEdit: () => void;
+  canEdit: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5 px-1">
+        <label className="text-[13px] font-bold text-[#1F2937]">{label}</label>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onCreate}
+            className="text-[11px] font-bold text-[#941C2F] hover:bg-rose-50 active:scale-95 transition-all flex items-center gap-1 px-2 py-1 rounded-md"
+          >
+            <Plus className="w-3 h-3" strokeWidth={2.5} />
+            Buat baru
+          </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            disabled={!canEdit}
+            className="text-slate-400 hover:text-[#941C2F] hover:bg-rose-50 active:scale-95 p-1 rounded-md disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-all"
+            aria-label={`Edit ${label}`}
+            title={canEdit ? `Edit ${label} yang dipilih` : `Pilih ${label.toLowerCase()} dulu untuk edit`}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
       {children}
     </div>
   );

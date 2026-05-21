@@ -38,6 +38,9 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const [isLogoutClosing, setIsLogoutClosing] = useState(false);
   const [logoutStartY, setLogoutStartY] = useState(0);
   const [logoutDragY, setLogoutDragY] = useState(0);
+  const [timeStr, setTimeStr] = useState('');
+  const [dateStr, setDateStr] = useState('');
+  const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { clearUser } = useUserStore();
@@ -48,6 +51,21 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
     document.body.style.overflow = isSidebarOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [isSidebarOpen]);
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setTimeStr(now.toLocaleTimeString('id-ID', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      }));
+      setDateStr(now.toLocaleDateString('id-ID', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      }));
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = async () => {
     await logoutUser();
@@ -316,22 +334,45 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             </Link>
           </div>
 
-          <header id="dashboard-header-mobile" className="lg:hidden absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-7 z-20 bg-transparent">
+          <div id="dashboard-clock-desktop" className="hidden lg:flex absolute top-7 right-7 z-20 items-center gap-4 text-right">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase leading-none">{dateStr.split(', ')[0]}</p>
+              <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase mt-1 leading-none">{dateStr.split(', ')[1]}</p>
+            </div>
+            <div className="w-px h-10 bg-slate-200/70" />
+            <div>
+              <p className="text-2xl font-black font-mono tracking-tight text-[#941C2F] leading-none">{timeStr}</p>
+              <p className="text-[10px] font-extrabold text-slate-500 tracking-widest text-right mt-1">WIB</p>
+            </div>
+          </div>
+
+          <header id="dashboard-header-mobile" className={`lg:hidden absolute top-0 left-0 right-0 flex items-center justify-between gap-3 px-6 py-3.5 z-20 transition-all duration-300 ${isScrolled ? 'bg-white/60 backdrop-blur-md shadow-sm border-b border-white/30' : 'bg-transparent'}`}>
             <Link
               href={homeHref}
-              className="text-[#941C2F] hover:scale-105 active:scale-90 active:bg-[#941C2F]/10 active:shadow-[0_0_20px_rgba(148,28,47,0.15)] rounded-full transition-all duration-200 p-2.5 flex items-center justify-center"
+              className="shrink-0 text-[#941C2F] hover:scale-105 active:scale-90 active:bg-[#941C2F]/10 active:shadow-[0_0_20px_rgba(148,28,47,0.15)] rounded-full transition-all duration-200 p-2.5 flex items-center justify-center"
             >
               <Home size={26} strokeWidth={2.5} />
             </Link>
+            <div id="dashboard-clock-mobile" className={`flex flex-col items-center rounded-xl px-3 py-1.5 transition-all duration-300 ${isScrolled ? 'bg-transparent border border-transparent shadow-none' : 'bg-white/40 backdrop-blur-md shadow-sm border border-white/20'}`}>
+              <p className="text-[8px] font-bold text-slate-500 tracking-widest uppercase leading-none">{dateStr}</p>
+              <div className="flex items-baseline gap-1 mt-1">
+                <p className="text-base font-black font-mono tracking-tight text-[#941C2F] leading-none">{timeStr}</p>
+                <p className="text-[9px] font-extrabold text-slate-500 tracking-widest leading-none">WIB</p>
+              </div>
+            </div>
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="text-[#941C2F] hover:scale-105 active:scale-90 active:bg-[#941C2F]/10 active:shadow-[0_0_20px_rgba(148,28,47,0.15)] rounded-full transition-all duration-200 p-2.5 flex items-center justify-center"
+              className="shrink-0 text-[#941C2F] hover:scale-105 active:scale-90 active:bg-[#941C2F]/10 active:shadow-[0_0_20px_rgba(148,28,47,0.15)] rounded-full transition-all duration-200 p-2.5 flex items-center justify-center"
             >
               <Menu size={28} strokeWidth={2.5} />
             </button>
           </header>
 
-          <div id="dashboard-children-container" className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-6 lg:px-12 pt-24 lg:pt-24 pb-20">
+          <div
+            id="dashboard-children-container"
+            onScroll={(e) => setIsScrolled((e.target as HTMLDivElement).scrollTop > 8)}
+            className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-6 lg:px-12 pt-20 lg:pt-24 pb-20"
+          >
             {children}
           </div>
 

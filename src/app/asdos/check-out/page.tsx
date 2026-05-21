@@ -29,26 +29,25 @@ export default function CheckOutPage() {
       setIsLoading(true);
       try {
         const res = await getMyPresensi();
-        console.log("Check-out Status Check:", res);
-        
+
         if (res.success && res.data) {
+          // Hanya anggap "active" kalau presensi (a) belum di-checkout DAN (b) tanggal_mengajar = hari ini.
+          // Tanpa filter tanggal, presensi lama dangling dari hari sebelumnya akan ke-pick sebagai aktif.
+          const today = new Date().toISOString().split('T')[0];
           const active = res.data.find(p => {
             const checkout = p.waktu_checkout;
-            return !checkout || 
-                   checkout === "" || 
-                   checkout === "null" || 
-                   String(checkout).startsWith("0001");
+            const isOpen = !checkout ||
+                           checkout === "" ||
+                           checkout === "null" ||
+                           String(checkout).startsWith("0001");
+            if (!isOpen) return false;
+
+            const presensiDate = String(p.tanggal_mengajar ?? '').split('T')[0];
+            return presensiDate === today;
           });
-          
-          if (active) {
-            console.log("Found Active Session:", active);
-            setActivePresensi(active);
-          } else {
-            console.log("No Active Session Found in data:", res.data);
-            setActivePresensi(null);
-          }
+
+          setActivePresensi(active ?? null);
         } else {
-          console.error("Failed to fetch presensi or data is empty:", res);
           setActivePresensi(null);
         }
       } catch (error) {
@@ -458,7 +457,7 @@ export default function CheckOutPage() {
             </button>
           </div>
 
-          <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-10 lg:p-12">
+          <div>
             <div className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border border-[#941C2F]/20 mb-6 md:mb-8 gap-3 md:gap-0">
               <div className="flex items-center gap-3 md:gap-4 min-w-0">
                 <div className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center bg-[#941C2F]/10 text-[#941C2F]">

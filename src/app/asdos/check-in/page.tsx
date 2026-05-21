@@ -1,11 +1,20 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
-import { submitCheckIn } from '@/lib/actions/presensi';
+import { submitCheckIn, getMyPresensi } from '@/lib/actions/presensi';
 import { toast } from 'sonner';
 import { AsdosListSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 import { decodeJwtPayload } from '@/lib/auth/jwt';
+
+const isSessionExpired = (waktu: string): boolean => {
+  const match = waktu.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+  if (!match) return false;
+  const endHour = parseInt(match[3], 10);
+  const endMin = parseInt(match[4], 10);
+  const now = new Date();
+  return endHour * 60 + endMin < now.getHours() * 60 + now.getMinutes();
+};
 
 export default function CheckInPage() {
   const [step, setStep] = useState(1);
@@ -29,17 +38,14 @@ export default function CheckInPage() {
   const animFrameRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Helper untuk memvalidasi dan mem-parsing data dari QR Code
   const parseAndValidateQrToken = useCallback((token: string): { isValid: boolean; sessionId?: string } => {
     if (!token) return { isValid: false };
-    
-    // Format token simulasi untuk keperluan development
+
     if (token.startsWith('SIMULATED_') || token.startsWith('MOCK_')) {
       const match = token.match(/_(?:SESSION|SESI)_([a-zA-Z0-9-]+)/i);
       return { isValid: true, sessionId: match ? match[1] : undefined };
     }
 
-    // Pendeteksian jika QR Code berisi string JSON terstruktur
     if (token.trim().startsWith('{') && token.trim().endsWith('}')) {
       try {
         const parsed = JSON.parse(token);
@@ -50,24 +56,21 @@ export default function CheckInPage() {
       }
     }
 
-    // Pendeteksian jika QR Code adalah token JWT
     const parts = token.split('.');
     if (parts.length === 3) {
       const payload = decodeJwtPayload(token);
       if (payload) {
-        // Cek kedaluwarsa JWT jika terdapat claim 'exp'
         if (typeof payload.exp === 'number' && payload.exp * 1000 < Date.now()) {
           return { isValid: false };
         }
         const sessionId = payload.id_sesi || payload.sesi || payload.sessionId;
-        return { 
-          isValid: true, 
-          sessionId: typeof sessionId === 'string' ? sessionId : undefined 
+        return {
+          isValid: true,
+          sessionId: typeof sessionId === 'string' ? sessionId : undefined
         };
       }
     }
 
-    // Fallback: Jika berupa kode token alfanumerik biasa (minimal 10 karakter)
     if (/^[a-zA-Z0-9_-]{10,}$/.test(token)) {
       return { isValid: true };
     }
@@ -75,45 +78,46 @@ export default function CheckInPage() {
     return { isValid: false };
   }, []);
 
-  // Handler yang dijalankan setelah QR Code valid ditemukan
   const handleValidQrScanned = useCallback(async (token: string) => {
-    // Jalankan haptic feedback (getaran ponsel) jika didukung browser/device
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
         navigator.vibrate(100);
       } catch {
-        // Hiraukan error jika diblokir browser
       }
     }
 
     setQrToken(token);
     setIsLoading(true);
 
-    // Ambil data sesi mengajar hari ini saat QR terbukti valid (Lazy Fetch)
     const today = new Date().toISOString().split('T')[0];
-    const res = await getSessionsByDate(today);
+    const [res, presensiRes] = await Promise.all([
+      getSessionsByDate(today),
+      getMyPresensi(),
+    ]);
 
-    if (res.success && res.data) {
-      const fetchedSessions = res.data;
+    const completedSessionIds = new Set<string>(
+      (presensiRes.success ? presensiRes.data ?? [] : [])
+        .filter(p => p.tanggal_mengajar?.slice(0, 10) === today)
+        .flatMap(p => [p.id_sesi, p.id_sesi_pengganti].filter((v): v is string => !!v))
+    );
+
+    if (res.success) {
+      const fetchedSessions = (res.data ?? [])
+        .filter(s => !isSessionExpired(s.waktu))
+        .filter(s => !completedSessionIds.has(s.id_sesi));
       setSessions(fetchedSessions);
 
-      // Cari kecocokan data sesi dari dalam QR payload
       const { sessionId } = parseAndValidateQrToken(token);
-      let matchedSession = null;
-
-      if (sessionId) {
-        matchedSession = fetchedSessions.find(s => s.id_sesi === sessionId);
-      }
+      const matchedSession = sessionId
+        ? fetchedSessions.find(s => s.id_sesi === sessionId)
+        : null;
 
       if (matchedSession) {
-        // Otomatis pilih sesi yang cocok
         setSelectedSessionId(matchedSession.id_sesi);
-        toast.success(`✓ Sesi ${matchedSession.mata_kuliah} berhasil dikenali!`);
-        
-        // Pindah ke Step 2 dan otomatis buka lembar konfirmasi check-in
+
         setStep(2);
         setIsLoading(false);
-        
+
         setTimeout(() => {
           setIsSheetOpen(true);
           setIsSheetVisible(true);
@@ -121,15 +125,14 @@ export default function CheckInPage() {
           setSheetDragY(0);
         }, 100);
       } else {
-        // Jika tidak ada data sesi di QR, pilih sesi pertama sebagai default
         if (fetchedSessions.length > 0) {
           setSelectedSessionId(fetchedSessions[0].id_sesi);
         }
         setStep(2);
         setIsLoading(false);
-        toast.success('✓ Kode QR Koordinator berhasil diverifikasi!');
       }
     } else {
+      setCameraStatus('idle');
       setIsLoading(false);
       toast.error(res.message || 'Gagal mengunduh sesi aktif untuk check-in');
     }
@@ -150,6 +153,7 @@ export default function CheckInPage() {
       streamRef.current = null;
     }
     if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraStatus(prev => (prev === 'active' ? 'idle' : prev));
   }, []);
 
   const startDecodeLoop = useCallback(async () => {
@@ -516,7 +520,7 @@ export default function CheckInPage() {
             </div>
             <div className="md:flex-1 flex flex-col items-center w-full gap-4">
               <div className="w-full max-w-[280px] md:max-w-[320px] relative group mx-auto">
-                <div className={`w-full aspect-square flex flex-col items-center justify-center text-slate-300 bg-slate-50 rounded-2xl border border-slate-200 shadow-inner
+                <div className={`w-full aspect-square flex flex-col items-center justify-center text-slate-300 bg-white rounded-2xl border border-slate-200 shadow-inner
                   ${cameraStatus === 'active' ? 'opacity-0' : 'opacity-100'} transition-opacity`}>
                   {cameraStatus === 'requesting' ? (
                     <Loader2 size={48} className="opacity-60 animate-spin mb-3 text-[#941C2F]" />
@@ -631,16 +635,7 @@ export default function CheckInPage() {
             </button>
           </div>
 
-          <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-10 lg:p-12">
-            {qrToken && (
-              <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3.5 mb-6 shadow-[0_2px_10px_rgba(16,185,129,0.04)] animate-in fade-in slide-in-from-top-2 duration-300">
-                <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                <p className="text-xs text-emerald-800 font-semibold leading-relaxed">
-                  ✓ Kode QR Koordinator berhasil diverifikasi dan aman digunakan.
-                </p>
-              </div>
-            )}
-
+          <div>
             <div className="flex justify-between items-center mb-4 md:mb-6 px-1">
               <h4 className="text-[11px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Sesi Tersedia Hari Ini</h4>
               <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] md:text-xs font-bold px-2.5 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg">{sessions.length} Sesi</span>
@@ -657,36 +652,70 @@ export default function CheckInPage() {
                   const isAktif = true;
                   return (
                     <div key={s.id_sesi} onClick={() => setSelectedSessionId(s.id_sesi)}
-                      className={`bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border-2 transition-all gap-3 md:gap-0
+                      className={`bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm border-2 transition-all
                         cursor-pointer active:scale-[0.99]
                         ${isSel ? 'border-[#941C2F] shadow-md shadow-[#941C2F]/10' : 'border-transparent md:border-slate-100 md:hover:border-slate-200 md:hover:shadow-md'}`}>
-                      <div className="flex items-center gap-3 md:gap-4 min-w-0 md:w-2/5">
-                        <div className={`w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center transition-colors ${isSel ? 'bg-[#941C2F]/10' : 'bg-rose-50'} text-[#941C2F]`}>
-                          <BookOpen size={20} strokeWidth={2} />
+
+                      <div className="md:hidden">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition-colors ${isSel ? 'bg-[#941C2F]/10' : 'bg-rose-50'} text-[#941C2F]`}>
+                            <BookOpen size={20} strokeWidth={2} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-[15px] text-[#1F2937] truncate">{s.mata_kuliah}</h3>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={`text-[10px] font-bold tracking-wider ${isAktif ? 'text-[#941C2F]' : 'text-slate-400'}`}>{s.nama_kelas}</span>
+                              <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                              <div className={`w-1.5 h-1.5 rounded-full ${isAktif ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                              <span className={`text-[10px] font-semibold ${isAktif ? 'text-emerald-600' : 'text-slate-400'}`}>{s.tipe_jadwal}</span>
+                            </div>
+                          </div>
+                          <div className={`shrink-0 self-start mt-0.5 w-7 h-7 rounded-full flex items-center justify-center transition-all ${isSel ? 'bg-[#941C2F] shadow-md' : 'bg-slate-100'}`}>
+                            <Check size={13} strokeWidth={3} className={isSel ? 'text-white' : 'text-slate-300'} />
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{s.mata_kuliah}</h3>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`text-[10px] md:text-xs font-bold tracking-wider ${isAktif ? 'text-[#941C2F]' : 'text-slate-400'}`}>{s.nama_kelas}</span>
-                            <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                            <div className={`w-1.5 h-1.5 rounded-full ${isAktif ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                            <span className={`text-[10px] md:text-xs font-semibold ${isAktif ? 'text-emerald-600' : 'text-slate-400'}`}>{s.tipe_jadwal}</span>
+                        <div className="flex flex-col gap-1.5 mt-3 pt-3 border-t border-slate-100">
+                          <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                            <Clock size={13} className="text-slate-400 shrink-0" />
+                            <span className="text-xs font-semibold text-slate-700">{s.waktu}</span>
+                          </div>
+                          <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                            <MapPin size={13} className="text-slate-400 shrink-0" />
+                            <span className="text-xs font-semibold text-slate-700">{s.ruangan}</span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 md:gap-3 pt-3 border-t border-slate-100 md:border-none md:pt-0">
-                        <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center md:justify-start gap-2">
-                          <Clock size={13} className="text-slate-400 shrink-0" />
-                          <span className="text-xs md:text-[13px] font-semibold text-slate-700">{s.waktu}</span>
+
+                      <div className="hidden md:flex md:items-center md:justify-between">
+                        <div className="flex items-center gap-4 min-w-0 w-2/5">
+                          <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center transition-colors ${isSel ? 'bg-[#941C2F]/10' : 'bg-rose-50'} text-[#941C2F]`}>
+                            <BookOpen size={20} strokeWidth={2} />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-base text-[#1F2937] truncate">{s.mata_kuliah}</h3>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={`text-xs font-bold tracking-wider ${isAktif ? 'text-[#941C2F]' : 'text-slate-400'}`}>{s.nama_kelas}</span>
+                              <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                              <div className={`w-1.5 h-1.5 rounded-full ${isAktif ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                              <span className={`text-xs font-semibold ${isAktif ? 'text-emerald-600' : 'text-slate-400'}`}>{s.tipe_jadwal}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1 md:flex-none bg-slate-50 border border-slate-100 px-3 py-1.5 md:px-4 md:py-2 rounded-lg flex items-center justify-center md:justify-start gap-2">
-                          <MapPin size={13} className="text-slate-400 shrink-0" />
-                          <span className="text-xs md:text-[13px] font-semibold text-slate-700">{s.ruangan}</span>
-                        </div>
-                        <div className={`shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center transition-all ${isSel ? 'bg-[#941C2F] shadow-md' : 'bg-slate-100'}`}>
-                          <Check size={13} strokeWidth={3} className={isSel ? 'text-white' : 'text-slate-300'} />
+                        <div className="flex items-center gap-3">
+                          <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center justify-start gap-2">
+                            <Clock size={13} className="text-slate-400 shrink-0" />
+                            <span className="text-[13px] font-semibold text-slate-700">{s.waktu}</span>
+                          </div>
+                          <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center justify-start gap-2">
+                            <MapPin size={13} className="text-slate-400 shrink-0" />
+                            <span className="text-[13px] font-semibold text-slate-700">{s.ruangan}</span>
+                          </div>
+                          <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${isSel ? 'bg-[#941C2F] shadow-md' : 'bg-slate-100'}`}>
+                            <Check size={13} strokeWidth={3} className={isSel ? 'text-white' : 'text-slate-300'} />
+                          </div>
                         </div>
                       </div>
+
                     </div>
                   );
                 })
@@ -717,7 +746,7 @@ export default function CheckInPage() {
             <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Berhasil!</h2>
             <p className="text-sm text-slate-500 mt-1 md:text-base">Kehadiran Anda telah tercatat di sistem.</p>
           </div>
-          <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-12 lg:p-16 md:flex md:items-center md:gap-16">
+          <div className="md:flex md:items-center md:gap-16">
             <div className="flex justify-center md:flex-1 mb-10 md:mb-0">
               <div className="relative flex items-center justify-center">
                 <div className="absolute w-36 h-36 md:w-48 md:h-48 bg-[#941C2F]/5 rounded-full animate-ping" />

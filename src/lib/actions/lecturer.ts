@@ -20,8 +20,8 @@ export async function getLecturerList(page = 1, search = '', limit = 10) {
 }
 
 export async function createLecturer(data: { nama: string; nip: string }) {
-  const res = await apiClient.post('/lecturers', data, { auth: true });
-  return { success: res.success, message: res.message };
+  const res = await apiClient.post<LecturerItem>('/lecturers', data, { auth: true });
+  return { success: res.success, message: res.message, data: res.data };
 }
 
 export async function updateLecturer(id: string, data: { nama: string; nip: string }) {

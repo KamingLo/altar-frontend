@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, startTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CalendarDays,
@@ -167,13 +167,17 @@ export default function GenerateQrPage() {
 
   const refreshQRToken = useCallback(async () => {
     const res = await generateQRToken();
-    if (res.success && res.data?.qr_token) {
-      setQrToken(res.data.qr_token);
-      setCountdown(REFRESH_INTERVAL_SEC);
-      setLastRefreshed(new Date());
-    } else {
-      showToast(res.message || 'Gagal menyegarkan kode QR.', 'error');
-    }
+    // Bungkus state updates dengan startTransition agar tidak bentrok dengan
+    // router.refresh() implicit yang Next.js trigger setelah server action selesai
+    startTransition(() => {
+      if (res.success && res.data?.qr_token) {
+        setQrToken(res.data.qr_token);
+        setCountdown(REFRESH_INTERVAL_SEC);
+        setLastRefreshed(new Date());
+      } else {
+        showToast(res.message || 'Gagal menyegarkan kode QR.', 'error');
+      }
+    });
   }, [showToast]);
 
   useEffect(() => {
@@ -710,7 +714,9 @@ export default function GenerateQrPage() {
           <style>{`
             #dashboard-home-button-desktop,
             #dashboard-header-mobile,
-            #dashboard-sidebar-desktop {
+            #dashboard-sidebar-desktop,
+            #dashboard-clock-desktop,
+            #dashboard-clock-mobile {
               display: none !important;
             }
             main {
