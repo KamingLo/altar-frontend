@@ -16,6 +16,15 @@ function getSessionTime(session?: SessionFromAPI) {
   return { start, end, label: raw || '-' };
 }
 
+function isSessionPast(session: SessionFromAPI): boolean {
+  const { end } = getSessionTime(session);
+  if (!end) return false;
+  const [endH, endM] = end.split(':').map(Number);
+  if (isNaN(endH) || isNaN(endM)) return false;
+  const now = new Date();
+  return endH * 60 + endM < now.getHours() * 60 + now.getMinutes();
+}
+
 export default function PresensiKelasOnlinePage() {
   const [step, setStep] = useState(1);
   const [sessions, setSessions] = useState<SessionFromAPI[]>([]);
@@ -33,7 +42,7 @@ export default function PresensiKelasOnlinePage() {
   const [sheetDragY, setSheetDragY] = useState(0);
 
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-  const onlineSessions = useMemo(() => sessions, [sessions]);
+  const onlineSessions = useMemo(() => sessions.filter(s => !isSessionPast(s)), [sessions]);
   const selectedSession = onlineSessions.find(s => s.id_sesi === selectedSessionId);
   const selectedTime = getSessionTime(selectedSession);
 
@@ -43,8 +52,8 @@ export default function PresensiKelasOnlinePage() {
       const res = await getSessionsByDate(todayIso());
       if (res.success && res.data) {
         setSessions(res.data);
-        if (res.data.length > 0) {
-          const firstSession = res.data[0];
+        const firstSession = res.data.find(s => !isSessionPast(s));
+        if (firstSession) {
           const firstTime = getSessionTime(firstSession);
           setSelectedSessionId(firstSession.id_sesi);
           setWaktuMulai(firstTime.start);

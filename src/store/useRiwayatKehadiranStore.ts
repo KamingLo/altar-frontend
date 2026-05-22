@@ -14,6 +14,7 @@ interface RiwayatKehadiranState {
   setError: (message: string | null) => void;
   showMore: () => void;
   resetVisible: () => void;
+  reset: () => void;
 }
 
 export const useRiwayatKehadiranStore = create<RiwayatKehadiranState>()((set) => ({
@@ -27,4 +28,5 @@ export const useRiwayatKehadiranStore = create<RiwayatKehadiranState>()((set) =>
   setError: (message) => set({ error: message }),
   showMore: () => set((state) => ({ visibleCount: state.visibleCount + PAGE_SIZE })),
   resetVisible: () => set({ visibleCount: PAGE_SIZE }),
+  reset: () => set({ items: [], fetched: false, visibleCount: PAGE_SIZE, isLoading: true, error: null }),
 }));

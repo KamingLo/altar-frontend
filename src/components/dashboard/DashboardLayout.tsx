@@ -7,6 +7,10 @@ import { useRouter, usePathname } from 'next/navigation';
 import { logoutUser } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
+import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
+import { useJadwalStore } from '@/store/useJadwalStore';
+import { usePengajuanKpStore } from '@/store/usePengajuanKpStore';
+import { usePresensiStore } from '@/store/usePresensiStore';
 import { getAllSubstitutions } from '@/lib/actions/pergantian-kelas';
 import { getAllPresensi, getMyPresensi } from '@/lib/actions/presensi';
 
@@ -56,6 +60,10 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const router = useRouter();
   const pathname = usePathname();
   const { user, clearUser } = useUserStore();
+  const resetRiwayat = useRiwayatKehadiranStore(s => s.reset);
+  const resetJadwal = useJadwalStore(s => s.reset);
+  const resetPengajuanKp = usePengajuanKpStore(s => s.reset);
+  const resetPresensi = usePresensiStore(s => s.reset);
   const { hasSeen, pendingCount, setPendingCount } = useNotificationStore();
 
   const hasDualRole = !!(user?.id_asisten && user?.id_koordinator);
@@ -125,13 +133,18 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
       }
     };
 
-    const interval = setInterval(poll, 60000);
+    poll();
+    const interval = setInterval(poll, 15000);
     return () => clearInterval(interval);
   }, [pathname, homeHref, setPendingCount]);
 
   const handleLogout = async () => {
     await logoutUser();
     clearUser();
+    resetRiwayat();
+    resetJadwal();
+    resetPengajuanKp();
+    resetPresensi();
     router.replace('/auth/login');
   };
 
@@ -332,6 +345,12 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
           to { opacity: 1; transform: translateY(0); }
         }
         .animate-fade-up { animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+        @keyframes border-pulse {
+          0% { transform: scaleX(0); opacity: 1; }
+          70% { transform: scaleX(1); opacity: 1; }
+          100% { transform: scaleX(1); opacity: 0; }
+        }
+        .animate-border-pulse { animation: border-pulse 1.2s ease-out infinite; transform-origin: center; }
       `}</style>
 
       <div className="flex w-full h-screen overflow-hidden lg:max-w-none bg-[#EDF2F4]   shadow-2xl lg:shadow-none relative">
@@ -387,8 +406,8 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
               onClick={openLogoutConfirm}
               title={isSidebarCollapsed ? 'Keluar' : undefined}
               className={`w-full flex items-center transition-all duration-300 group ${isSidebarCollapsed
-                ? 'justify-center w-[46px] h-[46px] mx-auto rounded-xl text-white/70 hover:text-white hover:bg-white/20 hover:backdrop-blur-md'
-                : 'justify-between px-4 py-3 rounded-xl text-white/70 hover:text-white hover:bg-white/20 hover:backdrop-blur-md'
+                ? 'justify-center w-[46px] h-[46px] mx-auto rounded-xl text-white/70 hover:text-white hover:bg-white/20'
+                : 'justify-between px-4 py-3 rounded-xl text-white/70 hover:text-white hover:bg-white/20'
                 }`}
             >
               <div className={`flex items-center ${isSidebarCollapsed ? '' : 'gap-3.5'}`}>
@@ -411,59 +430,58 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
           className="relative z-10 w-full max-w-md lg:max-w-none h-screen bg-transparent overflow-hidden flex flex-col mx-auto lg:mx-0 transition-all duration-300"
           style={{ fontFamily: "'Inter', sans-serif" }}
         >
-          <div id="dashboard-top-right" className="hidden lg:flex flex-col absolute top-7 right-7 z-20 items-end gap-3">
-            <div className="flex items-center gap-4 text-right">
-              <div>
-                <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase leading-none drop-shadow-sm">{dateStr.split(', ')[0]}</p>
-                <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase mt-1 leading-none drop-shadow-sm">{dateStr.split(', ')[1]}</p>
-              </div>
-              <div className="w-0.5 h-10 bg-white/80" />
-              <div>
-                <p className="text-2xl font-black font-mono tracking-tight text-[#941C2F] leading-none drop-shadow-sm">{timeStr}</p>
-                <p className="text-[10px] font-extrabold text-slate-500 tracking-widest text-right mt-1 drop-shadow-sm">WIB</p>
-              </div>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <div className="flex gap-2">
-                {hasDualRole ? (
-                  <>
-                    <Link
-                      href="/koordinator"
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/koordinator' ? 'bg-[#941C2F]/90 text-white border-white/20 shadow-lg shadow-[#941C2F]/20' : 'text-[#941C2F] bg-white/80 border-white/50 shadow-sm hover:shadow-md'}`}
-                    >
-                      <LayoutDashboard size={16} strokeWidth={2.5} />
-                      Dash Koor
-                    </Link>
-                    <Link
-                      href="/asdos"
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/asdos' ? 'bg-[#941C2F]/90 text-white border-white/20 shadow-lg shadow-[#941C2F]/20' : 'text-[#941C2F] bg-white/80 border-white/50 shadow-sm hover:shadow-md'}`}
-                    >
-                      <GraduationCap size={16} strokeWidth={2.5} />
-                      Dash Asdos
-                    </Link>
-                  </>
-                ) : (
-                  <Link
-                    href={homeHref}
-                    className="flex items-center gap-2 px-4 py-2.5 text-[#941C2F] bg-white/80 backdrop-blur-md border border-white/50 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 rounded-2xl transition-all duration-300 text-sm font-bold"
-                  >
-                    <Home size={17} strokeWidth={2.5} />
-                    Dashboard
-                  </Link>
-                )}
-              </div>
-              {pathname !== homeHref && !hasSeen && pendingCount > 0 && (
+          {/* Dashboard button(s) — top left, next to sidebar */}
+          <div id="dashboard-top-left" className="hidden lg:flex absolute top-7 left-7 z-20 items-center gap-2">
+            {hasDualRole ? (
+              <>
+                <Link
+                  href="/koordinator"
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/koordinator' ? 'bg-[#941C2F]/90 text-white border-white/20 shadow-lg shadow-[#941C2F]/20' : 'text-[#941C2F] bg-white/80 border-white/50 shadow-sm hover:shadow-md'}`}
+                >
+                  <LayoutDashboard size={16} strokeWidth={2.5} />
+                  Dash Koor
+                </Link>
+                <Link
+                  href="/asdos"
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/asdos' ? 'bg-[#941C2F]/90 text-white border-white/20 shadow-lg shadow-[#941C2F]/20' : 'text-[#941C2F] bg-white/80 border-white/50 shadow-sm hover:shadow-md'}`}
+                >
+                  <GraduationCap size={16} strokeWidth={2.5} />
+                  Dash Asdos
+                </Link>
+              </>
+            ) : (
+              <Link
+                href={homeHref}
+                className="flex items-center gap-2 px-4 py-2.5 text-[#941C2F] bg-white/80 backdrop-blur-md border border-white/50 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 rounded-2xl transition-all duration-300 text-sm font-bold"
+              >
+                <Home size={17} strokeWidth={2.5} />
+                Dashboard
+              </Link>
+            )}
+          </div>
+
+          {/* Date/time + notification — top right */}
+          <div id="dashboard-top-right" className="hidden lg:flex absolute top-7 right-7 z-20 items-center gap-4">
+            {pathname !== homeHref && !hasSeen && pendingCount > 0 && (
+              <>
                 <button
                   onClick={() => router.push(homeHref)}
-                  className="flex items-center gap-2 px-3 py-2 text-[#941C2F] bg-white/80 backdrop-blur-md border border-white/50 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 rounded-2xl transition-all duration-300 text-xs font-bold"
+                  className="relative p-2 text-[#941C2F] active:scale-95 transition-all duration-200 cursor-pointer"
                 >
-                  <div className="relative">
-                    <Bell size={15} strokeWidth={2.5} />
-                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#941C2F]" />
-                  </div>
-                  Notifikasi
+                  <Bell size={22} strokeWidth={2.5} />
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#941C2F]" />
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[#941C2F] animate-border-pulse" />
                 </button>
-              )}
+              </>
+            )}
+            <div className="text-right">
+              <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase leading-none drop-shadow-sm">{dateStr.split(', ')[0]}</p>
+              <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase mt-1 leading-none drop-shadow-sm">{dateStr.split(', ')[1]}</p>
+            </div>
+            <div className="w-0.5 h-10 bg-white/80" />
+            <div className="w-[6rem]">
+              <p className="text-2xl font-black font-mono tracking-tight text-[#941C2F] leading-none drop-shadow-sm tabular-nums">{timeStr}</p>
+              <p className="text-[10px] font-extrabold text-slate-500 tracking-widest mt-1 drop-shadow-sm text-right">WIB</p>
             </div>
           </div>
 

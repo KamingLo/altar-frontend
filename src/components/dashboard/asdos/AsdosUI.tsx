@@ -43,12 +43,14 @@ type AsdosStateProps = {
   message: string;
   variant?: 'loading' | 'empty' | 'error';
   className?: string;
+  noBg?: boolean;
 };
 
-export function AsdosState({ icon, title, message, variant = 'empty', className = '' }: AsdosStateProps) {
+export function AsdosState({ icon, title, message, variant = 'empty', className = '', noBg = false }: AsdosStateProps) {
   const isError = variant === 'error';
+  const bgClass = noBg ? '' : (isError ? 'bg-red-50 border-red-100' : 'bg-white border-slate-200');
   return (
-    <div className={`${isError ? 'bg-red-50 border-red-100 text-red-600' : 'bg-white border-slate-200 text-center'} rounded-2xl border border-dashed p-6 md:p-12 shadow-sm ${className}`}>
+    <div className={`${bgClass} ${isError ? 'text-red-600' : 'text-center'} rounded-2xl border border-dashed p-6 md:p-12 shadow-sm ${className}`}>
       {icon && <div className="mx-auto mb-3 w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">{icon}</div>}
       {title && <p className="text-sm md:text-base font-semibold text-slate-700">{title}</p>}
       <p className={`${isError ? 'text-sm font-semibold' : 'text-xs md:text-sm text-slate-500 mt-1'}`}>{message}</p>

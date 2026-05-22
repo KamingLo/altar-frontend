@@ -496,13 +496,9 @@ export default function JadwalAjarPage() {
                     ))}
                   </div>
                 ) : (
-                  /* Empty state */
-                  <div className="flex flex-col items-center justify-center py-16 bg-white border border-slate-100 rounded-2xl text-center">
-                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center mb-3 text-slate-300">
-                      <BookOpen size={20} />
-                    </div>
-                    <p className="text-sm font-semibold text-slate-700">Tidak ada jadwal</p>
-                    <p className="text-xs text-slate-400 mt-1 max-w-[240px]">
+                  <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center">
+                    <p className="text-slate-500 font-medium">Tidak ada jadwal.</p>
+                    <p className="text-xs text-slate-400 mt-1">
                       {viewMode === 'PERSONAL'
                         ? 'Tidak ada sesi yang dijadwalkan pada minggu ini.'
                         : 'Tidak ada sesi untuk seluruh asisten minggu ini.'}

@@ -298,13 +298,13 @@ function renderFields(
       return (
         <>
           <Field label="Nama Kelas">
-            <input className={inputClass} placeholder="cth: TI A" value={form.nama_kelas} onChange={set('nama_kelas')} disabled={disabled} />
+            <input className={inputClass} placeholder="cth: TI A" value={form.nama_kelas ?? ''} onChange={set('nama_kelas')} disabled={disabled} />
           </Field>
           <Field label="Jurusan">
-            <input className={inputClass} placeholder="cth: Teknik Informatika" value={form.jurusan} onChange={set('jurusan')} disabled={disabled} />
+            <input className={inputClass} placeholder="cth: Teknik Informatika" value={form.jurusan ?? ''} onChange={set('jurusan')} disabled={disabled} />
           </Field>
           <Field label="Jumlah Siswa">
-            <input className={inputClass} type="number" min={1} placeholder="cth: 40" value={form.jumlah_siswa} onChange={set('jumlah_siswa')} disabled={disabled} />
+            <input className={inputClass} type="number" min={1} placeholder="cth: 40" value={form.jumlah_siswa ?? ''} onChange={set('jumlah_siswa')} disabled={disabled} />
           </Field>
         </>
       );
@@ -312,10 +312,10 @@ function renderFields(
       return (
         <>
           <Field label="Nama Mata Kuliah">
-            <input className={inputClass} placeholder="cth: Basis Data" value={form.nama_mk} onChange={set('nama_mk')} disabled={disabled} />
+            <input className={inputClass} placeholder="cth: Basis Data" value={form.nama_mk ?? ''} onChange={set('nama_mk')} disabled={disabled} />
           </Field>
           <Field label="SKS">
-            <input className={inputClass} type="number" min={1} max={10} placeholder="cth: 3" value={form.sks} onChange={set('sks')} disabled={disabled} />
+            <input className={inputClass} type="number" min={1} max={10} placeholder="cth: 3" value={form.sks ?? ''} onChange={set('sks')} disabled={disabled} />
           </Field>
         </>
       );
@@ -323,13 +323,13 @@ function renderFields(
       return (
         <>
           <Field label="Nama Ruangan">
-            <input className={inputClass} placeholder="cth: Lab Komputer 1" value={form.nama_ruangan} onChange={set('nama_ruangan')} disabled={disabled} />
+            <input className={inputClass} placeholder="cth: Lab Komputer 1" value={form.nama_ruangan ?? ''} onChange={set('nama_ruangan')} disabled={disabled} />
           </Field>
           <Field label="Lantai">
-            <input className={inputClass} type="number" min={1} placeholder="cth: 9" value={form.lantai} onChange={set('lantai')} disabled={disabled} />
+            <input className={inputClass} type="number" min={1} placeholder="cth: 9" value={form.lantai ?? ''} onChange={set('lantai')} disabled={disabled} />
           </Field>
           <Field label="Kapasitas">
-            <input className={inputClass} type="number" min={1} placeholder="cth: 40" value={form.kapasitas} onChange={set('kapasitas')} disabled={disabled} />
+            <input className={inputClass} type="number" min={1} placeholder="cth: 40" value={form.kapasitas ?? ''} onChange={set('kapasitas')} disabled={disabled} />
           </Field>
         </>
       );
@@ -337,10 +337,10 @@ function renderFields(
       return (
         <>
           <Field label="Nama Dosen">
-            <input className={inputClass} placeholder="cth: Dr. Budi Hartono" value={form.nama} onChange={set('nama')} disabled={disabled} />
+            <input className={inputClass} placeholder="cth: Dr. Budi Hartono" value={form.nama ?? ''} onChange={set('nama')} disabled={disabled} />
           </Field>
           <Field label="NIP">
-            <input className={inputClass} placeholder="cth: 198001012005011001" value={form.nip} onChange={set('nip')} disabled={disabled} />
+            <input className={inputClass} placeholder="cth: 198001012005011001" value={form.nip ?? ''} onChange={set('nip')} disabled={disabled} />
           </Field>
         </>
       );
@@ -348,7 +348,7 @@ function renderFields(
       return (
         <>
           <Field label="Tahun Ajaran">
-            <input className={inputClass} placeholder="cth: 2026/2027" value={form.tahun_ajaran} onChange={set('tahun_ajaran')} disabled={disabled} />
+            <input className={inputClass} placeholder="cth: 2026/2027" value={form.tahun_ajaran ?? ''} onChange={set('tahun_ajaran')} disabled={disabled} />
           </Field>
           <Field label="Tipe Semester">
             <CustomSelect

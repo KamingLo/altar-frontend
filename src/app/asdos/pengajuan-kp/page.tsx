@@ -283,7 +283,9 @@ export default function PengajuanKpPage() {
         )}
 
         {!historyLoading && !historyError && history.length === 0 && (
-          <AsdosState icon={<CalendarPlus size={24} />} title="Belum ada pengajuan." message="Ajukan kelas pengganti lewat tombol di bawah." className="p-10 rounded-[2rem]" />
+          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center">
+            <p className="text-slate-500 font-medium">Belum ada pengajuan kelas pengganti.</p>
+          </div>
         )}
 
         {!historyLoading && !historyError && history.map(item => {

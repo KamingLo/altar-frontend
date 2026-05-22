@@ -20,7 +20,15 @@ const statusCfg = {
 
 function isActivePresensi(item: PresensiResponseDTO) {
   const checkout = item.waktu_checkout;
-  return !checkout || checkout === '' || checkout === 'null' || String(checkout).startsWith('0001');
+  const hasNoCheckout = !checkout || checkout === '' || checkout === 'null' || String(checkout).startsWith('0001');
+  if (!hasNoCheckout) return false;
+
+  // Tanpa checkout — selesai otomatis jika tanggal sesi sudah lewat
+  const sessionDate = new Date(item.tanggal_mengajar);
+  const today = new Date();
+  const sessionDay = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
+  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return sessionDay >= todayDay;
 }
 
 function formatDate(value: string) {
@@ -48,7 +56,7 @@ function mapPresensiToHistory(item: PresensiResponseDTO): HistoryItem {
     checkOut: active ? '--:--' : formatTime(item.waktu_checkout),
     room: item.nama_ruangan,
     status: active ? 'BERJALAN' : 'SELESAI',
-    materi: item.deskripsi_materi || (active ? 'Sesi sedang berlangsung. Materi belum diisi.' : 'Materi tidak tersedia.'),
+    materi: item.deskripsi_materi || (active ? 'Sesi sedang berlangsung. Materi belum diisi.' : '-'),
   };
 }
 
@@ -80,8 +88,8 @@ export default function RiwayatKehadiranPage() {
       setError(null);
       const res = await getMyPresensi();
 
-      if (res.success && res.data) {
-        setItems(res.data);
+      if (res.success) {
+        setItems(res.data ?? []);
       } else {
         setError(res.message || 'Gagal memuat riwayat kehadiran.');
       }
@@ -204,7 +212,9 @@ export default function RiwayatKehadiranPage() {
             </div>
           );
         }) : (
-          <AsdosState icon={<BookOpen size={22} />} title="Riwayat tidak ditemukan." message="Coba gunakan kata kunci atau filter lain." />
+          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center">
+            <p className="text-slate-500 font-medium">Belum ada Riwayat Kehadiran.</p>
+          </div>
         )}
         <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 md:mt-2">
           Menampilkan {displayed.length} dari {filtered.length} riwayat kehadiran.
@@ -266,6 +276,9 @@ export default function RiwayatKehadiranPage() {
               <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-6 text-sm md:text-base text-slate-600 shadow-[0_2px_10px_rgba(0,0,0,0.02)] leading-relaxed min-h-[80px]">
                 {selectedItem.materi}
               </div>
+              {selectedItem.checkOut === '--:--' && selectedItem.status === 'SELESAI' && (
+                <p className="text-xs font-semibold text-red-500 mt-2 ml-1">Kamu tidak melakukan checkout pada sesi ini.</p>
+              )}
             </div>
 
             <button onClick={() => setSelectedItem(null)}
