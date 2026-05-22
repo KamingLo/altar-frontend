@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   CalendarDays,
   Clock,
@@ -43,20 +43,21 @@ export default function ManajemenKpPage() {
   const [isClosing, setIsClosing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const hasLoadedRef = useRef(false);
+
   const fetchRequests = useCallback(async (silent = false) => {
-    if (!silent && substitutionList.length === 0) {
+    if (!silent && !hasLoadedRef.current) {
       setIsLoading(true);
     }
     try {
-
       const res = await getAllSubstitutions(undefined);
       if (res.success && res.data?.items) {
         setSubstitutions(res.data.items);
-      } else {
-        if (!silent) {
-          setSubstitutions([]);
-          toast.error(res.message || 'Gagal memuat data pengajuan.');
-        }
+        hasLoadedRef.current = true;
+      } else if (!silent) {
+        setSubstitutions([]);
+        toast.error(res.message || 'Gagal memuat data pengajuan.');
+        hasLoadedRef.current = true;
       }
     } catch {
       if (!silent) {
@@ -68,18 +69,10 @@ export default function ManajemenKpPage() {
         setIsLoading(false);
       }
     }
-  }, [setSubstitutions, setIsLoading, substitutionList.length]);
+  }, [setSubstitutions, setIsLoading]);
 
   useEffect(() => {
     fetchRequests(false);
-  }, [fetchRequests]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      fetchRequests(true); 
-    }, 5000);
-
-    return () => clearInterval(timer);
   }, [fetchRequests]);
 
   const openModal = (req: SubstituteSessionDetail, type: 'APPROVE' | 'REJECT') => {

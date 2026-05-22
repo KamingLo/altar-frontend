@@ -1,12 +1,16 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ScanLine, FileSignature, Monitor, History,
   CalendarDays, CalendarSync, CalendarClock,
-  CheckCircle2, Info, TrendingUp
+  CheckCircle2, Info, Bell, ChevronRight
 } from 'lucide-react';
-import { useUserStore } from '@/store/useUserStore';
+import { useNotificationStore } from '@/store/useNotificationStore';
+import { getAllSubstitutions } from '@/lib/actions/pergantian-kelas';
+import { getMyPresensi } from '@/lib/actions/presensi';
+import type { SubstituteSessionDetail } from '@/types/api';
+import type { PresensiResponseDTO } from '@/lib/actions/presensi';
 
 export const asdosMenuItems = [
   {
@@ -80,11 +84,47 @@ const feedbacks = [
 ];
 
 export default function AsdosHome() {
-  const { user } = useUserStore();
+  const { markSeen, setPendingCount } = useNotificationStore();
+  const [kpItem, setKpItem] = useState<SubstituteSessionDetail | null>(null);
+  const [presensiItem, setPresensiItem] = useState<PresensiResponseDTO | null>(null);
+  const [notifLoaded, setNotifLoaded] = useState(false);
 
-  const today = new Date().toLocaleDateString('id-ID', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  });
+  useEffect(() => {
+    async function fetchNotifications() {
+      const today = new Date().toISOString().split('T')[0];
+      const { lastSeenKpId, lastSeenPresensiId, setLastSeenKpId, setLastSeenPresensiId } = useNotificationStore.getState();
+
+      const [kpRes, presensiRes] = await Promise.all([
+        getAllSubstitutions(),
+        getMyPresensi(),
+      ]);
+
+      // Most recent VERIFIED/REJECTED KP — no time cutoff, use ID comparison instead
+      const recentKp = (kpRes.success && kpRes.data?.items ? kpRes.data.items : [])
+        .filter(item => item.status === 'VERIFIED' || item.status === 'REJECTED')
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0] ?? null;
+
+      // Only show if it's a KP the user hasn't acknowledged yet
+      const kpToShow = recentKp && recentKp.id !== lastSeenKpId ? recentKp : null;
+
+      const verifiedToday = (presensiRes.success && presensiRes.data ? presensiRes.data : [])
+        .filter(p => p.is_verified && String(p.tanggal_mengajar).split('T')[0] === today)[0] ?? null;
+
+      const presensiToShow = verifiedToday && verifiedToday.id_presensi !== lastSeenPresensiId ? verifiedToday : null;
+
+      setKpItem(kpToShow);
+      setPresensiItem(presensiToShow);
+      setPendingCount((kpToShow ? 1 : 0) + (presensiToShow ? 1 : 0));
+
+      // Mark these as acknowledged so they don't reappear next visit
+      if (recentKp) setLastSeenKpId(recentKp.id);
+      if (verifiedToday) setLastSeenPresensiId(verifiedToday.id_presensi);
+
+      markSeen();
+      setNotifLoaded(true);
+    }
+    fetchNotifications();
+  }, [markSeen, setPendingCount]);
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -94,16 +134,53 @@ export default function AsdosHome() {
           <p className="text-sm lg:text-base font-semibold text-[#941C2F] tracking-wide uppercase mb-1">
             Dashboard Asdos
           </p>
-          <h1 className="text-3xl lg:text-4xl font-bold lg:font-extrabold text-slate-800 leading-tight">
-            Halo, <br className="lg:hidden" />{user?.email.split('@')[0] ?? '—'}
-          </h1>
-        </div>
-
-        <div className="hidden lg:flex items-center gap-2.5 bg-white rounded-2xl px-5 py-3 shadow-sm border border-slate-100 shrink-0">
-          <TrendingUp size={15} className="text-[#941C2F]" />
-          <span className="text-sm font-semibold text-slate-500">{today}</span>
         </div>
       </div>
+
+      {notifLoaded && (kpItem || presensiItem) && (
+        <div className="mb-8 animate-fade-up" style={{ animationDelay: '0.05s' }}>
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <div className="relative">
+              <Bell size={16} className="text-[#941C2F]" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#941C2F]" />
+            </div>
+            <h3 className="font-bold text-lg text-slate-800">Notifikasi</h3>
+          </div>
+          <div className="space-y-3">
+            {kpItem && (
+              <div className="bg-white p-4 rounded-2xl shadow-md lg:shadow-sm flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${kpItem.status === 'VERIFIED' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>
+                  <CheckCircle2 size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 truncate">
+                    {kpItem.status === 'VERIFIED' ? 'Pengajuan KP Disetujui' : 'Pengajuan KP Ditolak'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                    Kelas pengganti{kpItem.session?.mata_kuliah ? ` ${kpItem.session.mata_kuliah}` : ''}{kpItem.session?.nama_kelas ? ` ${kpItem.session.nama_kelas}` : ''} telah {kpItem.status === 'VERIFIED' ? 'disetujui' : 'ditolak'} koordinator
+                  </p>
+                </div>
+              </div>
+            )}
+            {presensiItem && (
+              <div className="bg-white p-4 rounded-2xl shadow-md lg:shadow-sm flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
+                  <CalendarSync size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 truncate">Presensi Telah Diverifikasi</p>
+                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                    Kehadiran {presensiItem.nama_mata_kuliah} {presensiItem.nama_kelas} telah diverifikasi oleh koordinator
+                  </p>
+                </div>
+                <Link href="/asdos/riwayat-kehadiran" className="flex items-center gap-1 text-xs font-bold text-[#941C2F] shrink-0 hover:underline">
+                  Selengkapnya <ChevronRight size={13} />
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-4 lg:hidden gap-y-6 gap-x-3 mb-10 w-full px-1">
         {asdosMenuItems.map((item) => {

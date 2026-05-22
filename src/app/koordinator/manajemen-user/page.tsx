@@ -4,7 +4,6 @@ import {
   getAsdosList, getKoorList, getUserList, getAsdosDetail,
   createUser, assignKoor, assignAsdos,
   updateAsdos, updateKoor,
-  deleteAsdos, deleteKoor,
 } from '@/lib/actions/manajemen';
 import type { UserListItem } from '@/lib/actions/manajemen';
 import { useManajemenStore } from '@/store/useManajemenStore';
@@ -23,7 +22,6 @@ type ModalForm = {
 
 const SearchIcon = () => <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
 const EditIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>;
-const DeleteIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
 const PhoneIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>;
 const UserIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
 
@@ -55,16 +53,8 @@ export default function ManajemenAsdosPage() {
     username: '', email: '', nim: '', nip: '', phone_number: '',
   });
 
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; username: string; tab: TabId } | null>(null);
-  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
-  const [isDeleteClosing, setIsDeleteClosing] = useState(false);
-  const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
-
   const [sheetStartY, setSheetStartY] = useState(0);
   const [sheetDragY, setSheetDragY] = useState(0);
-  const [deleteSheetStartY, setDeleteSheetStartY] = useState(0);
-  const [deleteSheetDragY, setDeleteSheetDragY] = useState(0);
   const [isMd, setIsMd] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : false
   );
@@ -317,53 +307,12 @@ export default function ManajemenAsdosPage() {
     loadTabData(activeTab, searchQuery, 1);
   };
 
-  const handleDeleteOpen = (id: string, username: string) => {
-    setDeleteTarget({ id, username, tab: activeTab });
-    setIsDeleteClosing(false);
-    setDeleteSheetDragY(0);
-    setTimeout(() => setIsDeleteModalVisible(true), 10);
-  };
-
-  const handleCloseDeleteModal = () => {
-    setIsDeleteClosing(true);
-    setIsDeleteModalVisible(false);
-    setTimeout(() => {
-      setDeleteTarget(null);
-      setIsDeleteClosing(false);
-      setDeleteSheetDragY(0);
-      setDeleteError('');
-    }, 300);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleteSubmitting(true);
-    setDeleteError('');
-    const res = deleteTarget.tab === 'asdos'
-      ? await deleteAsdos(deleteTarget.id)
-      : await deleteKoor(deleteTarget.id);
-    setIsDeleteSubmitting(false);
-    if (!res.success) {
-      setDeleteError(res.message || 'Gagal menghapus data. Coba lagi.');
-      return;
-    }
-    handleCloseDeleteModal();
-    loadTabData(activeTab, searchQuery, 1);
-  };
-
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => setSheetStartY(e.touches[0].clientY);
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     const delta = e.touches[0].clientY - sheetStartY;
     if (delta > 0) setSheetDragY(delta);
   };
   const handleTouchEnd = () => { if (sheetDragY > 100) handleCloseModal(); else setSheetDragY(0); };
-
-  const handleDeleteTouchStart = (e: React.TouchEvent<HTMLDivElement>) => setDeleteSheetStartY(e.touches[0].clientY);
-  const handleDeleteTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    const delta = e.touches[0].clientY - deleteSheetStartY;
-    if (delta > 0) setDeleteSheetDragY(delta);
-  };
-  const handleDeleteTouchEnd = () => { if (deleteSheetDragY > 100) handleCloseDeleteModal(); else setDeleteSheetDragY(0); };
 
   const isEmptyResult = !isLoading && activeItems.length === 0;
   const showAddButton = activeTab !== 'user';
@@ -442,8 +391,7 @@ export default function ManajemenAsdosPage() {
               </div>
 
               {activeTab !== 'user' && (
-                <div className="flex space-x-1 md:space-x-2 shrink-0">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100/80 animate-shimmer" />
+                <div className="shrink-0">
                   <div className="w-10 h-10 rounded-xl bg-slate-100/80 animate-shimmer" />
                 </div>
               )}
@@ -476,20 +424,13 @@ export default function ManajemenAsdosPage() {
             </div>
 
             {activeTab !== 'user' && (
-              <div className="flex space-x-1 md:space-x-2 text-slate-300 md:text-slate-400 shrink-0">
+              <div className="text-slate-300 md:text-slate-400 shrink-0">
                 <button
                   onClick={() => handleOpenModal('edit', item)}
                   className="p-2.5 hover:text-[#941C2F] active:bg-slate-50 md:hover:bg-slate-50 rounded-xl transition-colors"
                   aria-label="Edit data"
                 >
                   <EditIcon />
-                </button>
-                <button
-                  onClick={() => handleDeleteOpen(item.id, item.username)}
-                  className="p-2.5 hover:text-red-500 active:bg-slate-50 md:hover:bg-red-50 rounded-xl transition-colors"
-                  aria-label="Hapus data"
-                >
-                  <DeleteIcon />
                 </button>
               </div>
             )}
@@ -890,60 +831,6 @@ export default function ManajemenAsdosPage() {
         </>
       )}
 
-      {deleteTarget && (
-        <>
-          <div
-            className={`fixed inset-0 bg-slate-900/45 backdrop-blur-[2px] z-[60] transition-opacity duration-300 ease-out ${isDeleteModalVisible && !isDeleteClosing ? 'opacity-100' : 'opacity-0'}`}
-            onClick={handleCloseDeleteModal}
-          />
-          <div className="fixed inset-0 z-[61] flex items-end md:items-center justify-center pointer-events-none">
-            <div
-              className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col overflow-hidden pointer-events-auto${isMd ? ` transition-all duration-300 ${isDeleteModalVisible && !isDeleteClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}` : ''}`}
-              style={!isMd ? {
-                transform: (!isDeleteModalVisible || isDeleteClosing) ? 'translateY(100%)' : `translateY(${deleteSheetDragY}px)`,
-                transition: (!isDeleteModalVisible || isDeleteClosing || deleteSheetDragY === 0) ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
-              } : undefined}
-            >
-              <div
-                className="w-full flex md:hidden items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none"
-                onTouchStart={handleDeleteTouchStart}
-                onTouchMove={handleDeleteTouchMove}
-                onTouchEnd={handleDeleteTouchEnd}
-              >
-                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
-              </div>
-
-              <div className="px-5 pt-2 md:pt-6 pb-6 md:pb-8">
-                <h2 className="text-[20px] font-extrabold text-[#1F2937] leading-7">Hapus Data?</h2>
-                <p className="text-sm text-slate-500 mt-2 font-medium">
-                  Apakah anda yakin ingin menghapus <span className="font-semibold text-slate-700">{deleteTarget.username}</span>?
-                </p>
-                {deleteError && (
-                  <p className="mt-3 text-xs font-medium text-red-600 bg-red-50 rounded-lg px-3 py-2">{deleteError}</p>
-                )}
-                <div className="mt-6 md:mt-8 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={handleCloseDeleteModal}
-                    disabled={isDeleteSubmitting}
-                    className="flex-1 rounded-xl py-3.5 bg-slate-100 text-slate-600 font-bold text-[15px] active:bg-slate-200 transition-colors disabled:opacity-50"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleConfirmDelete}
-                    disabled={isDeleteSubmitting}
-                    className="flex-1 rounded-xl py-3.5 bg-[#941C2F] text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-md shadow-[#941C2F]/20 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {isDeleteSubmitting ? 'Menghapus...' : 'Ya, Hapus'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

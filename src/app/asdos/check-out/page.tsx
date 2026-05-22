@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Check, Scan, ArrowLeft, Clock, BookOpen, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { getMyPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/actions/presensi';
-import { toast } from 'sonner';
+
 import Link from 'next/link';
 import { AsdosQrScanSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 
@@ -214,10 +214,7 @@ export default function CheckOutPage() {
     });
 
     if (res.success) {
-      toast.success('Check-out berhasil!');
       setStep(3);
-    } else {
-      toast.error(res.message || 'Gagal melakukan check-out');
     }
     setIsSubmitting(false);
   };

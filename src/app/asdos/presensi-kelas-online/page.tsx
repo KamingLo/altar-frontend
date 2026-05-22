@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ArrowLeft, Clock, BookOpen, Send, Link2, X, AlertCircle } from 'lucide-react';
 import { submitOnlineAttendance } from '@/lib/actions/presensi';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
-import { toast } from 'sonner';
+
 import { AsdosOnlineSessionSkeleton, AsdosPageHeader, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 
 function todayIso() {
@@ -50,8 +50,6 @@ export default function PresensiKelasOnlinePage() {
           setWaktuMulai(firstTime.start);
           setWaktuSelesai(firstTime.end);
         }
-      } else {
-        toast.error(res.message || 'Gagal mengambil data sesi');
       }
       setIsLoading(false);
     }
@@ -118,11 +116,8 @@ export default function PresensiKelasOnlinePage() {
     });
 
     if (res.success) {
-      toast.success('Laporan berhasil dikirim!');
       handleCloseSheet();
       setTimeout(() => setStep(3), 300);
-    } else {
-      toast.error(res.message || 'Gagal mengirim laporan');
     }
     setIsSubmitting(false);
   };

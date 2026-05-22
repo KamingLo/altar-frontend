@@ -55,7 +55,7 @@ export default function DataPresensiPage() {
   });
 
   const fetchPresensi = useCallback(async (silent = false) => {
-    if (!silent && presensiList.length === 0) {
+    if (!silent) {
       setIsLoading(true);
     }
     try {
@@ -78,18 +78,34 @@ export default function DataPresensiPage() {
         setIsLoading(false);
       }
     }
-  }, [setPresensi, setIsLoading, presensiList.length]);
+  }, [setPresensi, setIsLoading]);
 
   useEffect(() => {
     fetchPresensi(false);
   }, [fetchPresensi]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      fetchPresensi(true);
-    }, 5000);
+    let timeoutId: ReturnType<typeof setTimeout>;
 
-    return () => clearInterval(timer);
+    const poll = async () => {
+      if (document.visibilityState === 'visible') {
+        await fetchPresensi(true);
+      }
+      timeoutId = setTimeout(poll, 30_000);
+    };
+
+    timeoutId = setTimeout(poll, 30_000);
+    return () => clearTimeout(timeoutId);
+  }, [fetchPresensi]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        fetchPresensi(true);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [fetchPresensi]);
 
   const openConfirmModal = (item: PresensiResponseDTO, action: boolean) => {

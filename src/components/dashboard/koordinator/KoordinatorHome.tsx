@@ -1,12 +1,16 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNotificationStore } from '@/store/useNotificationStore';
 import Link from 'next/link';
 import {
   FileText, QrCode, Users, CalendarSync,
-  MapPin, LogOut, ChevronRight, TrendingUp, Clock, CheckCircle2,
-  CalendarDays
+  MapPin, LogOut, ChevronRight, Clock, CheckCircle2,
+  CalendarDays, Bell
 } from 'lucide-react';
-import { useUserStore } from '@/store/useUserStore';
+import { getAllSubstitutions } from '@/lib/actions/pergantian-kelas';
+import { getAllPresensi } from '@/lib/actions/presensi';
+import type { SubstituteSessionDetail } from '@/types/api';
+import type { PresensiResponseDTO } from '@/lib/actions/presensi';
 
 export const koordinatorMenuItems = [
   { id: 1, title: 'Data Presensi', icon: FileText, href: '/koordinator/data-presensi', desc: 'Lihat & kelola data presensi' },
@@ -23,16 +27,6 @@ const desktopStats = [
   { id: 3, label: 'Menunggu ACC', value: '2', sub: 'Perlu persetujuan', icon: Clock, positive: false },
 ];
 
-const notifications = [
-  {
-    id: 1, name: 'Sarah Amalia', type: 'Jaringan Komputer TI C',
-    detail: 'Senin, 11 Nov -> Kamis, 14 Nov', status: 'Menunggu ACC', time: '10 mnt lalu',
-  },
-  {
-    id: 2, name: 'Doni Tata', type: 'Sistem Operasi TI A',
-    detail: 'Selasa, 12 Nov -> Jumat, 15 Nov', status: 'Menunggu ACC', time: '1 jam lalu',
-  },
-];
 
 const activities = [
   { id: 1, name: 'Bima Sakti', action: 'Check-in', subject: 'Basis Data - Ruang M305', time: '08:00 WIB', isCheckIn: true },
@@ -40,12 +34,45 @@ const activities = [
   { id: 3, name: 'Alya Rahma', action: 'Check-in', subject: 'Pemrograman Web - Ruang M402', time: '11:15 WIB', isCheckIn: true },
 ];
 
-export default function KoordinatorHome() {
-  const { user } = useUserStore();
+function timeAgo(dateStr: string) {
+  const ms = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `${mins} mnt lalu`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} jam lalu`;
+  return `${Math.floor(hrs / 24)} hr lalu`;
+}
 
-  const today = new Date().toLocaleDateString('id-ID', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  });
+function formatShortDate(dateStr: string) {
+  try {
+    return new Date(dateStr).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
+  } catch { return dateStr; }
+}
+
+export default function KoordinatorHome() {
+  const { markSeen, setPendingCount } = useNotificationStore();
+  const [kpItem, setKpItem] = useState<SubstituteSessionDetail | null>(null);
+  const [kpItems, setKpItems] = useState<SubstituteSessionDetail[]>([]);
+  const [presensiItem, setPresensiItem] = useState<PresensiResponseDTO | null>(null);
+  const [notifLoaded, setNotifLoaded] = useState(false);
+
+  useEffect(() => {
+    async function fetchNotifications() {
+      const [kpRes, presensiRes] = await Promise.all([
+        getAllSubstitutions('PENDING'),
+        getAllPresensi(false),
+      ]);
+      const kpData = kpRes.success && kpRes.data?.items ? kpRes.data.items : [];
+      const presensiItems = presensiRes.success && presensiRes.data ? presensiRes.data : [];
+      setKpItems(kpData);
+      setKpItem(kpData[0] ?? null);
+      setPresensiItem(presensiItems[0] ?? null);
+      setPendingCount(kpData.length + presensiItems.length);
+      markSeen();
+      setNotifLoaded(true);
+    }
+    fetchNotifications();
+  }, [markSeen, setPendingCount]);
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -55,16 +82,54 @@ export default function KoordinatorHome() {
           <p className="text-sm lg:text-base font-semibold text-[#941C2F] tracking-wide uppercase mb-1">
             Dashboard Koordinator
           </p>
-          <h1 className="text-3xl lg:text-4xl font-bold lg:font-extrabold text-slate-800 leading-tight">
-            Halo, <br className="lg:hidden" />{user?.email.split('@')[0] ?? 'Admin'}
-          </h1>
-        </div>
-
-        <div className="hidden lg:flex items-center gap-2.5 bg-white rounded-2xl px-5 py-3 shadow-sm border border-slate-100 shrink-0">
-          <TrendingUp size={15} className="text-[#941C2F]" />
-          <span className="text-sm font-semibold text-slate-500">{today}</span>
         </div>
       </div>
+
+      {notifLoaded && (kpItem || presensiItem) && (
+        <div className="mb-8 animate-fade-up" style={{ animationDelay: '0.05s' }}>
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <div className="relative">
+              <Bell size={16} className="text-[#941C2F]" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#941C2F]" />
+            </div>
+            <h3 className="font-bold text-lg text-slate-800">Notifikasi</h3>
+          </div>
+          <div className="space-y-3">
+            {kpItem && (
+              <div className="bg-white p-4 rounded-2xl shadow-md lg:shadow-sm flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 shrink-0">
+                  <CalendarSync size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 truncate">Pengajuan KP Baru</p>
+                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                    {kpItem.substitute_teacher} mengajukan kelas pengganti{kpItem.session?.mata_kuliah ? ` ${kpItem.session.mata_kuliah}` : ''}{kpItem.session?.nama_kelas ? ` ${kpItem.session.nama_kelas}` : ''}
+                  </p>
+                </div>
+                <Link href="/koordinator/manajemen-kp" className="flex items-center gap-1 text-xs font-bold text-[#941C2F] shrink-0 hover:underline">
+                  Selengkapnya <ChevronRight size={13} />
+                </Link>
+              </div>
+            )}
+            {presensiItem && (
+              <div className="bg-white p-4 rounded-2xl shadow-md lg:shadow-sm flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 truncate">Presensi Menunggu Verifikasi</p>
+                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                    {presensiItem.nama_asdos} check-in {presensiItem.nama_mata_kuliah} {presensiItem.nama_kelas} dan menunggu verifikasi
+                  </p>
+                </div>
+                <Link href="/koordinator/data-presensi" className="flex items-center gap-1 text-xs font-bold text-[#941C2F] shrink-0 hover:underline">
+                  Selengkapnya <ChevronRight size={13} />
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="hidden lg:gap-5 lg:mb-10">
         {desktopStats.map((stat) => {
@@ -124,32 +189,54 @@ export default function KoordinatorHome() {
         <div className="animate-fade-up" style={{ animationDelay: '0.1s' }}>
           <div className="flex justify-between items-center mb-4 lg:mb-6 px-1">
             <h3 className="font-bold text-lg lg:text-xl text-slate-800">Notifikasi Masuk</h3>
-            <button className="text-xs lg:text-sm font-semibold text-[#941C2F] active:scale-95 transition">
+            <Link href="/koordinator/manajemen-kp" className="text-xs lg:text-sm font-semibold text-[#941C2F] active:scale-95 transition">
               Lihat Semua
-            </button>
+            </Link>
           </div>
           <div className="space-y-4">
-            {notifications.map((notif) => (
-              <div
-                key={notif.id}
-                className="bg-white p-4 lg:p-5 rounded-2xl lg:rounded-3xl shadow-md lg:shadow-sm active:scale-[0.97] transition-all duration-200 flex gap-4 lg:gap-5 items-start"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-[#941C2F]/5 flex items-center justify-center text-[#941C2F] shrink-0">
-                  <CalendarSync size={22} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start mb-1">
-                    <h4 className="text-sm font-bold text-slate-800 truncate pr-2">{notif.name}</h4>
-                    <span className="text-[10px] lg:text-xs text-slate-400 font-medium whitespace-nowrap">{notif.time}</span>
+            {!notifLoaded ? (
+              [1, 2].map(i => (
+                <div key={i} className="bg-white p-4 lg:p-5 rounded-2xl animate-pulse flex gap-4 items-start">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-100 shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-slate-100 rounded w-1/2" />
+                    <div className="h-3 bg-slate-100 rounded w-1/3" />
+                    <div className="h-3 bg-slate-100 rounded w-2/3" />
                   </div>
-                  <p className="text-[12px] lg:text-xs font-semibold text-[#941C2F] mb-1 truncate">{notif.type}</p>
-                  <p className="text-[12px] lg:text-xs text-slate-500 mb-3 line-clamp-2">{notif.detail}</p>
-                  <span className="inline-block text-[10px] lg:text-xs font-bold text-[#941C2F] bg-[#941C2F]/10 px-4 py-1.5 rounded-full">
-                    {notif.status}
-                  </span>
                 </div>
+              ))
+            ) : kpItems.length === 0 ? (
+              <div className="bg-white p-6 rounded-2xl lg:rounded-3xl shadow-md lg:shadow-sm text-center text-slate-400">
+                <CalendarSync size={28} className="mx-auto mb-2 text-slate-300" />
+                <p className="text-sm font-semibold">Tidak ada pengajuan kelas pengganti pending</p>
               </div>
-            ))}
+            ) : (
+              kpItems.map((kp) => (
+                <div
+                  key={kp.id}
+                  className="bg-white p-4 lg:p-5 rounded-2xl lg:rounded-3xl shadow-md lg:shadow-sm active:scale-[0.97] transition-all duration-200 flex gap-4 lg:gap-5 items-start"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-[#941C2F]/5 flex items-center justify-center text-[#941C2F] shrink-0">
+                    <CalendarSync size={22} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start mb-1">
+                      <h4 className="text-sm font-bold text-slate-800 truncate pr-2">{kp.substitute_teacher}</h4>
+                      <span className="text-[10px] lg:text-xs text-slate-400 font-medium whitespace-nowrap">{timeAgo(kp.created_at)}</span>
+                    </div>
+                    <p className="text-[12px] lg:text-xs font-semibold text-[#941C2F] mb-1 truncate">
+                      {kp.session?.mata_kuliah}{kp.session?.nama_kelas ? ` — ${kp.session.nama_kelas}` : ''}
+                    </p>
+                    <p className="text-[12px] lg:text-xs text-slate-500 mb-3 line-clamp-2">
+                      {formatShortDate(kp.original_date)} → {formatShortDate(kp.substitute_date)}
+                    </p>
+                    <span className="inline-block text-[10px] lg:text-xs font-bold text-amber-600 bg-amber-50 px-4 py-1.5 rounded-full">
+                      Menunggu ACC
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

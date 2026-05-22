@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Check, Scan, ArrowLeft, Clock, MapPin, BookOpen, X, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 import { submitCheckIn, getMyPresensi } from '@/lib/actions/presensi';
-import { toast } from 'sonner';
+
 import { AsdosQrScanSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 import { decodeJwtPayload } from '@/lib/auth/jwt';
 
@@ -134,7 +134,6 @@ export default function CheckInPage() {
     } else {
       setCameraStatus('idle');
       setIsLoading(false);
-      toast.error(res.message || 'Gagal mengunduh sesi aktif untuk check-in');
     }
   }, [parseAndValidateQrToken]);
 
@@ -331,11 +330,8 @@ export default function CheckInPage() {
       id_sesi_pengganti: selectedSession?.tipe_jadwal === 'PENGGANTI' ? selectedSession.id_sesi : undefined,
     });
     if (res.success) {
-      toast.success('Check-in berhasil!');
       handleCloseSheet();
       setTimeout(() => setStep(3), 300);
-    } else {
-      toast.error(res.message || 'Gagal melakukan check-in');
     }
     setIsSubmitting(false);
   };
