@@ -16,16 +16,23 @@ import {
   QrCode,
   ExternalLink,
   Filter,
-  AlertTriangle
+  AlertTriangle,
+  Banknote,
+  Square,
+  CheckSquare2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getAllPresensi,
   verifyPresensi,
+  updatePaymentStatus,
   type PresensiResponseDTO
 } from '@/lib/actions/presensi';
+import { getSemesterList } from '@/lib/actions/data-master';
+import type { SemesterItem } from '@/types/api';
 import { usePresensiStore } from '@/store/usePresensiStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 type TabId = 'ALL' | 'PENDING' | 'VERIFIED';
 type TipeFilter = 'ALL' | 'QR' | 'LINK';
@@ -37,12 +44,16 @@ const FILTER_TIPE_OPTIONS = [
 ];
 
 export default function DataPresensiPage() {
-  const { presensiList, isLoading, setPresensi, verifyPresensiLocal, setIsLoading } = usePresensiStore();
+  const { presensiList, isLoading, setPresensi, verifyPresensiLocal, updatePaymentLocal, setIsLoading } = usePresensiStore();
 
   const [activeTab, setActiveTab] = useState<TabId>('PENDING');
   const [tipeFilter, setTipeFilter] = useState<TipeFilter>('ALL');
+  const [semesterFilter, setSemesterFilter] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isPending, startTransition] = useTransition();
+  const [bulkPending, setBulkPending] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [semesters, setSemesters] = useState<SemesterItem[]>([]);
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -54,14 +65,22 @@ export default function DataPresensiPage() {
     action: true
   });
 
-  const fetchPresensi = useCallback(async (silent = false) => {
+  useEffect(() => {
+    getSemesterList(1, '', 100).then((res) => {
+      if (res.success && res.data) setSemesters(res.data.items);
+    });
+  }, []);
+
+  const fetchPresensi = useCallback(async (silent = false, semId?: string) => {
     if (!silent) {
       setIsLoading(true);
     }
     try {
-      const res = await getAllPresensi(undefined, undefined);
+      const activeSem = (semId !== undefined ? semId : semesterFilter) || undefined;
+      const res = await getAllPresensi(undefined, undefined, undefined, activeSem);
       if (res.success && res.data) {
         setPresensi(res.data);
+        setSelectedIds(new Set());
       } else {
         if (!silent) {
           setPresensi([]);
@@ -78,7 +97,12 @@ export default function DataPresensiPage() {
         setIsLoading(false);
       }
     }
-  }, [setPresensi, setIsLoading]);
+  }, [setPresensi, setIsLoading, semesterFilter]);
+
+  const handleSemesterChange = (val: string) => {
+    setSemesterFilter(val);
+    fetchPresensi(false, val || undefined);
+  };
 
   useEffect(() => {
     fetchPresensi(false);
@@ -107,6 +131,36 @@ export default function DataPresensiPage() {
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [fetchPresensi]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkPayment = async (isPaid: boolean) => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    setBulkPending(true);
+    updatePaymentLocal(ids, isPaid);
+    try {
+      const res = await updatePaymentStatus(ids, isPaid);
+      if (res.success) {
+        toast.success(isPaid ? `${ids.length} presensi ditandai lunas.` : `${ids.length} presensi ditandai belum lunas.`);
+      } else {
+        toast.error(res.message || 'Gagal memperbarui status pembayaran.');
+        fetchPresensi(true);
+      }
+    } catch {
+      toast.error('Gagal memproses pembaruan pembayaran.');
+      fetchPresensi(true);
+    } finally {
+      setBulkPending(false);
+      setSelectedIds(new Set());
+    }
+  };
 
   const openConfirmModal = (item: PresensiResponseDTO, action: boolean) => {
     setConfirmModal({
@@ -208,13 +262,7 @@ export default function DataPresensiPage() {
 
       <div className="mb-6 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">
-            Data Presensi
-          </p>
-          <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Presensi Asisten</h2>
-          <p className="text-sm text-slate-500 mt-1 md:text-base max-w-xl">
-            Tinjau jurnal mengajar, periksa video bukti kelas malam, dan lakukan verifikasi kehadiran asisten dosen.
-          </p>
+          <PageHeader label="Data Presensi" title="Presensi Asisten" description="Tinjau jurnal mengajar, periksa video bukti kelas malam, dan lakukan verifikasi kehadiran asisten dosen." />
         </div>
       </div>
 
@@ -239,7 +287,7 @@ export default function DataPresensiPage() {
                     className={`
                       flex-1 md:flex-initial min-w-fit px-5 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] select-none
                       ${isActive 
-                        ? 'bg-[#941C2F] text-white shadow-sm' 
+                        ? 'bg-crimson text-white shadow-sm' 
                         : 'bg-transparent text-slate-500 hover:text-slate-800'
                       }
                     `}
@@ -262,7 +310,7 @@ export default function DataPresensiPage() {
                 placeholder="Cari asdos, matkul, atau kelas..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-[#941C2F] focus:ring-2 focus:ring-[#941C2F]/15 transition-all"
+                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-crimson focus:ring-2 focus:ring-crimson/15 transition-all"
               />
               {searchQuery && (
                 <button
@@ -285,10 +333,31 @@ export default function DataPresensiPage() {
                 placeholder="Filter tipe"
                 icon={<Filter className="w-[18px] h-[18px]" />}
                 triggerClassName={
-                  tipeFilter !== 'ALL' ? 'bg-red-50 border-[#941C2F] text-[#941C2F]' : ''
+                  tipeFilter !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : ''
                 }
               />
             </div>
+
+            {semesters.length > 0 && (
+              <div className="relative shrink-0">
+                <CustomSelect
+                  variant="icon"
+                  align="right"
+                  value={semesterFilter}
+                  onChange={handleSemesterChange}
+                  options={[
+                    { value: '', label: 'Semua Semester' },
+                    ...semesters.map((s) => ({
+                      value: s.id,
+                      label: `${s.tipe_semester} ${s.tahun_ajaran}`,
+                    })),
+                  ]}
+                  placeholder="Semester"
+                  icon={<CalendarDays className="w-[18px] h-[18px]" />}
+                  triggerClassName={semesterFilter ? 'bg-red-50 border-crimson text-crimson' : ''}
+                />
+              </div>
+            )}
 
           </div>
         </div>
@@ -344,12 +413,21 @@ export default function DataPresensiPage() {
             return (
               <div
                 key={item.id_presensi}
-                className="bg-white rounded-3xl p-6 shadow-sm hover:shadow-md hover:scale-[1.005] active:scale-[0.999] transition-all flex flex-col justify-between border border-slate-100"
+                className={`bg-white rounded-3xl p-6 shadow-sm hover:shadow-md hover:scale-[1.005] active:scale-[0.999] transition-all flex flex-col justify-between border ${selectedIds.has(item.id_presensi) ? 'border-crimson/40 ring-1 ring-crimson/20' : 'border-slate-100'}`}
               >
                 <div className="space-y-4">
 
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex gap-3 items-center min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleSelect(item.id_presensi)}
+                        className="shrink-0 text-slate-300 hover:text-crimson transition-colors"
+                      >
+                        {selectedIds.has(item.id_presensi)
+                          ? <CheckSquare2 size={20} className="text-crimson" />
+                          : <Square size={20} />}
+                      </button>
                       <div className={`w-11 h-11 shrink-0 rounded-2xl flex items-center justify-center ${isLink ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
                         {isLink ? <Video size={20} /> : <QrCode size={20} />}
                       </div>
@@ -361,17 +439,30 @@ export default function DataPresensiPage() {
                       </div>
                     </div>
 
-                    <span
-                      className={`
-                        text-[10px] font-extrabold tracking-wider px-2.5 py-1 rounded-lg border uppercase shrink-0
-                        ${isPendingStatus 
-                          ? 'bg-amber-50 text-amber-600 border-amber-200' 
-                          : 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                        }
-                      `}
-                    >
-                      {isPendingStatus ? 'Pending' : 'Verified'}
-                    </span>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <span
+                        className={`
+                          text-[10px] font-extrabold tracking-wider px-2.5 py-1 rounded-lg border uppercase
+                          ${isPendingStatus
+                            ? 'bg-amber-50 text-amber-600 border-amber-200'
+                            : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                          }
+                        `}
+                      >
+                        {isPendingStatus ? 'Pending' : 'Verified'}
+                      </span>
+                      <span
+                        className={`
+                          text-[10px] font-extrabold tracking-wider px-2.5 py-1 rounded-lg border uppercase
+                          ${item.is_paid
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-slate-50 text-slate-500 border-slate-200'
+                          }
+                        `}
+                      >
+                        {item.is_paid ? 'Lunas' : 'Blm Lunas'}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="pt-2 space-y-3">
@@ -385,7 +476,7 @@ export default function DataPresensiPage() {
                       <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
                       <span>Ruangan: {item.nama_ruangan}</span>
                       {item.menggantikan && (
-                        <span className="text-[9px] font-extrabold text-[#941C2F] bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded uppercase ml-2 tracking-wide">
+                        <span className="text-[9px] font-extrabold text-crimson bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded uppercase ml-2 tracking-wide">
                           Menggantikan
                         </span>
                       )}
@@ -472,7 +563,7 @@ export default function DataPresensiPage() {
                       type="button"
                       disabled={isPending}
                       onClick={() => openConfirmModal(item, false)}
-                      className="w-full py-3 px-4 rounded-xl border border-rose-200 text-[#941C2F] hover:bg-rose-50/50 font-extrabold text-xs transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      className="w-full py-3 px-4 rounded-xl border border-rose-200 text-crimson hover:bg-rose-50/50 font-extrabold text-xs transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                     >
                       {isPending ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -492,6 +583,40 @@ export default function DataPresensiPage() {
         </div>
       )}
 
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 px-5 py-3.5 flex items-center gap-4 pointer-events-auto max-w-md w-full">
+            <div className="flex-1">
+              <span className="text-sm font-extrabold text-slate-800">{selectedIds.size} terpilih</span>
+            </div>
+            <button
+              type="button"
+              disabled={bulkPending}
+              onClick={() => handleBulkPayment(true)}
+              className="flex items-center gap-1.5 py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-all active:scale-95 disabled:opacity-50"
+            >
+              {bulkPending ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />}
+              Tandai Lunas
+            </button>
+            <button
+              type="button"
+              disabled={bulkPending}
+              onClick={() => handleBulkPayment(false)}
+              className="flex items-center gap-1.5 py-2 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-extrabold transition-all active:scale-95 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Blm Lunas
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {confirmModal.isOpen && confirmModal.item && (
         <>
           <div
@@ -508,7 +633,7 @@ export default function DataPresensiPage() {
                     w-12 h-12 rounded-2xl flex items-center justify-center shrink-0
                     ${confirmModal.action 
                       ? 'bg-emerald-50 text-emerald-600' 
-                      : 'bg-rose-50 text-[#941C2F]'
+                      : 'bg-rose-50 text-crimson'
                     }
                   `}
                 >
@@ -539,7 +664,7 @@ export default function DataPresensiPage() {
                     {confirmModal.item.nama_mata_kuliah}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-xs text-[#941C2F] font-black border-b border-slate-200/50 pb-2">
+                <div className="flex justify-between items-center text-xs text-crimson font-black border-b border-slate-200/50 pb-2">
                   <span>Tanggal Sesi:</span>
                   <span>{formatDate(confirmModal.item.tanggal_mengajar)}</span>
                 </div>
@@ -574,7 +699,7 @@ export default function DataPresensiPage() {
                     flex-1 py-3.5 rounded-2xl text-white font-extrabold text-xs transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer
                     ${confirmModal.action
                       ? 'bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/10'
-                      : 'bg-[#941C2F] hover:bg-[#7a1728] shadow-md shadow-[#941C2F]/10'
+                      : 'bg-crimson hover:bg-[#7a1728] shadow-md shadow-crimson/10'
                     }
                   `}
                 >
@@ -590,3 +715,4 @@ export default function DataPresensiPage() {
     </div>
   );
 }
+

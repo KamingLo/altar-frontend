@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import DashboardLayout, { type MenuGroup } from '@/components/dashboard/DashboardLayout';
 import { koordinatorMenuItems } from '@/components/dashboard/koordinator/KoordinatorHome';
 import { asdosMenuItems } from '@/components/dashboard/asdos/AsdosHome';
@@ -27,3 +27,4 @@ export default function KoordinatorLayout({ children }: { children: React.ReactN
     </DashboardLayout>
   );
 }
+

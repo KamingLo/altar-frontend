@@ -1,4 +1,4 @@
-export function toIsoDate(year: number, month: number, day: number): string {
+﻿export function toIsoDate(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
@@ -30,7 +30,7 @@ export function getMonthBounds(year: number, month: number) {
 }
 
 export function semesterLabel(tahun: string, tipe: string) {
-  return `${tahun} · ${tipe}`;
+  return `${tahun} Â· ${tipe}`;
 }
 
 /** Normalisasi tanggal dari API (YYYY-MM-DD atau ISO datetime) */
@@ -110,3 +110,4 @@ export function dedupeSessions<T extends { id_sesi: string; tanggal: string; wak
   }
   return result;
 }
+

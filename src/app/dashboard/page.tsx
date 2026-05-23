@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/dashboard/useAuth';
@@ -20,3 +20,4 @@ export default function DashboardPage() {
 
   return <DashboardLoading />;
 }
+

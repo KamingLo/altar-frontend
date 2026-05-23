@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { cookies } from 'next/headers';
 import { apiClient } from '@/lib/api/client';
@@ -37,3 +37,4 @@ export async function loginUser(payload: { email?: string; password?: string }) 
     }
   };
 }
+

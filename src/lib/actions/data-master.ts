@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { apiClient } from '@/lib/api/client';
 import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem } from '@/types/api';
@@ -96,3 +96,4 @@ export async function deleteSemester(id: string) {
   const res = await apiClient.delete(`/semesters/${id}`, { auth: true });
   return { success: res.success, message: res.message };
 }
+

@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { apiClient } from '@/lib/api/client';
 
@@ -33,3 +33,4 @@ export async function deleteLecturer(id: string) {
   const res = await apiClient.delete(`/lecturers/${id}`, { auth: true });
   return { success: res.success, message: res.message };
 }
+

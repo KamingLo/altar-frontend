@@ -1,4 +1,4 @@
-interface AuthAlertProps {
+﻿interface AuthAlertProps {
   message: string | null;
   type: 'error' | 'success';
 }

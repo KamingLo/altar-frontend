@@ -1,4 +1,4 @@
-export interface APIResponse<T = unknown> {
+﻿export interface APIResponse<T = unknown> {
   success: boolean;
   message: string;
   data?: T;
@@ -107,3 +107,4 @@ export interface JadwalTimelineParams {
   end_date: string;
   id_semester: string;
 }
+

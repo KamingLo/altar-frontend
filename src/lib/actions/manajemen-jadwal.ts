@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import {
   createSession,
@@ -60,7 +60,7 @@ export async function fetchSessions(params: {
   };
 }
 
-/** Data dropdown form — kelas, MK, ruangan, semester, asdos, dosen dari DB */
+/** Data dropdown form â€” kelas, MK, ruangan, semester, asdos, dosen dari DB */
 export async function fetchDropdownData(): Promise<{
   success: boolean;
   message: string;
@@ -120,7 +120,7 @@ export async function buatSesi(data: SessionBody) {
   return { success: res.success, message: res.message };
 }
 
-/** PATCH /sessions/:id — tanggal instance dikirim di body & query agar backend tahu baris mana */
+/** PATCH /sessions/:id â€” tanggal instance dikirim di body & query agar backend tahu baris mana */
 export async function editSesi(id: string, data: SessionBody, instanceDate?: string) {
   const res = await updateSession(id, data, instanceDate ?? data.tanggal);
   return { success: res.success, message: res.message };
@@ -140,3 +140,4 @@ export async function hapusSesi(
   const res = await deleteSession(id, instanceDate);
   return { success: res.success, message: res.message };
 }
+

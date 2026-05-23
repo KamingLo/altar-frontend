@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import type { SubstituteSessionDetail } from '@/types/api';
 
 interface PengajuanKpState {
@@ -32,3 +32,4 @@ export const usePengajuanKpStore = create<PengajuanKpState>()((set) => ({
   })),
   reset: () => set({ items: [], total: 0, loadedPages: {} }),
 }));
+

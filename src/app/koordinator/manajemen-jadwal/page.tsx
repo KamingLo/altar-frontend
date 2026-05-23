@@ -54,6 +54,7 @@ import {
   type MasterItem,
   type MasterResource,
 } from '@/components/koordinator/manajemen-jadwal/MasterEntityModal';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 function redirectIfSessionExpired(message: string | undefined): boolean {
   if (typeof window !== 'undefined' && isSessionExpiredMessage(message)) {
@@ -662,7 +663,7 @@ export default function ManajemenJadwalPage() {
   const selectedDayLabel = calendarDays[parseInt(selectedDate, 10) - 1]?.dayMobile ?? '';
 
   const selectClass =
-    'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-white focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none disabled:opacity-60';
+    'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-white focus:border-crimson focus:ring-1 focus:ring-crimson outline-none disabled:opacity-60';
 
   if (isInitialLoad) {
     return (
@@ -744,20 +745,14 @@ export default function ManajemenJadwalPage() {
       <div className="shrink-0">
         <div className="mb-4 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">
-              Koordinator
-            </p>
-            <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Manajemen Jadwal</h2>
-            <p className="text-sm text-slate-500 mt-1 md:text-base max-w-lg">
-              Kelola sesi jadwal mengajar per semester — data langsung dari server.
-            </p>
+            <PageHeader label="Koordinator" title="Manajemen Jadwal" description="Kelola sesi jadwal mengajar per semester â€” data langsung dari server." />
           </div>
 
           <button
             type="button"
             onClick={() => handleOpenModal('add')}
             disabled={!selectedSemesterId}
-            className="hidden md:flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] hover:bg-[#7a1728] active:scale-[0.98] transition-all shadow-md shadow-[#941C2F]/20 disabled:opacity-50 disabled:cursor-not-allowed mt-4 md:mt-0"
+            className="hidden md:flex items-center gap-2 px-6 py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] hover:bg-[#7a1728] active:scale-[0.98] transition-all shadow-md shadow-crimson/20 disabled:opacity-50 disabled:cursor-not-allowed mt-4 md:mt-0"
           >
             <Plus className="w-5 h-5" strokeWidth={2.5} />
             Buat Sesi Baru
@@ -782,7 +777,7 @@ export default function ManajemenJadwalPage() {
             <button
               type="button"
               onClick={() => openMasterCreate('semester')}
-              className="shrink-0 w-11 h-11 md:w-12 md:h-12 flex items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-[#941C2F] active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+              className="shrink-0 w-11 h-11 md:w-12 md:h-12 flex items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-crimson active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
               aria-label="Buat semester baru"
               title="Buat semester baru"
             >
@@ -792,7 +787,7 @@ export default function ManajemenJadwalPage() {
               type="button"
               onClick={() => openMasterEdit('semester', selectedSemester ?? null)}
               disabled={!selectedSemester}
-              className="shrink-0 w-11 h-11 md:w-12 md:h-12 flex items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-[#941C2F] active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-slate-500"
+              className="shrink-0 w-11 h-11 md:w-12 md:h-12 flex items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-crimson active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-slate-500"
               aria-label="Edit semester terpilih"
               title="Edit semester terpilih"
             >
@@ -808,7 +803,7 @@ export default function ManajemenJadwalPage() {
                 placeholder="Cari MK, kelas, ruangan, pengajar..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-[#941C2F] focus:ring-2 focus:ring-[#941C2F]/15 transition-all"
+                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-crimson focus:ring-2 focus:ring-crimson/15 transition-all"
               />
             </div>
 
@@ -822,7 +817,7 @@ export default function ManajemenJadwalPage() {
                 placeholder="Filter tipe"
                 icon={<Filter className="w-[18px] h-[18px]" />}
                 triggerClassName={
-                  filterTipe !== 'ALL' ? 'bg-red-50 border-[#941C2F] text-[#941C2F]' : ''
+                  filterTipe !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : ''
                 }
               />
             </div>
@@ -836,7 +831,7 @@ export default function ManajemenJadwalPage() {
               ? `Hasil pencarian`
               : `${selectedDayLabel}, ${selectedDate} ${monthLabel}`}
           </h3>
-          <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] font-bold px-2.5 py-1 rounded-md">
+          <span className="bg-crimson/10 text-crimson text-[10px] font-bold px-2.5 py-1 rounded-md">
             {filtered.length} sesi
           </span>
         </div>
@@ -863,13 +858,13 @@ export default function ManajemenJadwalPage() {
                   type="button"
                   onClick={() => setSelectedDate(item.date)}
                   className={`flex flex-col items-center min-w-[64px] py-3.5 rounded-2xl transition-all snap-center shrink-0 border
-                  ${sel ? 'bg-[#941C2F] text-white shadow-lg shadow-[#941C2F]/20 border-[#941C2F]' : 'bg-white text-slate-500 border-slate-100'}`}
+                  ${sel ? 'bg-crimson text-white shadow-lg shadow-crimson/20 border-crimson' : 'bg-white text-slate-500 border-slate-100'}`}
                 >
                   <span className={`text-[10px] font-bold tracking-widest mb-1 ${sel ? 'text-white/80' : 'text-slate-400'}`}>
                     {item.dayMobile}
                   </span>
                   <span className="text-xl font-bold mb-1">{item.date}</span>
-                  <div className={`w-1 h-1 rounded-full ${sel ? 'bg-white' : hasSchedule(item.date) ? 'bg-[#941C2F]/50' : 'bg-transparent'}`} />
+                  <div className={`w-1 h-1 rounded-full ${sel ? 'bg-white' : hasSchedule(item.date) ? 'bg-crimson/50' : 'bg-transparent'}`} />
                 </button>
               );
             })}
@@ -920,13 +915,13 @@ export default function ManajemenJadwalPage() {
                   >
                     <div
                       className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-200
-                      ${sel ? 'bg-[#941C2F] text-white shadow-md' : 'bg-transparent text-slate-700 group-hover:bg-slate-100'}`}
+                      ${sel ? 'bg-crimson text-white shadow-md' : 'bg-transparent text-slate-700 group-hover:bg-slate-100'}`}
                     >
                       <span className="text-sm font-bold">{item.date}</span>
                     </div>
                     <div
                       className={`w-1 h-1 rounded-full mt-1.5 transition-all
-                      ${sel && hasItem ? 'bg-[#941C2F]' : !sel && hasItem ? 'bg-[#941C2F]/50' : 'bg-transparent'}`}
+                      ${sel && hasItem ? 'bg-crimson' : !sel && hasItem ? 'bg-crimson/50' : 'bg-transparent'}`}
                     />
                   </button>
                 );
@@ -939,7 +934,7 @@ export default function ManajemenJadwalPage() {
         <div className="flex flex-col flex-1 min-w-0 w-full md:min-h-[320px]">
 
           <div className="hidden md:flex justify-end items-center h-7 mb-2 shrink-0">
-            <span className="bg-[#941C2F]/10 text-[#941C2F] text-[10px] font-bold px-2.5 py-1 rounded-md">
+            <span className="bg-crimson/10 text-crimson text-[10px] font-bold px-2.5 py-1 rounded-md">
               {filtered.length} sesi
             </span>
           </div>
@@ -947,7 +942,7 @@ export default function ManajemenJadwalPage() {
           <div className="space-y-3">
             {loading && (
               <div className="flex justify-center py-12">
-                <div className="w-7 h-7 border-2 border-[#941C2F] border-t-transparent rounded-full animate-spin" />
+                <div className="w-7 h-7 border-2 border-crimson border-t-transparent rounded-full animate-spin" />
               </div>
             )}
 
@@ -960,7 +955,7 @@ export default function ManajemenJadwalPage() {
                     className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all group"
                   >
                     <div className="flex items-start gap-3 md:gap-4">
-                      <div className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
+                      <div className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-crimson">
                         <BookOpen size={20} strokeWidth={2} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -975,7 +970,7 @@ export default function ManajemenJadwalPage() {
                         <p className="text-xs text-slate-500 font-medium mt-0.5">
                           {s.nama_kelas}
                           {hasActiveSearch && (
-                            <span className="text-slate-400"> · {sessionDateKey(s.tanggal)}</span>
+                            <span className="text-slate-400"> Â· {sessionDateKey(s.tanggal)}</span>
                           )}
                         </p>
                         <div className="hidden md:flex flex-wrap gap-2 mt-2.5">
@@ -998,7 +993,7 @@ export default function ManajemenJadwalPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenModal('edit', s)}
-                            className="p-2 rounded-lg text-slate-400 hover:text-[#941C2F] hover:bg-rose-50 transition-colors"
+                            className="p-2 rounded-lg text-slate-400 hover:text-crimson hover:bg-rose-50 transition-colors"
                             aria-label="Edit sesi"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1064,7 +1059,7 @@ export default function ManajemenJadwalPage() {
         type="button"
         onClick={() => handleOpenModal('add')}
         disabled={!selectedSemesterId}
-        className="md:hidden fixed bottom-7 right-4 w-14 h-14 bg-[#941C2F] text-white rounded-full flex items-center justify-center shadow-lg shadow-[#941C2F]/30 z-20 active:scale-90 transition-transform disabled:opacity-50"
+        className="md:hidden fixed bottom-7 right-4 w-14 h-14 bg-crimson text-white rounded-full flex items-center justify-center shadow-lg shadow-crimson/30 z-20 active:scale-90 transition-transform disabled:opacity-50"
         aria-label="Buat sesi baru"
       >
         <Plus className="w-6 h-6" strokeWidth={2.5} />
@@ -1112,7 +1107,7 @@ export default function ManajemenJadwalPage() {
 
                 {dropdownLoading ? (
                   <div className="flex justify-center py-12">
-                    <div className="w-6 h-6 border-2 border-[#941C2F] border-t-transparent rounded-full animate-spin" />
+                    <div className="w-6 h-6 border-2 border-crimson border-t-transparent rounded-full animate-spin" />
                   </div>
                 ) : (
                   <form
@@ -1174,7 +1169,7 @@ export default function ManajemenJadwalPage() {
                       />
                       {form.tanggal && (
                         <p className="text-[11px] text-slate-500 font-medium mt-1 ml-1">
-                          Hari: {HARI_OPTIONS.find(h => h.value === form.opsi_hari)?.label ?? '—'}
+                          Hari: {HARI_OPTIONS.find(h => h.value === form.opsi_hari)?.label ?? 'â€”'}
                         </p>
                       )}
                     </Field>
@@ -1283,7 +1278,7 @@ export default function ManajemenJadwalPage() {
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting || dropdownLoading}
-                  className="flex-1 py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] shadow-md shadow-[#941C2F]/20 active:scale-[0.98] disabled:opacity-60"
+                  className="flex-1 py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] shadow-md shadow-crimson/20 active:scale-[0.98] disabled:opacity-60"
                 >
                   {isSubmitting ? 'Menyimpan...' : modalType === 'add' ? 'Buat Sesi' : 'Simpan'}
                 </button>
@@ -1344,7 +1339,7 @@ export default function ManajemenJadwalPage() {
                     type="button"
                     onClick={handleConfirmDelete}
                     disabled={isDeleteSubmitting}
-                    className="flex-1 py-3.5 rounded-xl bg-[#941C2F] text-white font-bold shadow-md shadow-[#941C2F]/20 disabled:opacity-60"
+                    className="flex-1 py-3.5 rounded-xl bg-crimson text-white font-bold shadow-md shadow-crimson/20 disabled:opacity-60"
                   >
                     {isDeleteSubmitting ? 'Menghapus...' : 'Ya, Hapus'}
                   </button>
@@ -1415,7 +1410,7 @@ function FieldCRUD({
           <button
             type="button"
             onClick={onCreate}
-            className="text-[11px] font-bold text-[#941C2F] hover:bg-rose-50 active:scale-95 transition-all flex items-center gap-1 px-2 py-1 rounded-md"
+            className="text-[11px] font-bold text-crimson hover:bg-rose-50 active:scale-95 transition-all flex items-center gap-1 px-2 py-1 rounded-md"
           >
             <Plus className="w-3 h-3" strokeWidth={2.5} />
             Buat baru
@@ -1424,7 +1419,7 @@ function FieldCRUD({
             type="button"
             onClick={onEdit}
             disabled={!canEdit}
-            className="text-slate-400 hover:text-[#941C2F] hover:bg-rose-50 active:scale-95 p-1 rounded-md disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-all"
+            className="text-slate-400 hover:text-crimson hover:bg-rose-50 active:scale-95 p-1 rounded-md disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-all"
             aria-label={`Edit ${label}`}
             title={canEdit ? `Edit ${label} yang dipilih` : `Pilih ${label.toLowerCase()} dulu untuk edit`}
           >

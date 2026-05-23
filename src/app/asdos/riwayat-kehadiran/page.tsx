@@ -1,8 +1,8 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Clock, MapPin, BookOpen } from 'lucide-react';
+import { Search, Filter, Clock, MapPin, BookOpen, Info } from 'lucide-react';
 import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
-import { AsdosLoadingState, AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
+import { AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -14,8 +14,8 @@ type HistoryItem = {
 };
 
 const statusCfg = {
-  BERJALAN: { bg: 'bg-blue-50', text: 'text-blue-500', label: 'Berjalan' },
-  SELESAI: { bg: 'bg-emerald-50', text: 'text-emerald-500', label: 'Selesai' },
+  BERJALAN: { bg: 'bg-fog', text: 'text-ink', label: 'BERJALAN' },
+  SELESAI: { bg: 'bg-obsidian', text: 'text-white', label: 'SELESAI' },
 };
 
 function isActivePresensi(item: PresensiResponseDTO) {
@@ -23,7 +23,6 @@ function isActivePresensi(item: PresensiResponseDTO) {
   const hasNoCheckout = !checkout || checkout === '' || checkout === 'null' || String(checkout).startsWith('0001');
   if (!hasNoCheckout) return false;
 
-  // Tanpa checkout — selesai otomatis jika tanggal sesi sudah lewat
   const sessionDate = new Date(item.tanggal_mengajar);
   const today = new Date();
   const sessionDay = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
@@ -34,11 +33,10 @@ function isActivePresensi(item: PresensiResponseDTO) {
 function formatDate(value: string) {
   if (!value) return '-';
   return new Date(value).toLocaleDateString('id-ID', {
-    weekday: 'long',
     day: '2-digit',
-    month: 'short',
+    month: 'long',
     year: 'numeric',
-  }).toUpperCase();
+  });
 }
 
 function formatTime(value?: string) {
@@ -83,20 +81,16 @@ export default function RiwayatKehadiranPage() {
         setLoading(false);
         return;
       }
-
       setLoading(true);
       setError(null);
       const res = await getMyPresensi();
-
       if (res.success) {
         setItems(res.data ?? []);
       } else {
         setError(res.message || 'Gagal memuat riwayat kehadiran.');
       }
-
       setLoading(false);
     }
-
     fetchHistory();
   }, [fetched, setError, setItems, setLoading]);
 
@@ -128,7 +122,7 @@ export default function RiwayatKehadiranPage() {
               </div>
               <input type="text" placeholder="Cari materi atau kelas..." value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]" />
+                className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]" />
             </div>
             <CustomSelect
               value={filterStatus}
@@ -141,91 +135,109 @@ export default function RiwayatKehadiranPage() {
               variant="icon"
               icon={<Filter className="w-[18px] h-[18px] md:w-5 md:h-5" />}
               align="right"
-              triggerClassName={filterStatus !== 'ALL' ? 'bg-red-50 border-[#941C2F] text-[#941C2F]' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}
+              triggerClassName={filterStatus !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}
             />
           </div>
         }
       />
 
-      <div className="space-y-3 pb-8">
+      <div className="flex flex-col gap-6 w-full pb-8">
         {isLoading ? (
-          <AsdosLoadingState message="Memuat riwayat kehadiran..." />
+          <div className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col gap-6 w-full animate-pulse">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="flex flex-col gap-3 w-full md:w-1/3">
+                <div className="h-6 md:h-8 w-3/4 rounded-lg bg-slate-100" />
+                <div className="h-4 w-1/2 rounded-lg bg-slate-100" />
+              </div>
+
+              <div className="flex flex-row gap-6 md:gap-8 w-full md:w-auto">
+                <div className="border-l-2 border-slate-100 pl-4 space-y-2">
+                  <div className="h-3 w-14 rounded bg-slate-100" />
+                  <div className="h-4 w-24 rounded bg-slate-100" />
+                </div>
+                <div className="border-l-2 border-slate-100 pl-4 space-y-2">
+                  <div className="h-3 w-12 rounded bg-slate-100" />
+                  <div className="h-4 w-28 rounded bg-slate-100" />
+                </div>
+              </div>
+
+              <div className="h-9 w-24 rounded-xl bg-slate-100 mt-2 md:mt-0" />
+            </div>
+
+            <div className="bg-fog rounded-[12px] md:rounded-[20px] p-5 space-y-3">
+              <div className="h-4 w-40 rounded bg-slate-200/70" />
+              <div className="h-4 w-full rounded bg-slate-200/70" />
+              <div className="h-4 w-2/3 rounded bg-slate-200/70" />
+            </div>
+            <p className="sr-only">Memuat riwayat kehadiran...</p>
+          </div>
         ) : error ? (
           <AsdosState variant="error" message={error} />
         ) : displayed.length > 0 ? displayed.map(item => {
           const cfg = statusCfg[item.status];
           return (
-            <div key={item.id} onClick={() => setSelectedItem(item)}
-              className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm border border-slate-100 cursor-pointer active:scale-[0.99] md:hover:shadow-md md:hover:border-slate-200 transition-all">
+            <section
+              key={item.id}
+              className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col gap-6 w-full"
+            >
+              <article className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
 
-              <div className="flex items-center gap-3 md:hidden">
-                <div className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
-                  <BookOpen size={20} strokeWidth={2} />
+                <div className="flex flex-col gap-1 w-full md:w-1/3">
+                  <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 leading-snug">{item.subject}</h2>
+                  <p className="text-sm text-slate-500 font-medium">Ruang: {item.room}</p>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-[15px] text-[#1F2937] truncate">{item.subject}</h3>
-                  <p className="text-[10px] font-bold text-slate-400 tracking-wider mt-0.5">{item.date}</p>
+                <div className="flex flex-row gap-6 md:gap-8 w-full md:w-auto">
+                  <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
+                    <span className="text-sm md:text-base font-bold text-slate-800">{item.date}</span>
+                  </div>
+                  <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+                    <span className="text-sm md:text-base font-bold text-slate-800">{item.checkIn} – {item.checkOut}</span>
+                  </div>
                 </div>
 
-                <div className={`shrink-0 self-start mt-0.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold tracking-wider ${cfg.bg} ${cfg.text}`}>
+                <span className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap mt-2 md:mt-0 ${cfg.bg} ${cfg.text}`}>
                   {cfg.label}
+                </span>
+
+              </article>
+
+              <div className="bg-fog rounded-[20px] p-5 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-slate-800">
+                  <Info className="w-[18px] h-[18px] text-slate-800" strokeWidth={2.5} />
+                  <span className="text-sm md:text-base font-bold text-slate-800">Bahasan Materi</span>
                 </div>
+                <p className="text-sm text-slate-500 mt-1 ml-1 leading-relaxed">
+                  &quot;{item.materi}&quot;
+                </p>
+                {item.checkOut === '--:--' && item.status === 'SELESAI' && (
+                  <p className="text-xs font-semibold text-crimson mt-2 ml-1">
+                    Kamu tidak melakukan checkout pada sesi ini.
+                  </p>
+                )}
               </div>
 
-              <div className="flex md:hidden flex-col gap-1.5 mt-3 pt-3 border-t border-slate-100">
-                <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                  <Clock size={13} className="text-slate-400 shrink-0" />
-                  <span className="text-xs font-semibold text-slate-700">{item.checkIn} - {item.checkOut}</span>
-                </div>
-                <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                  <MapPin size={13} className="text-slate-400 shrink-0" />
-                  <span className="text-xs font-semibold text-slate-700">{item.room}</span>
-                </div>
-              </div>
-
-              <div className="hidden md:flex md:items-center md:justify-between">
-                <div className="flex items-center gap-4 min-w-0 w-2/5">
-                  <div className="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-[#941C2F]">
-                    <BookOpen size={20} strokeWidth={2} />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-base text-[#1F2937] truncate">{item.subject}</h3>
-                    <p className="text-xs font-bold text-slate-400 tracking-wider mt-0.5">{item.date}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center justify-start gap-2">
-                    <Clock size={13} className="text-slate-400 shrink-0" />
-                    <span className="text-[13px] font-semibold text-slate-700">{item.checkIn} - {item.checkOut}</span>
-                  </div>
-                  <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-lg flex items-center justify-start gap-2">
-                    <MapPin size={13} className="text-slate-400 shrink-0" />
-                    <span className="text-[13px] font-semibold text-slate-700">{item.room}</span>
-                  </div>
-                  <div className={`shrink-0 px-3 py-2 rounded-lg text-xs font-bold tracking-wider ${cfg.bg} ${cfg.text}`}>
-                    {cfg.label}
-                  </div>
-                </div>
-              </div>
-
-            </div>
+            </section>
           );
         }) : (
-          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center">
+          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[12px] md:rounded-[32px] p-10 text-center">
             <p className="text-slate-500 font-medium">Belum ada Riwayat Kehadiran.</p>
           </div>
         )}
-        <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 md:mt-2">
+
+        <p className="text-xs font-medium text-slate-400 text-center mt-2">
           Menampilkan {displayed.length} dari {filtered.length} riwayat kehadiran.
         </p>
+
         {hasMore && (
           <div className="flex justify-center pt-2">
             <button
               onClick={showMore}
-              className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:border-[#941C2F]/30 hover:text-[#941C2F] transition-all"
+              className="px-6 py-3 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:border-crimson/30 hover:text-crimson shadow-sm transition-all active:scale-95"
             >
-              Show More
+              Tampilkan Lebih Banyak
             </button>
           </div>
         )}
@@ -238,7 +250,7 @@ export default function RiwayatKehadiranPage() {
         subtitle={selectedItem?.date}
         headerAction={
           selectedItem && (
-            <span className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg tracking-wider ${statusCfg[selectedItem.status].bg} ${statusCfg[selectedItem.status].text}`}>
+            <span className={`text-[10px] font-bold px-3 py-2 rounded-xl tracking-widest ${statusCfg[selectedItem.status].bg} ${statusCfg[selectedItem.status].text}`}>
               {statusCfg[selectedItem.status].label}
             </span>
           )
@@ -263,7 +275,7 @@ export default function RiwayatKehadiranPage() {
                 <MapPin className="w-3 h-3 md:w-4 md:h-4 text-slate-400" />
                 <h4 className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Lokasi / Ruangan</h4>
               </div>
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm font-semibold text-slate-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
                 {selectedItem.room}
               </div>
             </div>
@@ -271,7 +283,7 @@ export default function RiwayatKehadiranPage() {
             <div className="mb-6">
               <div className="flex items-center gap-1.5 mb-2 ml-1">
                 <BookOpen className="w-3 h-3 md:w-4 md:h-4 text-slate-400" />
-                <h4 className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Bahasan Materi</h4>
+                <h4 className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Bahasan Materi Lengkap</h4>
               </div>
               <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-6 text-sm md:text-base text-slate-600 shadow-[0_2px_10px_rgba(0,0,0,0.02)] leading-relaxed min-h-[80px]">
                 {selectedItem.materi}

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
@@ -27,3 +27,4 @@ export async function GET(request: Request) {
   // Dashboard akan menangani loading via DashboardLoading.tsx & sinkronisasi Zustand via useAuth.ts
   return NextResponse.redirect(new URL('/dashboard', request.url));
 }
+

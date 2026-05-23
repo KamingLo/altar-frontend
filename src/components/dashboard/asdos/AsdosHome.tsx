@@ -99,7 +99,7 @@ export default function AsdosHome() {
         getMyPresensi(),
       ]);
 
-      // Most recent VERIFIED/REJECTED KP — no time cutoff, use ID comparison instead
+      // Most recent VERIFIED/REJECTED KP â€” no time cutoff, use ID comparison instead
       const recentKp = (kpRes.success && kpRes.data?.items ? kpRes.data.items : [])
         .filter(item => item.status === 'VERIFIED' || item.status === 'REJECTED')
         .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0] ?? null;
@@ -131,7 +131,7 @@ export default function AsdosHome() {
 
       <div className="mb-8 animate-fade-up lg:flex lg:justify-between lg:items-end">
         <div>
-          <p className="text-sm lg:text-base font-semibold text-[#941C2F] tracking-wide uppercase mb-1">
+          <p className="text-sm lg:text-base font-semibold text-crimson tracking-wide uppercase mb-1">
             Dashboard Asdos
           </p>
         </div>
@@ -141,8 +141,8 @@ export default function AsdosHome() {
         <div className="mb-8 animate-fade-up" style={{ animationDelay: '0.05s' }}>
           <div className="flex items-center gap-2 mb-4 px-1">
             <div className="relative">
-              <Bell size={16} className="text-[#941C2F]" />
-              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#941C2F]" />
+              <Bell size={16} className="text-crimson" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-crimson" />
             </div>
             <h3 className="font-bold text-lg text-slate-800">Notifikasi</h3>
           </div>
@@ -173,7 +173,7 @@ export default function AsdosHome() {
                     Kehadiran {presensiItem.nama_mata_kuliah} {presensiItem.nama_kelas} telah diverifikasi oleh koordinator
                   </p>
                 </div>
-                <Link href="/asdos/riwayat-kehadiran" className="flex items-center gap-1 text-xs font-bold text-[#941C2F] shrink-0 hover:underline">
+                <Link href="/asdos/riwayat-kehadiran" className="flex items-center gap-1 text-xs font-bold text-crimson shrink-0 hover:underline">
                   Selengkapnya <ChevronRight size={13} />
                 </Link>
               </div>
@@ -187,7 +187,7 @@ export default function AsdosHome() {
           const Icon = item.icon;
           return (
             <Link key={item.id} href={item.href} className="flex flex-col items-center group">
-              <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] text-[#941C2F] group-hover:scale-105 group-active:scale-95 transition-all mb-3">
+              <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] text-crimson group-hover:scale-105 group-active:scale-95 transition-all mb-3">
                 <Icon size={24} strokeWidth={2} />
               </div>
               <span className="text-[10px] font-semibold text-slate-600 text-center w-16 leading-tight">
@@ -203,7 +203,7 @@ export default function AsdosHome() {
         <div className="animate-fade-up" style={{ animationDelay: '0.1s' }}>
           <div className="flex justify-between items-center mb-4 lg:mb-6 px-1">
             <h3 className="font-bold text-lg lg:text-xl text-slate-800">Jadwal Mengajar</h3>
-            <button className="text-xs lg:text-sm font-semibold text-[#941C2F] active:scale-95 transition">
+            <button className="text-xs lg:text-sm font-semibold text-crimson active:scale-95 transition">
               Lihat Semua
             </button>
           </div>
@@ -220,7 +220,7 @@ export default function AsdosHome() {
                       <p className="text-[12px] text-slate-500 leading-tight mt-0.5">{schedule.room}</p>
                     </div>
                     <div className="text-right">
-                      <div className="text-[11px] font-bold text-[#941C2F]">{schedule.day}</div>
+                      <div className="text-[11px] font-bold text-crimson">{schedule.day}</div>
                       <div className="text-[11px] text-slate-500 font-medium">{schedule.session}</div>
                     </div>
                   </div>
@@ -233,7 +233,7 @@ export default function AsdosHome() {
         <div className="animate-fade-up" style={{ animationDelay: '0.15s' }}>
           <div className="flex justify-between items-center mb-4 lg:mb-6 px-1">
             <h3 className="font-bold text-lg lg:text-xl text-slate-800">Umpan Balik Koordinator</h3>
-            <button className="text-xs lg:text-sm font-semibold text-[#941C2F] active:scale-95 transition">
+            <button className="text-xs lg:text-sm font-semibold text-crimson active:scale-95 transition">
               Lihat Semua
             </button>
           </div>

@@ -1,4 +1,4 @@
-/** Segment path koleksi Django — wajib trailing slash agar redirect tidak membuang Authorization */
+﻿/** Segment path koleksi Django â€” wajib trailing slash agar redirect tidak membuang Authorization */
 const COLLECTION_PATH_SEGMENTS = new Set([
   'sessions',
   'classes',
@@ -56,3 +56,4 @@ export function isSessionExpiredMessage(message: string | undefined): boolean {
   const lower = message.toLowerCase();
   return lower.includes('session expired') || lower.includes('invalid or expired token');
 }
+

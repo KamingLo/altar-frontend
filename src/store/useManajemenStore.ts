@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import type { AsdosListItem, KoorListItem, UserListItem } from '@/lib/actions/manajemen';
 
 interface ManajemenState {
@@ -33,3 +33,4 @@ export const useManajemenStore = create<ManajemenState>()((set) => ({
     set((s) => ({ userList: append ? [...s.userList, ...list] : list, userHasMore: hasMore, userPage: page })),
   setIsLoading: (v) => set({ isLoading: v }),
 }));
+

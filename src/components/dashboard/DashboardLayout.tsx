@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown, GraduationCap, LayoutDashboard, ArrowLeftRight, Bell } from 'lucide-react';
+import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown, GraduationCap, LayoutDashboard, ArrowLeftRight, Bell, Sun, Moon } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { logoutUser } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
@@ -40,7 +40,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarReady, setSidebarReady] = useState(false);
 
-  // useLayoutEffect runs before browser paint — no flash when restoring collapsed state
+  // useLayoutEffect runs before browser paint â€” no flash when restoring collapsed/dark state
   useLayoutEffect(() => {
     const stored = localStorage.getItem('sidebar-collapsed');
     if (stored !== null) setIsSidebarCollapsed(stored === 'true');
@@ -169,6 +169,8 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
     closeLogoutConfirm();
     setTimeout(() => handleLogout(), 300);
   };
+
+
 
   const toggleGroup = (id: string) => {
     setOpenGroups(prev => {
@@ -335,7 +337,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-100 lg:bg-[#EDF2F4]">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-100 lg:bg-canvas">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -353,7 +355,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
         .animate-border-pulse { animation: border-pulse 1.2s ease-out infinite; transform-origin: center; }
       `}</style>
 
-      <div className="flex w-full h-screen overflow-hidden lg:max-w-none bg-[#EDF2F4]   shadow-2xl lg:shadow-none relative">
+      <div className="flex w-full h-screen overflow-hidden lg:max-w-none shadow-2xl lg:shadow-none relative bg-canvas">
 
         {/* Background Layer - Moved to root so sidebar glass blurs it perfectly */}
         {bgImage && (
@@ -369,7 +371,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             <div
               className="absolute inset-0 z-10"
               style={{
-                background: 'linear-gradient(to top, #EDF2F4 0%, #EDF2F4 15%, rgba(237, 242, 244, 0.8) 30%, rgba(237, 242, 244, 0.4) 45%, rgba(237, 242, 244, 0.1) 65%, transparent 100%)'
+                background: 'linear-gradient(to top, #f4f4f5 0%, #f4f4f5 15%, rgba(244, 244, 245, 0.8) 30%, rgba(244, 244, 245, 0.4) 45%, rgba(244, 244, 245, 0.1) 65%, transparent 100%)'
               }}
             />
           </div>
@@ -378,7 +380,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
         {/* --- DESKTOP FLOATING SIDEBAR --- */}
         <aside
           id="dashboard-sidebar-desktop"
-          className={`relative z-20 hidden lg:flex flex-col h-[calc(100vh-2rem)] my-4 ml-4 rounded-[1.5rem] overflow-hidden shrink-0 bg-[#941C2F]/80 backdrop-blur-2xl border border-white/20 shadow-[0_8px_32px_rgba(148,28,47,0.25)] ${sidebarReady ? 'transition-[width] duration-300 ease-in-out' : ''} ${isSidebarCollapsed ? 'w-[84px]' : 'w-[280px]'}`}
+          className={`relative z-20 hidden lg:flex flex-col h-[calc(100vh-2rem)] my-4 ml-4 rounded-[1.5rem] overflow-hidden shrink-0 backdrop-blur-2xl border bg-crimson/80 border-white/20 shadow-[0_8px_32px_rgba(148,28,47,0.25)] ${sidebarReady ? 'transition-[width,background-color] duration-300 ease-in-out' : ''} ${isSidebarCollapsed ? 'w-[84px]' : 'w-[280px]'}`}
         >
           <div className={`pt-8 pb-6 border-b border-white/10 flex items-center transition-all duration-300 shrink-0 ${isSidebarCollapsed ? 'justify-center px-2' : 'justify-between px-7'}`}>
             <div className={`overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'}`}>
@@ -430,20 +432,20 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
           className="relative z-10 w-full max-w-md lg:max-w-none h-screen bg-transparent overflow-hidden flex flex-col mx-auto lg:mx-0 transition-all duration-300"
           style={{ fontFamily: "'Inter', sans-serif" }}
         >
-          {/* Dashboard button(s) — top left, next to sidebar */}
+          {/* Dashboard button(s) â€” top left, next to sidebar */}
           <div id="dashboard-top-left" className="hidden lg:flex absolute top-7 left-7 z-20 items-center gap-2">
             {hasDualRole ? (
               <>
                 <Link
                   href="/koordinator"
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/koordinator' ? 'bg-[#941C2F]/90 text-white border-white/20 shadow-lg shadow-[#941C2F]/20' : 'text-[#941C2F] bg-white/80 border-white/50 shadow-sm hover:shadow-md'}`}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/koordinator' ? 'bg-crimson/90 text-white border-white/20 shadow-lg shadow-crimson/20' : 'text-crimson bg-white/80 border-white/50 shadow-sm hover:shadow-md'}`}
                 >
                   <LayoutDashboard size={16} strokeWidth={2.5} />
                   Dash Koor
                 </Link>
                 <Link
                   href="/asdos"
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/asdos' ? 'bg-[#941C2F]/90 text-white border-white/20 shadow-lg shadow-[#941C2F]/20' : 'text-[#941C2F] bg-white/80 border-white/50 shadow-sm hover:shadow-md'}`}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/asdos' ? 'bg-crimson/90 text-white border-white/20 shadow-lg shadow-crimson/20' : 'text-crimson bg-white/80 border-white/50 shadow-sm hover:shadow-md'}`}
                 >
                   <GraduationCap size={16} strokeWidth={2.5} />
                   Dash Asdos
@@ -452,7 +454,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             ) : (
               <Link
                 href={homeHref}
-                className="flex items-center gap-2 px-4 py-2.5 text-[#941C2F] bg-white/80 backdrop-blur-md border border-white/50 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 rounded-2xl transition-all duration-300 text-sm font-bold"
+                className="flex items-center gap-2 px-4 py-2.5 text-crimson bg-white/80 backdrop-blur-md border border-white/50 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 rounded-2xl transition-all duration-300 text-sm font-bold"
               >
                 <Home size={17} strokeWidth={2.5} />
                 Dashboard
@@ -460,48 +462,53 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             )}
           </div>
 
-          {/* Date/time + notification — top right */}
-          <div id="dashboard-top-right" className="hidden lg:flex absolute top-7 right-7 z-20 items-center gap-4">
-            {pathname !== homeHref && !hasSeen && pendingCount > 0 && (
-              <>
+          {/* Date/time + notification + dark toggle â€” top right */}
+          <div id="dashboard-top-right" className="hidden lg:flex flex-col absolute top-7 right-7 z-20 items-end gap-3">
+            <div className="flex items-center gap-4">
+              {pathname !== homeHref && !hasSeen && pendingCount > 0 && (
                 <button
                   onClick={() => router.push(homeHref)}
-                  className="relative p-2 text-[#941C2F] active:scale-95 transition-all duration-200 cursor-pointer"
+                  className="relative p-2 text-crimson active:scale-95 transition-all duration-200 cursor-pointer"
                 >
                   <Bell size={22} strokeWidth={2.5} />
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#941C2F]" />
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[#941C2F] animate-border-pulse" />
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-crimson" />
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-crimson animate-border-pulse" />
                 </button>
-              </>
-            )}
-            <div className="text-right">
-              <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase leading-none drop-shadow-sm">{dateStr.split(', ')[0]}</p>
-              <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase mt-1 leading-none drop-shadow-sm">{dateStr.split(', ')[1]}</p>
-            </div>
-            <div className="w-0.5 h-10 bg-white/80" />
-            <div className="w-[6rem]">
-              <p className="text-2xl font-black font-mono tracking-tight text-[#941C2F] leading-none drop-shadow-sm tabular-nums">{timeStr}</p>
-              <p className="text-[10px] font-extrabold text-slate-500 tracking-widest mt-1 drop-shadow-sm text-right">WIB</p>
+              )}
+              <div className="text-right">
+                <p className="text-[11px] font-bold tracking-widest uppercase leading-none drop-shadow-sm text-slate-500">{dateStr.split(', ')[0]}</p>
+                <p className="text-[11px] font-bold tracking-widest uppercase mt-1 leading-none drop-shadow-sm text-slate-500">{dateStr.split(', ')[1]}</p>
+              </div>
+              <div className="w-0.5 h-10 bg-white/80" />
+              <div className="w-[6rem]">
+                <p className="text-2xl font-black font-mono tracking-tight leading-none drop-shadow-sm tabular-nums text-crimson">{timeStr}</p>
+                <p className="text-[10px] font-extrabold tracking-widest mt-1 drop-shadow-sm text-right text-slate-500">WIB</p>
+              </div>
             </div>
           </div>
 
           <header id="dashboard-header-mobile" className={`lg:hidden absolute top-0 left-0 right-0 flex items-center justify-between gap-3 px-6 py-3.5 z-20 transition-all duration-300 ${isScrolled ? 'bg-white/60 backdrop-blur-md shadow-sm border-b border-white/30' : 'bg-transparent'}`}>
             <Link
               href={homeHref}
-              className="shrink-0 text-[#941C2F] hover:scale-105 active:scale-90 active:bg-[#941C2F]/10 active:shadow-[0_0_20px_rgba(148,28,47,0.15)] rounded-full transition-all duration-200 p-2.5 flex items-center justify-center"
+              className="shrink-0 hover:scale-105 active:scale-90 rounded-full transition-all duration-200 p-2.5 flex items-center justify-center text-crimson"
             >
               <Home size={26} strokeWidth={2.5} />
             </Link>
-            <div id="dashboard-clock-mobile" className={`flex flex-col items-center rounded-xl px-3 py-1.5 transition-all duration-300 ${isScrolled ? 'bg-transparent border border-transparent shadow-none' : 'bg-white/40 backdrop-blur-md shadow-sm border border-white/20'}`}>
-              <p className="text-[8px] font-bold text-slate-500 tracking-widest uppercase leading-none">{dateStr}</p>
-              <div className="flex items-baseline gap-1 mt-1">
-                <p className="text-base font-black font-mono tracking-tight text-[#941C2F] leading-none">{timeStr}</p>
-                <p className="text-[9px] font-extrabold text-slate-500 tracking-widest leading-none">WIB</p>
+
+            {/* clock container */}
+            <div className="flex flex-col items-center">
+              <div id="dashboard-clock-mobile" className={`flex flex-col items-center rounded-xl px-3 py-1.5 transition-all duration-300 ${isScrolled ? 'bg-transparent border border-transparent shadow-none' : 'bg-white/40 backdrop-blur-md shadow-sm border border-white/20'}`}>
+                <p className="text-[8px] font-bold tracking-widest uppercase leading-none text-slate-500">{dateStr}</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <p className="text-base font-black font-mono tracking-tight leading-none text-crimson">{timeStr}</p>
+                  <p className="text-[9px] font-extrabold tracking-widest leading-none text-slate-500">WIB</p>
+                </div>
               </div>
             </div>
+
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="shrink-0 text-[#941C2F] hover:scale-105 active:scale-90 active:bg-[#941C2F]/10 active:shadow-[0_0_20px_rgba(148,28,47,0.15)] rounded-full transition-all duration-200 p-2.5 flex items-center justify-center"
+              className="shrink-0 hover:scale-105 active:scale-90 rounded-full transition-all duration-200 p-2.5 flex items-center justify-center text-crimson"
             >
               <Menu size={28} strokeWidth={2.5} />
             </button>
@@ -522,7 +529,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
               onClick={() => setIsSidebarOpen(false)}
             />
             <div
-              className={`absolute top-0 left-0 w-[280px] h-[calc(100dvh-1.5rem)] my-3 ml-3 rounded-[1.5rem] bg-[#941C2F]/85 backdrop-blur-2xl border border-white/20 shadow-[20px_0_40px_rgba(0,0,0,0.2)] flex flex-col overscroll-none overflow-x-hidden transition-transform duration-300 ease-in-out transform-gpu ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}
+              className={`absolute top-0 left-0 w-[280px] h-[calc(100dvh-1.5rem)] my-3 ml-3 rounded-[1.5rem] backdrop-blur-2xl border border-white/20 shadow-[20px_0_40px_rgba(0,0,0,0.2)] flex flex-col overscroll-none overflow-x-hidden transition-all duration-300 ease-in-out transform-gpu bg-crimson/85 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}
             >
               <div className="pt-8 pb-6 px-6 border-b border-white/10 shrink-0">
                 <Image src="/logo-sb.png" alt="Logo" width={160} height={32} className="h-8 w-auto object-contain drop-shadow-md" style={{ width: 'auto' }} />
@@ -580,7 +587,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             >
               <div className="p-7 pb-5">
                 <div className="flex items-center justify-center w-14 h-14 bg-red-50 rounded-2xl mx-auto mb-5">
-                  <LogOut size={24} className="text-[#941C2F]" />
+                  <LogOut size={24} className="text-crimson" />
                 </div>
                 <h2 className="text-[20px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">Keluar dari Sistem?</h2>
                 <p className="text-sm text-slate-500 text-center leading-relaxed">Anda akan keluar dari akun ini. Pastikan semua pekerjaan sudah tersimpan.</p>
@@ -591,7 +598,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
                   Batal
                 </button>
                 <button onClick={confirmLogout}
-                  className="flex-1 py-3 rounded-xl bg-[#941C2F] text-white font-bold text-sm shadow-md shadow-[#941C2F]/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                  className="flex-1 py-3 rounded-xl bg-crimson text-white font-bold text-sm shadow-md shadow-crimson/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
                   <LogOut size={14} /> Keluar
                 </button>
               </div>
@@ -627,13 +634,13 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
               </div>
               <div className="px-6 pt-4 pb-8">
                 <div className="flex items-center justify-center w-14 h-14 bg-red-50 rounded-2xl mx-auto mb-5">
-                  <LogOut size={24} className="text-[#941C2F]" />
+                  <LogOut size={24} className="text-crimson" />
                 </div>
                 <h2 className="text-[22px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">Keluar dari Sistem?</h2>
                 <p className="text-sm text-slate-500 text-center leading-relaxed mb-7">Anda akan keluar dari akun ini. Pastikan semua pekerjaan sudah tersimpan.</p>
                 <div className="flex flex-col gap-3">
                   <button onClick={confirmLogout}
-                    className="w-full py-4 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] shadow-md shadow-[#941C2F]/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                    className="w-full py-4 rounded-xl bg-crimson text-white font-bold text-[15px] shadow-md shadow-crimson/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
                     <LogOut size={16} /> Keluar Sekarang
                   </button>
                   <button onClick={closeLogoutConfirm}

@@ -28,9 +28,9 @@ export function AsdosPageHeader({ eyebrow, title, description, action, className
   return (
     <div className={`mb-6 md:mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4 md:gap-6 ${className}`}>
       <div>
-        <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">{eyebrow}</p>
+        <p className="text-[11px] font-bold text-crimson tracking-[0.15em] uppercase mb-1 md:text-xs">{eyebrow}</p>
         <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">{title}</h2>
-        {description && <p className="text-sm text-slate-500 mt-1 md:text-base">{description}</p>}
+        {description && <p className="text-sm mt-1 md:text-base text-slate-500">{description}</p>}
       </div>
       {action}
     </div>
@@ -144,20 +144,26 @@ export function AsdosOnlineSessionSkeleton({ count = 3 }: { count?: number }) {
         <div className="h-6 w-14 rounded-lg animate-shimmer" />
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {Array.from({ length: count }, (_, i) => (
-          <div key={i} className="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 flex flex-col">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl shrink-0 animate-shimmer" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 w-36 rounded-lg animate-shimmer" />
-                <div className="h-3 w-24 rounded-lg animate-shimmer" />
+          <div key={i} className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 border border-slate-100 flex flex-col gap-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="flex items-start justify-between gap-4 md:block md:w-1/3 w-full">
+                <div className="flex flex-col gap-2 flex-1 min-w-0">
+                  <div className="h-6 w-40 rounded-lg animate-shimmer" />
+                  <div className="h-4 w-28 rounded-lg animate-shimmer" />
+                </div>
+                <div className="md:hidden w-8 h-8 rounded-full animate-shimmer shrink-0" />
               </div>
-              <div className="w-7 h-7 rounded-full animate-shimmer shrink-0" />
-            </div>
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-              <div className="flex-1 h-8 rounded-lg animate-shimmer" />
-              <div className="flex-1 h-8 rounded-lg animate-shimmer" />
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full md:w-[480px]">
+                {Array.from({ length: 3 }, (_, j) => (
+                  <div key={j} className="border-l-2 border-slate-100 pl-4 space-y-1.5">
+                    <div className="h-2.5 w-12 rounded animate-shimmer" />
+                    <div className="h-4 w-24 rounded-lg animate-shimmer" />
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block w-8 h-8 rounded-full animate-shimmer shrink-0" />
             </div>
           </div>
         ))}
@@ -174,7 +180,7 @@ export function AsdosPrimaryButton({ icon, children, className = '', ...props }:
   return (
     <button
       {...props}
-      className={`bg-[#941C2F] text-white font-bold rounded-xl shadow-md shadow-[#941C2F]/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${className}`}
+      className={`bg-crimson text-white font-bold rounded-xl shadow-md shadow-crimson/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${className}`}
     >
       {icon}
       {children}
@@ -248,3 +254,4 @@ export function AsdosSheetCloseButton({ onClick }: { onClick: () => void }) {
     </button>
   );
 }
+

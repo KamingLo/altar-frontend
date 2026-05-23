@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers';
+﻿import { cookies } from 'next/headers';
 import type { ActionResponse } from '@/types/api';
 
 const BASE_URL = process.env.BACKEND_URL ?? '';
@@ -79,3 +79,4 @@ export const apiClient = {
   delete: <T = unknown>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(endpoint, { ...options, method: 'DELETE' }),
 };
+

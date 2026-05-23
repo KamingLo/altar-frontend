@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import type { SubstituteSessionDetail } from '@/types/api';
 
 interface PergantianKelasState {
@@ -27,4 +27,5 @@ export const usePergantianKelasStore = create<PergantianKelasState>()((set) => (
   setIsLoading: (v) => set({ isLoading: v }),
   reset: () => set({ substitutionList: [], isLoading: false }),
 }));
+
 

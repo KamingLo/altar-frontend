@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem } from '@/types/api';
 
 interface DataMasterState {
@@ -53,3 +53,4 @@ export const useDataMasterStore = create<DataMasterState>()((set) => ({
     else set({ semesterList: [], semesterPage: 1, semesterHasMore: false });
   },
 }));
+

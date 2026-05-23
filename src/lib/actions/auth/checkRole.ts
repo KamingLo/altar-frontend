@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { apiClient } from '@/lib/api/client';
 
@@ -9,3 +9,4 @@ export async function checkIsAsdos() {
 export async function checkIsKoordinator() {
   return apiClient.get('/auth/is-koor', { auth: true, cache: 'no-store' });
 }
+

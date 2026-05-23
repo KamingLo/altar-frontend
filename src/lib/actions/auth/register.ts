@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { apiClient } from '@/lib/api/client';
 
@@ -14,3 +14,4 @@ export async function registerUser(payload: {
 }) {
   return apiClient.post('/auth/register', payload);
 }
+

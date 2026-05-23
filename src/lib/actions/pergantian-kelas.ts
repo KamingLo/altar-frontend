@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { apiClient } from '@/lib/api/client';
 import type { SubstituteSessionDetail } from '@/types/api';
@@ -34,7 +34,7 @@ export async function getSubstitutionDetail(id: string) {
 }
 
 // Asdos: ajukan request pergantian kelas baru
-// slot_option 1-7 → 07:30-09:10, 09:30-11:10, 11:30-13:10, 13:30-15:10,
+// slot_option 1-7 â†’ 07:30-09:10, 09:30-11:10, 11:30-13:10, 13:30-15:10,
 //                    15:30-17:10, 17:40-19:15, 19:30-21:00
 export async function createSubstitution(data: {
   id_session: string;
@@ -65,3 +65,4 @@ export async function updateSubstitutionStatus(
   const res = await apiClient.patch(`/substitute-sessions/${id}/status`, data, { auth: true });
   return { success: res.success, message: res.message };
 }
+

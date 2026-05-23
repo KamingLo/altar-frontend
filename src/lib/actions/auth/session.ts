@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { cookies } from 'next/headers';
 import { apiClient } from '@/lib/api/client';
@@ -34,3 +34,4 @@ export async function logoutUser() {
   cookieStore.delete('_gothic_session');
   return { success: true, message: 'Berhasil logout' };
 }
+

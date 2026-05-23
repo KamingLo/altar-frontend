@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { ReactNode } from 'react';
 
 export const AuthLayout = ({ children }: { children: ReactNode }) => (
@@ -18,7 +18,7 @@ export const AuthLayout = ({ children }: { children: ReactNode }) => (
     {/* Footer Branding */}
     <div className="absolute bottom-8 text-center z-20">
       <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-        Secured by MSC Ecosystem • 2026
+        Secured by MSC Ecosystem â€¢ 2026
       </p>
     </div>
 

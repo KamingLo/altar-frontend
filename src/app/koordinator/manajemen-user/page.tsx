@@ -7,6 +7,7 @@ import {
 } from '@/lib/actions/manajemen';
 import type { UserListItem } from '@/lib/actions/manajemen';
 import { useManajemenStore } from '@/store/useManajemenStore';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 type TabId = 'asdos' | 'koordinator' | 'user';
 type AddStep = 'role_search' | 'create_user' | 'role_data';
@@ -79,7 +80,7 @@ export default function ManajemenAsdosPage() {
   ];
 
   const tabTheme: Record<TabId, { iconBg: string; iconText: string }> = {
-    asdos: { iconBg: 'bg-rose-100', iconText: 'text-[#941C2F]' },
+    asdos: { iconBg: 'bg-rose-100', iconText: 'text-crimson' },
     koordinator: { iconBg: 'bg-indigo-100', iconText: 'text-indigo-700' },
     user: { iconBg: 'bg-emerald-100', iconText: 'text-emerald-700' },
   };
@@ -323,15 +324,13 @@ export default function ManajemenAsdosPage() {
 
       <div className="mb-4 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[11px] font-bold text-[#941C2F] tracking-[0.15em] uppercase mb-1 md:text-xs">Manajemen User</p>
-          <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Kelola Akses</h2>
-          <p className="text-sm text-slate-500 mt-1 md:text-base">Atur data asdos, koordinator, dan user dalam satu halaman.</p>
+          <PageHeader label="Manajemen User" title="Kelola Akses" description="Atur data asdos, koordinator, dan user dalam satu halaman." />
         </div>
 
         {showAddButton && (
           <button
             onClick={() => handleOpenModal('add')}
-            className="hidden md:flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] hover:bg-red-800 active:scale-[0.98] transition-all shadow-md shadow-[#941C2F]/20 mt-4 md:mt-0"
+            className="hidden md:flex items-center gap-2 px-6 py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] hover:bg-red-800 active:scale-[0.98] transition-all shadow-md shadow-crimson/20 mt-4 md:mt-0"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
             Tambah {tabs.find(t => t.id === activeTab)?.short}
@@ -346,7 +345,7 @@ export default function ManajemenAsdosPage() {
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setSearchQuery(''); }}
-                className={`flex-1 min-w-fit px-3 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] ${activeTab === tab.id ? 'bg-[#941C2F] text-white' : 'bg-transparent text-slate-500'}`}
+                className={`flex-1 min-w-fit px-3 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] ${activeTab === tab.id ? 'bg-crimson text-white' : 'bg-transparent text-slate-500'}`}
               >
                 <span>{tab.short}</span>
               </button>
@@ -363,7 +362,7 @@ export default function ManajemenAsdosPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-[#941C2F] focus:ring-2 focus:ring-[#941C2F]/15 transition-all"
+              className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-crimson focus:ring-2 focus:ring-crimson/15 transition-all"
               placeholder="Ketik nama asdos, koor, user"
             />
           </div>
@@ -427,7 +426,7 @@ export default function ManajemenAsdosPage() {
               <div className="text-slate-300 md:text-slate-400 shrink-0">
                 <button
                   onClick={() => handleOpenModal('edit', item)}
-                  className="p-2.5 hover:text-[#941C2F] active:bg-slate-50 md:hover:bg-slate-50 rounded-xl transition-colors"
+                  className="p-2.5 hover:text-crimson active:bg-slate-50 md:hover:bg-slate-50 rounded-xl transition-colors"
                   aria-label="Edit data"
                 >
                   <EditIcon />
@@ -456,7 +455,7 @@ export default function ManajemenAsdosPage() {
         {hasMore && !isLoading && (
           <button
             onClick={handleLoadMore}
-            className="w-full py-3 md:py-4 text-sm font-semibold text-[#941C2F] bg-white rounded-2xl border border-slate-200/80 active:scale-[0.98] transition-transform md:hover:bg-slate-50"
+            className="w-full py-3 md:py-4 text-sm font-semibold text-crimson bg-white rounded-2xl border border-slate-200/80 active:scale-[0.98] transition-transform md:hover:bg-slate-50"
           >
             Muat lebih banyak
           </button>
@@ -464,7 +463,7 @@ export default function ManajemenAsdosPage() {
 
         {isLoading && activeItems.length > 0 && (
           <div className="flex justify-center py-4">
-            <div className="w-5 h-5 border-2 border-[#941C2F]/30 border-t-[#941C2F] rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-crimson/30 border-t-crimson rounded-full animate-spin" />
           </div>
         )}
 
@@ -476,7 +475,7 @@ export default function ManajemenAsdosPage() {
       {showAddButton && (
         <button
           onClick={() => handleOpenModal('add')}
-          className="md:hidden fixed bottom-7 right-4 w-14 h-14 bg-[#941C2F] text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-800 active:scale-90 transition-transform shadow-[#941C2F]/30 z-20"
+          className="md:hidden fixed bottom-7 right-4 w-14 h-14 bg-crimson text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-800 active:scale-90 transition-transform shadow-crimson/30 z-20"
           aria-label="Tambah data baru"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
@@ -524,7 +523,7 @@ export default function ManajemenAsdosPage() {
                                 type="text"
                                 value={modalForm.nim}
                                 onChange={(e) => setModalForm(prev => ({ ...prev, nim: e.target.value }))}
-                                className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none"
+                                className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                                 placeholder="Contoh: 535200000"
                               />
                             </div>
@@ -542,7 +541,7 @@ export default function ManajemenAsdosPage() {
                                   type="tel"
                                   value={modalForm.phone_number}
                                   onChange={(e) => setModalForm(prev => ({ ...prev, phone_number: e.target.value }))}
-                                  className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none"
+                                  className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                                   placeholder="Contoh: 081234567890"
                                 />
                               )}
@@ -559,7 +558,7 @@ export default function ManajemenAsdosPage() {
                               type="text"
                               value={modalForm.nip}
                               onChange={(e) => setModalForm(prev => ({ ...prev, nip: e.target.value }))}
-                              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none"
+                              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                               placeholder="Contoh: 198001012008011001"
                             />
                           </div>
@@ -573,7 +572,7 @@ export default function ManajemenAsdosPage() {
                       type="button"
                       onClick={handleSave}
                       disabled={isSubmitting || isDetailLoading}
-                      className="w-full py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-md shadow-[#941C2F]/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-full py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-md shadow-crimson/20 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}
                     </button>
@@ -591,7 +590,7 @@ export default function ManajemenAsdosPage() {
                       <button
                         type="button"
                         onClick={() => { setAddRole('asdos'); setModalSearchQuery(''); setModalSearchResults([]); setModalSearchDone(false); }}
-                        className={`p-3 rounded-xl border-2 font-bold text-sm transition-all active:scale-[0.97] ${addRole === 'asdos' ? 'border-[#941C2F] bg-rose-50 text-[#941C2F]' : 'border-slate-200 bg-white text-slate-500'}`}
+                        className={`p-3 rounded-xl border-2 font-bold text-sm transition-all active:scale-[0.97] ${addRole === 'asdos' ? 'border-crimson bg-rose-50 text-crimson' : 'border-slate-200 bg-white text-slate-500'}`}
                       >
                         Asisten Dosen
                       </button>
@@ -612,7 +611,7 @@ export default function ManajemenAsdosPage() {
                         type="text"
                         value={modalSearchQuery}
                         onChange={(e) => handleModalSearchChange(e.target.value)}
-                        className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none"
+                        className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                         placeholder="Cari user berdasarkan nama atau email"
                         autoComplete="off"
                       />
@@ -620,7 +619,7 @@ export default function ManajemenAsdosPage() {
 
                     {isModalSearching && (
                       <div className="flex items-center justify-center py-6">
-                        <div className="w-5 h-5 border-2 border-[#941C2F]/30 border-t-[#941C2F] rounded-full animate-spin" />
+                        <div className="w-5 h-5 border-2 border-crimson/30 border-t-crimson rounded-full animate-spin" />
                       </div>
                     )}
 
@@ -633,7 +632,7 @@ export default function ManajemenAsdosPage() {
                             onClick={() => handleSelectUser(user)}
                             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] transition-all text-left"
                           >
-                            <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-bold text-sm text-[#941C2F] shrink-0">
+                            <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-bold text-sm text-crimson shrink-0">
                               {user.username[0]?.toUpperCase()}
                             </div>
                             <div className="min-w-0 flex-1">
@@ -655,7 +654,7 @@ export default function ManajemenAsdosPage() {
                         <button
                           type="button"
                           onClick={handleGoToCreateUser}
-                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#941C2F] text-white font-bold text-sm active:scale-[0.97] transition-transform shadow-sm shadow-[#941C2F]/20"
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-crimson text-white font-bold text-sm active:scale-[0.97] transition-transform shadow-sm shadow-crimson/20"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                           Buat User Baru
@@ -701,7 +700,7 @@ export default function ManajemenAsdosPage() {
                           type="text"
                           value={createUserForm.username}
                           onChange={(e) => setCreateUserForm(prev => ({ ...prev, username: e.target.value }))}
-                          className="w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none"
+                          className="w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                           placeholder="Masukkan nama lengkap"
                           autoComplete="off"
                         />
@@ -712,7 +711,7 @@ export default function ManajemenAsdosPage() {
                           type="email"
                           value={createUserForm.email}
                           onChange={(e) => setCreateUserForm(prev => ({ ...prev, email: e.target.value }))}
-                          className="w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none"
+                          className="w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                           placeholder="contoh@email.com"
                           autoComplete="off"
                         />
@@ -725,7 +724,7 @@ export default function ManajemenAsdosPage() {
                       type="button"
                       onClick={handleCreateUser}
                       disabled={isSubmitting}
-                      className="w-full py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-md shadow-[#941C2F]/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-full py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-md shadow-crimson/20 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? 'Membuat akun...' : 'Buat & Lanjutkan'}
                     </button>
@@ -753,7 +752,7 @@ export default function ManajemenAsdosPage() {
 
                     {selectedUser && (
                       <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 mb-4">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base shrink-0 ${addRole === 'asdos' ? 'bg-rose-100 text-[#941C2F]' : 'bg-indigo-100 text-indigo-700'}`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base shrink-0 ${addRole === 'asdos' ? 'bg-rose-100 text-crimson' : 'bg-indigo-100 text-indigo-700'}`}>
                           {selectedUser.username[0]?.toUpperCase()}
                         </div>
                         <div className="min-w-0">
@@ -774,7 +773,7 @@ export default function ManajemenAsdosPage() {
                                 type="text"
                                 value={modalForm.nim}
                                 onChange={(e) => setModalForm(prev => ({ ...prev, nim: e.target.value }))}
-                                className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none"
+                                className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                                 placeholder="Contoh: 535200000"
                               />
                             </div>
@@ -789,7 +788,7 @@ export default function ManajemenAsdosPage() {
                                 type="tel"
                                 value={modalForm.phone_number}
                                 onChange={(e) => setModalForm(prev => ({ ...prev, phone_number: e.target.value }))}
-                                className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none"
+                                className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                                 placeholder="Contoh: 081234567890"
                               />
                             </div>
@@ -805,7 +804,7 @@ export default function ManajemenAsdosPage() {
                               type="text"
                               value={modalForm.nip}
                               onChange={(e) => setModalForm(prev => ({ ...prev, nip: e.target.value }))}
-                              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none"
+                              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                               placeholder="Contoh: 198001012008011001"
                             />
                           </div>
@@ -819,7 +818,7 @@ export default function ManajemenAsdosPage() {
                       type="button"
                       onClick={handleAssignRole}
                       disabled={isSubmitting}
-                      className="w-full py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-md shadow-[#941C2F]/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-full py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-md shadow-crimson/20 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? 'Menyimpan...' : 'Simpan Data'}
                     </button>

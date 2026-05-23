@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface NotificationState {
@@ -33,8 +33,9 @@ export const useNotificationStore = create<NotificationState>()(
         pendingCount: state.pendingCount,
         lastSeenKpId: state.lastSeenKpId,
         lastSeenPresensiId: state.lastSeenPresensiId,
-        // hasSeen NOT persisted — session only, resets on page reload
+        // hasSeen NOT persisted â€” session only, resets on page reload
       }),
     }
   )
 );
+

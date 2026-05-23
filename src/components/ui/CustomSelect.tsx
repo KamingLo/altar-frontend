@@ -116,7 +116,7 @@ export function CustomSelect({
                   aria-selected={active}
                   onClick={() => handleSelect(opt.value)}
                   className={`w-full text-left px-5 py-3 transition-colors ${
-                    active ? 'bg-slate-50 text-[#941C2F] font-bold' : 'text-slate-600 hover:bg-slate-50'
+                    active ? 'bg-slate-50 text-crimson font-bold' : 'text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   <span className="block text-sm">{opt.label}</span>
@@ -144,11 +144,11 @@ export function CustomSelect({
         className={
           isIcon
             ? `border p-3.5 md:p-4 rounded-2xl md:rounded-3xl active:scale-95 transition-all flex items-center justify-center
-              ${open ? 'bg-red-50 border-[#941C2F] text-[#941C2F]' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}
+              ${open ? 'bg-red-50 border-crimson text-crimson' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}
               ${triggerClassName}`
             : `w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm font-medium text-left transition-all
               ${disabled ? 'opacity-60 cursor-not-allowed bg-slate-50' : 'bg-white hover:border-slate-300 active:scale-[0.99]'}
-              ${open ? 'border-[#941C2F] ring-1 ring-[#941C2F]' : 'border-slate-200'}
+              ${open ? 'border-crimson ring-1 ring-crimson' : 'border-slate-200'}
               ${!selected && !disabled ? 'text-slate-400' : 'text-slate-800'}
               ${triggerClassName}`
         }
@@ -160,7 +160,7 @@ export function CustomSelect({
           icon
         ) : (
           <>
-            {icon && <span className="shrink-0 text-[#941C2F]">{icon}</span>}
+            {icon && <span className="shrink-0 text-crimson">{icon}</span>}
             <span className="flex-1 min-w-0 truncate">{displayLabel}</span>
             <ChevronDown
               className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -172,3 +172,4 @@ export function CustomSelect({
     </div>
   );
 }
+

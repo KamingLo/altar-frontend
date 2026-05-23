@@ -14,66 +14,12 @@ import { asdosMenuItems } from '@/components/dashboard/asdos/AsdosHome';
 import { koordinatorMenuItems } from '@/components/dashboard/koordinator/KoordinatorHome';
 import { logoutUser } from '@/lib/actions/auth/session';
 
-/* ─── types ─────────────────────────────────── */
+/* ---- types ------------------------------------ */
 interface MenuItem { id: number; title: string; icon: React.ElementType; href: string }
 interface MenuGroup { id: string; title: string; items: MenuItem[] }
 
-export default function NotFound() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const router = useRouter();
-  const pathname = usePathname();
-  const { user, clearUser } = useUserStore();
-
-  const [collapsed, setCollapsed] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
-  const [timeStr, setTimeStr] = useState('');
-  const [dateStr, setDateStr] = useState('');
-
-  /* clock */
-  useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      setTimeStr(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }));
-      setDateStr(now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  /* lock body scroll when drawer open */
-  useEffect(() => {
-    document.body.style.overflow = drawerOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [drawerOpen]);
-
-  /* build menu groups from user role */
-  const menuGroups: MenuGroup[] = useMemo(() => {
-    const groups: MenuGroup[] = [];
-    if (user?.id_koordinator) groups.push({ id: 'koordinator', title: 'Koordinator', items: koordinatorMenuItems });
-    if (user?.id_asisten)     groups.push({ id: 'asdos',       title: 'Asdos',       items: asdosMenuItems });
-    return groups;
-  }, [user]);
-
-  const homeHref = user?.id_koordinator ? '/koordinator' : user?.id_asisten ? '/asdos' : '/';
-  const isMultiGroup = menuGroups.length > 1;
-  const allItems = menuGroups.flatMap(g => g.items);
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
-
-  const toggleGroup = (id: string) =>
-    setOpenGroups(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-
-  const handleLogout = async () => {
-    await logoutUser(); clearUser(); router.replace('/auth/login');
-  };
-
-  /* initialise all groups open */
-  useEffect(() => {
-    if (menuGroups.length > 0) setOpenGroups(new Set(menuGroups.map(g => g.id)));
-  }, [menuGroups]);
-
-  /* ── Three.js canvas ─────────────────────────── */
+/* ---- shared Three.js canvas hook -------------- */
+function useParticleCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -249,7 +195,6 @@ export default function NotFound() {
       function onMove(e: PointerEvent) {
         getPos(e);
         if (!state.ready || mouse.down) return;
-        /* cursor: grab only when close to a dot */
         const R2 = GRAB_R * GRAB_R;
         let near = false;
         for (let i = 0; i < state.count; i++) {
@@ -342,9 +287,130 @@ export default function NotFound() {
 
     init();
     return () => cleanupFn?.();
+  }, [canvasRef]);
+}
+
+/* ---- Guest 404 (belum login) ------------------- */
+function NotFoundGuest() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useParticleCanvas(canvasRef);
+
+  const gridStyle: React.CSSProperties = {
+    zIndex: 2,
+    backgroundImage: 'linear-gradient(to right,rgba(12,12,13,0.03) 1px,transparent 1px),linear-gradient(to bottom,rgba(12,12,13,0.03) 1px,transparent 1px)',
+    backgroundSize: '56px 56px',
+    maskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%,#000 30%,transparent 80%)',
+    WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%,#000 30%,transparent 80%)',
+  };
+
+  return (
+    <div
+      className="min-h-screen w-full relative overflow-hidden bg-canvas"
+      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+    >
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
+
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }} />
+      <div className="absolute inset-0 pointer-events-none" style={gridStyle} />
+
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6" style={{ zIndex: 3 }}>
+        <div className="h-[clamp(180px,34vh,320px)] w-full" />
+
+        <h1 className="text-[clamp(22px,3vw,40px)] font-extrabold text-slate-800 text-center leading-tight max-w-[18ch] mt-4">
+          Halaman ini <span className="text-crimson">tidak tersedia</span>
+        </h1>
+        <p className="text-sm text-slate-500 text-center max-w-[44ch] leading-relaxed mt-3">
+          Halaman yang kamu cari mungkin sudah dipindahkan, dihapus, atau URL-nya salah.
+        </p>
+
+        <div className="pointer-events-auto mt-6">
+          <Link
+            href="/auth/login"
+            className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-crimson text-white text-sm font-bold shadow-md shadow-crimson/20 hover:bg-[#7a1727] hover:-translate-y-px active:scale-95 transition-all duration-200"
+          >
+            <ChevronRight size={15} strokeWidth={2.5} /> Kembali
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- Authenticated 404 (sudah login) ----------- */
+function NotFoundAuth() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useParticleCanvas(canvasRef);
+
+  const router   = useRouter();
+  const pathname = usePathname();
+  const { user, clearUser } = useUserStore();
+
+  const [collapsed,   setCollapsed]   = useState(false);
+  const [drawerOpen,  setDrawerOpen]  = useState(false);
+  const [openGroups,  setOpenGroups]  = useState<Set<string>>(new Set());
+  const [timeStr,     setTimeStr]     = useState('');
+  const [dateStr,     setDateStr]     = useState('');
+
+  /* clock */
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      setTimeStr(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }));
+      setDateStr(now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, []);
 
-  /* ── nav item renderers ─────────────────────── */
+  useEffect(() => {
+    document.body.style.overflow = drawerOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [drawerOpen]);
+
+  const menuGroups: MenuGroup[] = useMemo(() => {
+    const groups: MenuGroup[] = [];
+    if (user?.id_koordinator) groups.push({ id: 'koordinator', title: 'Koordinator', items: koordinatorMenuItems });
+    if (user?.id_asisten)     groups.push({ id: 'asdos',       title: 'Asdos',       items: asdosMenuItems });
+    return groups;
+  }, [user]);
+
+  const homeHref    = user?.id_koordinator ? '/koordinator' : user?.id_asisten ? '/asdos' : '/';
+  const isMultiGroup = menuGroups.length > 1;
+  const allItems    = menuGroups.flatMap(g => g.items);
+  const isActive    = (href: string) => pathname === href || pathname.startsWith(href + '/');
+
+  const toggleGroup = (id: string) =>
+    setOpenGroups(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const handleLogout = async () => {
+    await logoutUser(); clearUser(); router.replace('/auth/login');
+  };
+
+  useEffect(() => {
+    if (menuGroups.length > 0) setOpenGroups(new Set(menuGroups.map(g => g.id)));
+  }, [menuGroups]);
+
+  const sidebarBg  = 'bg-crimson/80 border-white/20 shadow-[0_8px_32px_rgba(148,28,47,0.25)]';
+  const drawerBg   = 'bg-crimson/85';
+  const headingCls = 'text-slate-800';
+  const subCls     = 'text-slate-500';
+  const clockPillCls  = 'bg-white/40 border-white/20';
+  const clockDateCls  = 'text-slate-500';
+  const clockTimeCls  = 'text-crimson';
+  const sepLineCls    = 'bg-white/80';
+  const dashBtnCls    = 'text-crimson bg-white/80 border-white/50 hover:bg-white/95';
+  const mobileIconCls = 'text-crimson';
+
+  const gridStyle: React.CSSProperties = {
+    zIndex: 2,
+    backgroundImage: 'linear-gradient(to right,rgba(12,12,13,0.03) 1px,transparent 1px),linear-gradient(to bottom,rgba(12,12,13,0.03) 1px,transparent 1px)',
+    backgroundSize: '56px 56px',
+    maskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%,#000 30%,transparent 80%)',
+    WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%,#000 30%,transparent 80%)',
+  };
+
+  /* --- nav item renderers ------------------------ */
   const renderDesktopItem = (item: MenuItem) => {
     const Icon = item.icon;
     const active = isActive(item.href);
@@ -439,16 +505,21 @@ export default function NotFound() {
     );
   };
 
-  /* ── render ─────────────────────────────────── */
+  /* --- render ------------------------------------ */
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-100 lg:bg-[#EDF2F4]"
-      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div
+      className="min-h-screen w-full flex items-center justify-center transition-colors duration-300"
+      style={{ backgroundColor: 'var(--color-canvas)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+    >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
 
-      <div className="flex w-full h-screen overflow-hidden bg-[#EDF2F4] shadow-2xl lg:shadow-none relative">
+      <div
+        className="flex w-full h-screen overflow-hidden shadow-2xl lg:shadow-none relative"
+        style={{ backgroundColor: 'var(--color-canvas)' }}
+      >
 
-        {/* ── DESKTOP SIDEBAR ─────────────────────── */}
-        <aside className={`relative z-20 hidden lg:flex flex-col h-[calc(100vh-2rem)] my-4 ml-4 rounded-[1.5rem] overflow-hidden shrink-0 bg-[#941C2F]/80 backdrop-blur-2xl border border-white/20 shadow-[0_8px_32px_rgba(148,28,47,0.25)] transition-[width] duration-300 ease-in-out ${collapsed ? 'w-[84px]' : 'w-[280px]'}`}>
+        {/* --- DESKTOP SIDEBAR ------------------------ */}
+        <aside className={`relative z-20 hidden lg:flex flex-col h-[calc(100vh-2rem)] my-4 ml-4 rounded-[1.5rem] overflow-hidden shrink-0 backdrop-blur-2xl border transition-[width,background-color] duration-300 ease-in-out ${sidebarBg} ${collapsed ? 'w-[84px]' : 'w-[280px]'}`}>
 
           {/* header */}
           <div className={`pt-8 pb-6 border-b border-white/10 flex items-center shrink-0 transition-all duration-300 ${collapsed ? 'justify-center px-2' : 'justify-between px-7'}`}>
@@ -464,15 +535,9 @@ export default function NotFound() {
           {/* nav */}
           <div className="flex-1 min-h-0 px-3 py-6 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
             {menuGroups.length > 0 ? renderDesktopNav() : (
-              /* not logged in: simple 404 state */
               <div className={`flex flex-col items-center justify-center h-full gap-3 ${collapsed ? '' : 'px-4'}`}>
                 {!collapsed && (
-                  <>
-                    <div className="inline-flex items-center gap-2 bg-white/10 text-white/70 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white/60" /> Error 404
-                    </div>
-                    <p className="text-white/50 text-xs text-center leading-relaxed">Halaman yang kamu tuju tidak tersedia.</p>
-                  </>
+                  <p className="text-white/50 text-xs text-center leading-relaxed">Halaman yang kamu tuju tidak tersedia.</p>
                 )}
                 {collapsed && (
                   <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
@@ -499,88 +564,87 @@ export default function NotFound() {
           )}
         </aside>
 
-        {/* ── MAIN CONTENT ────────────────────────── */}
+        {/* --- MAIN CONTENT --------------------------- */}
         <main className="relative flex-1 h-screen flex flex-col overflow-hidden">
 
           {/* canvas */}
           <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }} />
 
           {/* grid wash */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            zIndex: 2,
-            backgroundImage: 'linear-gradient(to right,rgba(12,12,13,0.03) 1px,transparent 1px),linear-gradient(to bottom,rgba(12,12,13,0.03) 1px,transparent 1px)',
-            backgroundSize: '56px 56px',
-            maskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%,#000 30%,transparent 80%)',
-            WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%,#000 30%,transparent 80%)',
-          }} />
+          <div className="absolute inset-0 pointer-events-none" style={gridStyle} />
 
-          {/* content overlay — pointer-events-none so cursor events fall through to canvas */}
+          {/* content overlay */}
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6" style={{ zIndex: 3 }}>
-            {/* spacer for the animation */}
             <div className="h-[clamp(180px,34vh,320px)] w-full" />
 
-            <h1 className="text-[clamp(22px,3vw,40px)] font-extrabold text-slate-800 text-center leading-tight max-w-[18ch] mt-4">
-              Halaman ini <span className="text-[#941C2F]">tidak tersedia</span>
+            <h1 className={`text-[clamp(22px,3vw,40px)] font-extrabold text-center leading-tight max-w-[18ch] mt-4 ${headingCls}`}>
+              Halaman ini <span className="text-crimson">tidak tersedia</span>
             </h1>
-            <p className="text-sm text-slate-500 text-center max-w-[44ch] leading-relaxed mt-3">
+            <p className={`text-sm text-center max-w-[44ch] leading-relaxed mt-3 ${subCls}`}>
               Halaman yang kamu cari mungkin sudah dipindahkan, dihapus, atau URL-nya salah.
             </p>
 
             <div className="pointer-events-auto mt-6">
               <Link href={homeHref}
-                className="inline-flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#941C2F] text-white text-sm font-bold shadow-md shadow-[#941C2F]/20 hover:bg-[#7a1727] hover:-translate-y-px active:scale-95 transition-all duration-200">
+                className="inline-flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-crimson text-white text-sm font-bold shadow-md shadow-crimson/20 hover:bg-[#7a1727] hover:-translate-y-px active:scale-95 transition-all duration-200">
                 <Home size={15} strokeWidth={2.5} /> Dashboard
               </Link>
             </div>
           </div>
 
-          {/* ── MOBILE NAVBAR ───────────────────── */}
+          {/* --- MOBILE NAVBAR ---------------------- */}
           <header className="lg:hidden absolute top-0 left-0 right-0 flex items-center justify-between gap-3 px-6 py-3.5 z-20">
             <Link href={homeHref}
-              className="shrink-0 text-[#941C2F] hover:scale-105 active:scale-90 rounded-full transition-all duration-200 p-2.5 flex items-center justify-center">
+              className={`shrink-0 hover:scale-105 active:scale-90 rounded-full transition-all duration-200 p-2.5 flex items-center justify-center ${mobileIconCls}`}>
               <Home size={26} strokeWidth={2.5} />
             </Link>
-            <div className="flex flex-col items-center rounded-xl px-3 py-1.5 bg-white/40 backdrop-blur-md shadow-sm border border-white/20">
-              <p className="text-[8px] font-bold text-slate-500 tracking-widest uppercase leading-none">{dateStr}</p>
+
+            {/* clock */}
+            <div className={`flex flex-col items-center rounded-xl px-3 py-1.5 backdrop-blur-md shadow-sm border ${clockPillCls}`}>
+              <p className={`text-[8px] font-bold tracking-widest uppercase leading-none ${clockDateCls}`}>{dateStr}</p>
               <div className="flex items-baseline gap-1 mt-1">
-                <p className="text-base font-black font-mono tracking-tight text-[#941C2F] leading-none">{timeStr}</p>
-                <p className="text-[9px] font-extrabold text-slate-500 tracking-widest leading-none">WIB</p>
+                <p className={`text-base font-black font-mono tracking-tight leading-none ${clockTimeCls}`}>{timeStr}</p>
+                <p className={`text-[9px] font-extrabold tracking-widest leading-none ${clockDateCls}`}>WIB</p>
               </div>
             </div>
+
             <button onClick={() => setDrawerOpen(true)}
-              className="shrink-0 text-[#941C2F] hover:scale-105 active:scale-90 rounded-full transition-all duration-200 p-2.5 flex items-center justify-center">
+              className={`shrink-0 hover:scale-105 active:scale-90 rounded-full transition-all duration-200 p-2.5 flex items-center justify-center ${mobileIconCls}`}>
               <Menu size={28} strokeWidth={2.5} />
             </button>
           </header>
 
-          {/* ── DESKTOP TOP-RIGHT ────────────────── */}
+          {/* --- DESKTOP TOP-RIGHT ------------------- */}
           <div className="hidden lg:flex flex-col absolute top-7 right-7 z-20 items-end gap-3">
+            {/* clock */}
             <div className="flex items-center gap-4 text-right">
               <div>
-                <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase leading-none drop-shadow-sm">{dateStr.split(', ')[0]}</p>
-                <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase mt-1 leading-none drop-shadow-sm">{dateStr.split(', ')[1]}</p>
+                <p className={`text-[11px] font-bold tracking-widest uppercase leading-none drop-shadow-sm ${clockDateCls}`}>{dateStr.split(', ')[0]}</p>
+                <p className={`text-[11px] font-bold tracking-widest uppercase mt-1 leading-none drop-shadow-sm ${clockDateCls}`}>{dateStr.split(', ')[1]}</p>
               </div>
-              <div className="w-0.5 h-10 bg-white/80" />
+              <div className={`w-0.5 h-10 ${sepLineCls}`} />
               <div>
-                <p className="text-2xl font-black font-mono tracking-tight text-[#941C2F] leading-none drop-shadow-sm">{timeStr}</p>
-                <p className="text-[10px] font-extrabold text-slate-500 tracking-widest text-right mt-1 drop-shadow-sm">WIB</p>
+                <p className={`text-2xl font-black font-mono tracking-tight leading-none drop-shadow-sm ${clockTimeCls}`}>{timeStr}</p>
+                <p className={`text-[10px] font-extrabold tracking-widest text-right mt-1 drop-shadow-sm ${clockDateCls}`}>WIB</p>
               </div>
             </div>
+
+            {/* dashboard buttons */}
             <div className="flex gap-2">
               {user?.id_koordinator && user?.id_asisten ? (
                 <>
                   <Link href="/koordinator"
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md text-[#941C2F] bg-white/80 border-white/50 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 text-sm font-bold">
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 text-sm font-bold ${dashBtnCls}`}>
                     <Home size={16} strokeWidth={2.5} /> Dash Koor
                   </Link>
                   <Link href="/asdos"
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md text-[#941C2F] bg-white/80 border-white/50 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 text-sm font-bold">
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 text-sm font-bold ${dashBtnCls}`}>
                     <Home size={16} strokeWidth={2.5} /> Dash Asdos
                   </Link>
                 </>
               ) : (
                 <Link href={homeHref}
-                  className="flex items-center gap-2 px-4 py-2.5 text-[#941C2F] bg-white/80 backdrop-blur-md border border-white/50 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 rounded-2xl transition-all duration-300 text-sm font-bold">
+                  className={`flex items-center gap-2 px-4 py-2.5 backdrop-blur-md border shadow-sm hover:shadow-md hover:scale-105 active:scale-95 rounded-2xl transition-all duration-300 text-sm font-bold ${dashBtnCls}`}>
                   <Home size={17} strokeWidth={2.5} /> Dashboard
                 </Link>
               )}
@@ -589,20 +653,17 @@ export default function NotFound() {
         </main>
       </div>
 
-      {/* ── MOBILE SIDEBAR DRAWER ─────────────────── */}
+      {/* --- MOBILE SIDEBAR DRAWER -------------------- */}
       <div className={`lg:hidden fixed inset-0 z-50 ${drawerOpen ? '' : 'pointer-events-none'}`}>
         <div onClick={() => setDrawerOpen(false)}
           className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${drawerOpen ? 'opacity-100' : 'opacity-0'}`} />
-        <div className={`absolute top-0 left-0 w-[280px] h-[calc(100dvh-1.5rem)] my-3 ml-3 rounded-[1.5rem] bg-[#941C2F]/85 backdrop-blur-2xl border border-white/20 shadow-[20px_0_40px_rgba(0,0,0,0.2)] flex flex-col overflow-hidden transition-transform duration-300 ease-in-out ${drawerOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}>
+        <div className={`absolute top-0 left-0 w-[280px] h-[calc(100dvh-1.5rem)] my-3 ml-3 rounded-[1.5rem] backdrop-blur-2xl border border-white/20 shadow-[20px_0_40px_rgba(0,0,0,0.2)] flex flex-col overflow-hidden transition-transform duration-300 ease-in-out ${drawerBg} ${drawerOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}>
           <div className="pt-8 pb-6 px-6 border-b border-white/10 shrink-0">
             <Image src="/logo-sb.png" alt="Logo" width={160} height={32} className="h-8 w-auto object-contain drop-shadow-md" style={{ width: 'auto' }} />
           </div>
           <div className="flex-1 min-h-0 px-3 py-6 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
             {menuGroups.length > 0 ? renderMobileNav() : (
               <div className="flex flex-col items-center justify-center h-full gap-3 px-4">
-                <div className="inline-flex items-center gap-2 bg-white/10 text-white/70 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white/60" /> Error 404
-                </div>
                 <p className="text-white/50 text-xs text-center leading-relaxed">Halaman yang kamu tuju tidak tersedia.</p>
               </div>
             )}
@@ -625,3 +686,12 @@ export default function NotFound() {
     </div>
   );
 }
+
+/* ---- root export ------------------------------- */
+export default function NotFound() {
+  const { user } = useUserStore();
+
+  if (!user) return <NotFoundGuest />;
+  return <NotFoundAuth />;
+}
+

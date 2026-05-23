@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import type { PresensiResponseDTO } from '@/lib/actions/presensi';
 
 const PAGE_SIZE = 10;
@@ -30,3 +30,4 @@ export const useRiwayatKehadiranStore = create<RiwayatKehadiranState>()((set) =>
   resetVisible: () => set({ visibleCount: PAGE_SIZE }),
   reset: () => set({ items: [], fetched: false, visibleCount: PAGE_SIZE, isLoading: true, error: null }),
 }));
+

@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import type { SessionFromAPI } from '@/lib/actions/jadwal';
 
 const now = new Date();
@@ -71,3 +71,4 @@ export const useJadwalStore = create<JadwalState>()((set) => ({
     error: null,
   }),
 }));
+

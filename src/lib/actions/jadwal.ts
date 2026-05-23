@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { apiClient } from '@/lib/api/client';
 import type { JadwalTimelineParams, SessionTimeline, UnifiedJadwalResponse } from '@/types/api';
@@ -44,8 +44,8 @@ export type SessionBody = {
   id_asdos1?: string | null;
   id_asdos2?: string | null;
   id_dosen?: string | null;
-  tanggal: string; // YYYY-MM-DD — tanggal spesifik sesi
-  opsi_hari: number; // 1=Senin … 6=Sabtu
+  tanggal: string; // YYYY-MM-DD â€” tanggal spesifik sesi
+  opsi_hari: number; // 1=Senin â€¦ 6=Sabtu
   opsi_jam: number;  // 1-7 (lihat slot mapping di PANDUAN_API.txt)
 };
 
@@ -102,3 +102,4 @@ export async function getScheduleTimeline(params: JadwalTimelineParams) {
     items: UnifiedJadwalResponse[];
   }>(`/jadwal/sessions?${q.toString()}`, { auth: true, cache: 'no-store' });
 }
+

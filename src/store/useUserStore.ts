@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UserData, UserRole } from '@/types/api';
 
@@ -29,3 +29,4 @@ export const useUserStore = create<UserState>()(
     }
   )
 );
+

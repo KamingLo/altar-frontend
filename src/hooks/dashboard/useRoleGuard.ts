@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -30,3 +30,4 @@ export const useRoleGuard = (expectedRole: UserRole) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 };
+

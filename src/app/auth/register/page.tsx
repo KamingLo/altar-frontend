@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { RegisterForm } from '@/components/auth/RegisterForm'; // Pindahkan logika RegisterForm lama ke sini
 

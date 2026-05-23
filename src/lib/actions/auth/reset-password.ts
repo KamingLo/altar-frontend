@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { apiClient } from '@/lib/api/client';
 
@@ -9,3 +9,4 @@ export async function resetPasswordAction(data: {
 }) {
   return apiClient.post('/auth/reset-password', data, { cache: 'no-store' });
 }
+

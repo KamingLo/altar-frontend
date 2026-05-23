@@ -1,12 +1,12 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
-import { CalendarPlus, Clock, CheckCircle2, XCircle, Check, Trash2, MapPin, Calendar } from 'lucide-react';
+import { CalendarPlus, Info, Check, Trash2, XCircle, ArrowLeft, Calendar } from 'lucide-react';
 import { getSubstitutionDetail, createSubstitution, deleteSubstitution } from '@/lib/actions/pergantian-kelas';
 import { getRuanganList } from '@/lib/actions/data-master';
 import { getSessionsByDate } from '@/lib/actions/jadwal';
 import type { RuanganItem, SubstituteSessionDetail } from '@/types/api';
 import type { SessionFromAPI } from '@/lib/actions/jadwal';
-import { AsdosLoadingState, AsdosPageHeader, AsdosPageShell, AsdosPrimaryButton, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
+import { AsdosPageHeader, AsdosPageShell, AsdosPrimaryButton, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { usePengajuanKpStore } from '@/store/usePengajuanKpStore';
 import { useUserStore } from '@/store/useUserStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
@@ -33,21 +33,22 @@ const saveStoredIds = (userId: string | null | undefined, ids: string[]) => {
   if (!key || typeof window === 'undefined') return;
   window.localStorage.setItem(key, JSON.stringify(ids));
 };
+
 const SLOT_OPTIONS = [
-  { value: 1, label: '07:30 – 09:10' },
-  { value: 2, label: '09:30 – 11:10' },
-  { value: 3, label: '11:30 – 13:10' },
-  { value: 4, label: '13:30 – 15:10' },
-  { value: 5, label: '15:30 – 17:10' },
-  { value: 6, label: '17:40 – 19:15' },
-  { value: 7, label: '19:30 – 21:00' },
+  { value: 1, label: '07:30 — 09:10' },
+  { value: 2, label: '09:30 — 11:10' },
+  { value: 3, label: '11:30 — 13:10' },
+  { value: 4, label: '13:30 — 15:10' },
+  { value: 5, label: '15:30 — 17:10' },
+  { value: 6, label: '17:40 — 19:15' },
+  { value: 7, label: '19:30 — 21:00' },
 ];
 
 type KpStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
-const statusConfig: Record<KpStatus, { icon: React.ElementType; bg: string; text: string; border: string; label: string }> = {
-  PENDING: { icon: Clock, bg: 'bg-slate-100', text: 'text-slate-500', border: 'border-slate-200', label: 'Menunggu' },
-  VERIFIED: { icon: CheckCircle2, bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', label: 'Disetujui' },
-  REJECTED: { icon: XCircle, bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-100', label: 'Ditolak' },
+const statusConfig: Record<KpStatus, { bg: string; text: string; label: string }> = {
+  PENDING: { bg: 'bg-fog', text: 'text-ink', label: 'MENUNGGU' },
+  VERIFIED: { bg: 'bg-obsidian', text: 'text-white', label: 'DISETUJUI' },
+  REJECTED: { bg: 'bg-obsidian', text: 'text-white', label: 'DITOLAK' },
 };
 
 function formatDate(iso: string) {
@@ -55,7 +56,7 @@ function formatDate(iso: string) {
   const datePart = iso.split('T')[0];
   const [year, month, day] = datePart.split('-').map(Number);
   const d = year && month && day ? new Date(year, month - 1, day) : new Date(iso);
-  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
 function todayIso() {
@@ -71,6 +72,14 @@ export default function PengajuanKpPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [targetDeleteId, setTargetDeleteId] = useState<string | null>(null);
@@ -89,6 +98,7 @@ export default function PengajuanKpPage() {
   const [sessionList, setSessionList] = useState<SessionFromAPI[]>([]);
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState<string | null>(null);
+
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     setHistoryError(null);
@@ -113,37 +123,29 @@ export default function PengajuanKpPage() {
   }, [userId, setPage]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
-  useEffect(() => {
-    setClientToday(todayIso());
-  }, []);
+  useEffect(() => { setClientToday(todayIso()); }, []);
+
+
 
   useEffect(() => {
-    if (!isFormOpen) return;
     let cancelled = false;
     setDropdownLoading(true);
     setDropdownError(null);
-
     getRuanganList(1, '', DROPDOWN_LIMIT).then((ruanganRes) => {
       if (cancelled) return;
-      if (!ruanganRes.success) {
-        setDropdownError(ruanganRes.message || 'Gagal memuat daftar ruangan.');
-      }
+      if (!ruanganRes.success) setDropdownError(ruanganRes.message || 'Gagal memuat daftar ruangan.');
       setRuanganList(ruanganRes.success ? ruanganRes.data?.items ?? [] : []);
     }).catch((e: unknown) => {
       if (cancelled) return;
       setDropdownError(e instanceof Error ? e.message : 'Gagal memuat data form.');
-    }).finally(() => {
-      if (!cancelled) setDropdownLoading(false);
-    });
-
+    }).finally(() => { if (!cancelled) setDropdownLoading(false); });
     return () => { cancelled = true; };
-  }, [isFormOpen]);
+  }, []);
 
   useEffect(() => {
-    if (!isFormOpen || !originalDate) return;
+    if (!originalDate) return;
     let cancelled = false;
     setDropdownError(null);
-
     getSessionsByDate(originalDate).then((res) => {
       if (cancelled) return;
       if (!res.success) {
@@ -160,38 +162,25 @@ export default function PengajuanKpPage() {
       setSessionList([]);
       setIdSession('');
     });
-
     return () => { cancelled = true; };
-  }, [originalDate, isFormOpen]);
+  }, [originalDate]);
 
-  const handleOpenSheet = () => {
-    setIsFormOpen(true);
-    setSubmitError(null);
-  };
+  const handleOpenSheet = () => { setIsFormOpen(true); setSubmitError(null); };
 
   const handleCloseSheet = () => {
     if (isSuccess || submitLoading) return;
     setIsFormOpen(false);
-    setOriginalDate('');
-    setSubstituteDate('');
-    setIdSession('');
-    setIdRuangan('');
-    setSlotOption(1);
-    setReason('');
-    setSubmitError(null);
+    setOriginalDate(''); setSubstituteDate(''); setIdSession('');
+    setIdRuangan(''); setSlotOption(1); setReason(''); setSubmitError(null);
   };
 
   const handleOpenDelete = (id: string) => {
-    setTargetDeleteId(id);
-    setIsDeleteOpen(true);
-    setDeleteError(null);
+    setTargetDeleteId(id); setIsDeleteOpen(true); setDeleteError(null);
   };
 
   const handleCloseDelete = () => {
     if (deletingId) return;
-    setIsDeleteOpen(false);
-    setTargetDeleteId(null);
-    setDeleteError(null);
+    setIsDeleteOpen(false); setTargetDeleteId(null); setDeleteError(null);
   };
 
   const handleSubmit = async () => {
@@ -206,7 +195,6 @@ export default function PengajuanKpPage() {
         slot_option: slotOption,
         reason,
       });
-
       if (res.success) {
         const newId = res.data?.id;
         if (newId) {
@@ -230,10 +218,6 @@ export default function PengajuanKpPage() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    handleOpenDelete(id);
-  };
-
   const confirmDelete = async () => {
     if (!targetDeleteId) return;
     setDeletingId(targetDeleteId);
@@ -255,337 +239,388 @@ export default function PengajuanKpPage() {
   };
 
   const isFormValid =
-    originalDate.trim() !== '' &&
-    substituteDate.trim() !== '' &&
-    idSession.trim() !== '' &&
-    idRuangan.trim() !== '' &&
-    reason.trim() !== '';
+    originalDate.trim() !== '' && substituteDate.trim() !== '' &&
+    idSession.trim() !== '' && idRuangan.trim() !== '' && reason.trim() !== '';
 
-  return (
-    <AsdosPageShell>
-      <AsdosPageHeader
-        eyebrow="Kelas Pengganti"
-        title="Riwayat Kelas Pengganti"
-        description="Daftar pengajuan Kelas Pengganti Anda."
-        action={
-          <AsdosPrimaryButton onClick={handleOpenSheet} icon={<CalendarPlus size={18} />} className="hidden md:flex py-3 px-6 text-[15px] mt-4 md:mt-0">
-            Ajukan Kelas Pengganti
-          </AsdosPrimaryButton>
-        }
-      />
-      <div className="space-y-3 pb-28 md:pb-8">
-        {historyLoading && (
-          <AsdosLoadingState message="Memuat riwayat..." />
-        )}
-
-        {historyError && !historyLoading && (
-          <AsdosState variant="error" message={historyError} />
-        )}
-
-        {!historyLoading && !historyError && history.length === 0 && (
-          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center">
-            <p className="text-slate-500 font-medium">Belum ada pengajuan kelas pengganti.</p>
+  const renderFormContent = () => {
+    if (isSuccess) {
+      return (
+        <div className="h-56 md:h-64 flex flex-col items-center justify-center text-center">
+          <div className="relative flex items-center justify-center mb-8">
+            <div className="absolute w-28 h-28 bg-crimson/5 rounded-full animate-ping" />
+            <div className="absolute w-20 h-20 bg-crimson/10 rounded-full" />
+            <div className="relative w-14 h-14 bg-crimson rounded-full flex items-center justify-center text-white shadow-lg shadow-crimson/30">
+              <Check size={28} strokeWidth={3} />
+            </div>
           </div>
-        )}
-
-        {!historyLoading && !historyError && history.map(item => {
-          const cfg = statusConfig[item.status];
-          const Icon = cfg.icon;
-          const isPending = item.status === 'PENDING';
-          const session = item.session;
-          return (
-            <div key={item.id}
-              className="bg-white rounded-2xl md:rounded-[1.25rem] p-4 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all group">
-
-              <div className="flex flex-col gap-3 md:hidden">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-white bg-gradient-to-br from-[#941C2F] to-[#b3273e]">
-                      <CalendarPlus size={22} strokeWidth={1.5} />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-[15px] text-[#1F2937] leading-tight truncate">{session?.mata_kuliah ?? 'Mata kuliah tidak tersedia'}</h3>
-                      <p className="text-xs font-semibold text-slate-500 mt-1 truncate">{session?.nama_kelas ?? 'Kelas tidak tersedia'}</p>
-                    </div>
-                  </div>
-                  <div className={`shrink-0 ml-3 px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wider uppercase border ${cfg.bg} ${cfg.text} ${cfg.border} flex items-center gap-1.5`}>
-                    <Icon size={12} strokeWidth={2.5} />
-                    {cfg.label}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5 mt-1 pt-3 border-t border-slate-100">
-                  <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                    <Calendar size={13} className="text-slate-400 shrink-0" />
-                    <span className="text-xs font-semibold text-slate-700">
-                      {formatDate(item.original_date)} → {formatDate(item.substitute_date)}
-                    </span>
-                  </div>
-                  <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                    <Clock size={13} className="text-slate-400 shrink-0" />
-                    <span className="text-xs font-semibold text-slate-700">{item.time_slot}</span>
-                  </div>
-                  <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                    <MapPin size={13} className="text-slate-400 shrink-0" />
-                    <span className="text-xs font-semibold text-slate-700 truncate">{item.room}</span>
-                  </div>
-                  <div className="bg-slate-50/50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                    <p className="text-xs text-slate-500 italic line-clamp-1 flex-1">&quot;{item.reason}&quot;</p>
-                    {isPending && (
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        disabled={deletingId === item.id}
-                        className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-rose-50 text-rose-400 border border-rose-100 transition-colors">
-                        {deletingId === item.id
-                          ? <div className="w-3.5 h-3.5 border-2 border-rose-400/30 border-t-rose-500 rounded-full animate-spin" />
-                          : <Trash2 size={13} />
-                        }
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {item.status === 'REJECTED' && item.coordinator_reason && (
-                  <div className="bg-rose-50 border border-rose-100 px-3 py-2 rounded-lg">
-                    <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-0.5">Alasan Ditolak</p>
-                    <p className="text-xs text-rose-600 leading-tight">{item.coordinator_reason}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="hidden md:block">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center bg-rose-50 text-[#941C2F] shadow-sm">
-                      <CalendarPlus size={22} strokeWidth={2} />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-base text-[#1F2937] truncate">{session?.mata_kuliah ?? 'Mata kuliah tidak tersedia'}</h3>
-                      <p className="text-[13px] font-semibold text-[#8BA3CB] truncate">{session?.nama_kelas ?? 'Kelas tidak tersedia'}</p>
-                    </div>
-                  </div>
-                  <div className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-bold tracking-widest uppercase ${cfg.bg} ${cfg.text} ${cfg.border}`}>
-                    <Icon size={14} strokeWidth={2.5} />
-                    <span>{cfg.label}</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <div className="flex flex-wrap gap-3">
-                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg transition-colors">
-                      <Calendar size={13} className="text-slate-400" />
-                      <span className="text-xs font-semibold text-slate-700">
-                        {formatDate(item.original_date)} → {formatDate(item.substitute_date)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg transition-colors">
-                      <Clock size={13} className="text-slate-400" />
-                      <span className="text-xs font-semibold text-slate-700">{item.time_slot}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg transition-colors">
-                      <MapPin size={13} className="text-slate-400" />
-                      <span className="text-xs font-semibold text-slate-700">{item.room}</span>
-                    </div>
-                  </div>
-
-                  {isPending && (
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      disabled={deletingId === item.id}
-                      className="shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-rose-50 text-rose-400 hover:bg-rose-100 hover:text-rose-600 border border-rose-100 transition-colors disabled:opacity-50">
-                      {deletingId === item.id
-                        ? <div className="w-4 h-4 border-2 border-rose-400/30 border-t-rose-500 rounded-full animate-spin" />
-                        : <Trash2 size={16} />
-                      }
-                    </button>
-                  )}
-                </div>
-
-                <div className="mt-3 flex items-start gap-2">
-                  <div className="flex-1 bg-slate-50/50 border border-slate-100 px-3.5 py-2 rounded-xl">
-                    <p className="text-xs text-slate-500 italic line-clamp-1">&quot;{item.reason}&quot;</p>
-                  </div>
-                </div>
-
-                {item.status === 'REJECTED' && item.coordinator_reason && (
-                  <div className="mt-3 bg-rose-50 border border-rose-100 px-4 py-3 rounded-xl">
-                    <p className="text-[11px] font-bold text-rose-500 uppercase tracking-wider mb-1">Alasan Ditolak</p>
-                    <p className="text-xs text-rose-600 leading-relaxed">{item.coordinator_reason}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-
-        {!historyLoading && !historyError && history.length > 0 && (
-          <p className="text-[11px] font-medium text-slate-400 px-1 pb-1 mt-2 text-center md:text-left">
-            Menampilkan {history.length} pengajuan kelas pengganti.
-          </p>
-        )}
-      </div>
-
-      <div className="md:hidden fixed bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent z-10">
-        <div className="max-w-md mx-auto">
-          <button onClick={handleOpenSheet}
-            className="w-full flex items-center justify-center gap-2 bg-[#941C2F] text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]">
-            <CalendarPlus size={18} /><span>Ajukan Kelas Pengganti</span>
-          </button>
+          <h2 className="text-xl font-extrabold text-[#1F2937] mb-1">Pengajuan Berhasil!</h2>
+          <p className="text-sm text-slate-500">Formulir Kelas Pengganti Anda telah disubmit.</p>
         </div>
-      </div>
+      );
+    }
 
-      <BottomSheet
-        isOpen={isFormOpen}
-        onClose={handleCloseSheet}
-        title="Pengajuan Kelas Pengganti"
-        subtitle="Isi formulir untuk mengajukan kelas pengganti."
-      >
-        {isSuccess ? (
-          <div className="h-56 md:h-64 flex flex-col items-center justify-center text-center">
-            <div className="relative flex items-center justify-center mb-8">
-              <div className="absolute w-28 h-28 bg-[#941C2F]/5 rounded-full animate-ping" />
-              <div className="absolute w-20 h-20 bg-[#941C2F]/10 rounded-full" />
-              <div className="relative w-14 h-14 bg-[#941C2F] rounded-full flex items-center justify-center text-white shadow-lg shadow-[#941C2F]/30">
-                <Check size={28} strokeWidth={3} />
-              </div>
-            </div>
-            <h2 className="text-xl font-extrabold text-[#1F2937] mb-1">Pengajuan Berhasil!</h2>
-            <p className="text-sm text-slate-500">Formulir Kelas Pengganti Anda telah disubmit.</p>
+    return (
+      <>
+        {dropdownLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="w-7 h-7 border-4 border-crimson/20 border-t-crimson rounded-full animate-spin" />
           </div>
         ) : (
-          <>
-            {dropdownLoading ? (
-              <div className="flex items-center justify-center py-10">
-                <div className="w-7 h-7 border-4 border-[#941C2F]/20 border-t-[#941C2F] rounded-full animate-spin" />
+          <div className="space-y-6 pt-2">
+            {dropdownError && (
+              <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold">
+                ⚠️ {dropdownError}
               </div>
-            ) : (
-              <div className="space-y-4 pt-2">
-                {dropdownError && (
-                  <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold">
-                    ⚠️ {dropdownError}
-                  </div>
-                )}
+            )}
 
-                <div>
-                  <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                    Tanggal Kelas Asli (yang Dibatalkan)
-                  </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                  Tanggal Kelas Asli (yang Dibatalkan)
+                </label>
+                <div className="relative">
                   <input
                     type="date"
                     value={originalDate}
                     onChange={e => setOriginalDate(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all"
+                    className="w-full bg-white border border-slate-200 rounded-[14px] px-5 py-[15px] pr-12 text-sm text-slate-700 focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300 transition-all cursor-pointer relative z-10 font-semibold placeholder-slate-400"
+                    placeholder="dd/mm/yyyy"
                   />
-                </div>
-
-                {originalDate && (
-                  <div>
-                    <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                      Sesi yang Diganti
-                    </label>
-                    {sessionList.length === 0 ? (
-                      <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-400 italic">
-                        Tidak ada jadwal pada tanggal ini.
-                      </div>
-                    ) : (
-                      <CustomSelect
-                        value={idSession}
-                        onChange={setIdSession}
-                        options={sessionList.map(s => ({
-                          value: s.id_sesi,
-                          label: s.mata_kuliah,
-                          description: `${s.nama_kelas} · ${s.waktu.split(', ')[1] ?? s.waktu}`,
-                        }))}
-                        placeholder="-- Pilih Sesi --"
-                      />
-                    )}
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-20">
+                    <Calendar size={18} />
                   </div>
-                )}
+                </div>
+              </div>
 
-                <div>
-                  <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                    Tanggal Kelas Pengganti
-                  </label>
+              <div>
+                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                  Tanggal Kelas Pengganti
+                </label>
+                <div className="relative">
                   <input
                     type="date"
                     value={substituteDate}
                     min={clientToday}
                     onChange={e => setSubstituteDate(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all"
+                    className="w-full bg-white border border-slate-200 rounded-[14px] px-5 py-[15px] pr-12 text-sm text-slate-700 focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300 transition-all cursor-pointer relative z-10 font-semibold placeholder-slate-400"
+                    placeholder="dd/mm/yyyy"
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                      Slot Jam
-                    </label>
-                    <CustomSelect
-                      value={String(slotOption)}
-                      onChange={val => setSlotOption(Number(val))}
-                      options={SLOT_OPTIONS.map(s => ({
-                        value: String(s.value),
-                        label: s.label,
-                      }))}
-                      placeholder="-- Pilih Slot --"
-                    />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-20">
+                    <Calendar size={18} />
                   </div>
-
-                  <div>
-                    <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                      Ruangan
-                    </label>
-                    <CustomSelect
-                      value={idRuangan}
-                      onChange={setIdRuangan}
-                      options={ruanganList.map(r => ({
-                        value: r.id,
-                        label: r.nama_ruangan,
-                        description: `Lantai ${r.lantai}`,
-                      }))}
-                      placeholder="-- Pilih --"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 ml-1">
-                    Alasan Pengajuan
-                  </label>
-                  <textarea
-                    value={reason}
-                    onChange={e => setReason(e.target.value)}
-                    placeholder="Masukkan alasan Anda..."
-                    className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm text-slate-700 focus:outline-none focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] transition-all resize-none h-28"
-                  />
-                </div>
-
-                {submitError && (
-                  <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold">
-                    ⚠️ {submitError}
-                  </div>
-                )}
-
-                <div className="pt-4 border-t border-slate-100 bg-white">
-                  <button
-                    onClick={handleSubmit}
-                    disabled={!isFormValid || submitLoading}
-                    className="w-full py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] active:scale-[0.98] transition-all shadow-md shadow-[#941C2F]/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {submitLoading ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Mengirim...
-                      </>
-                    ) : (
-                      'Kirim Pengajuan'
-                    )}
-                  </button>
                 </div>
               </div>
+            </div>
+
+            {originalDate && (
+              <div className="animate-fade-in">
+                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                  Sesi yang Diganti
+                </label>
+                {sessionList.length === 0 ? (
+                  <div className="w-full bg-slate-50 border border-slate-200 rounded-[14px] px-5 py-4 text-sm text-slate-400 italic">
+                    Tidak ada jadwal pada tanggal ini.
+                  </div>
+                ) : (
+                  <CustomSelect
+                    value={idSession}
+                    onChange={setIdSession}
+                    triggerClassName="!rounded-[14px] !py-[15px] !border-slate-200 hover:!border-slate-300 !bg-white !font-semibold"
+                    options={sessionList.map(s => ({
+                      value: s.id_sesi,
+                      label: s.mata_kuliah,
+                      description: `${s.nama_kelas} · ${s.waktu.split(', ')[1] ?? s.waktu}`,
+                    }))}
+                    placeholder="-- Pilih Sesi --"
+                  />
+                )}
+              </div>
             )}
-          </>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                  Slot Jam
+                </label>
+                <CustomSelect
+                  value={String(slotOption)}
+                  onChange={val => setSlotOption(Number(val))}
+                  triggerClassName="!rounded-[14px] !py-[15px] !border-slate-200 hover:!border-slate-300 !bg-white !font-semibold"
+                  options={SLOT_OPTIONS.map(s => ({ value: String(s.value), label: s.label }))}
+                  placeholder="-- Pilih --"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                  Ruangan
+                </label>
+                <CustomSelect
+                  value={idRuangan}
+                  onChange={setIdRuangan}
+                  triggerClassName="!rounded-[14px] !py-[15px] !border-slate-200 hover:!border-slate-300 !bg-white !font-semibold"
+                  options={ruanganList.map(r => ({
+                    value: r.id,
+                    label: r.nama_ruangan,
+                    description: `Lantai ${r.lantai}`,
+                  }))}
+                  placeholder="-- Pilih --"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                Alasan Pengajuan
+              </label>
+              <textarea
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="Masukkan alasan Anda..."
+                className="w-full bg-white border border-slate-200 rounded-[14px] p-5 text-sm text-slate-700 focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300 transition-all resize-none h-32 font-semibold"
+              />
+            </div>
+
+            {submitError && (
+              <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold">
+                ⚠️ {submitError}
+              </div>
+            )}
+
+            <div className="pt-6 border-t border-slate-100 bg-white">
+              <button
+                onClick={handleSubmit}
+                disabled={!isFormValid || submitLoading}
+                className="w-full py-[16px] rounded-[20px] bg-crimson hover:bg-[#7a1727] text-white font-bold text-[15px] active:scale-[0.98] transition-all shadow-[0_10px_25px_rgba(148,28,47,0.2)] border border-white/5 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {submitLoading ? (
+                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Mengirim...</>
+                ) : 'Kirim Pengajuan'}
+              </button>
+            </div>
+          </div>
         )}
+      </>
+    );
+  };
+
+  return (
+    <AsdosPageShell>
+      <style>{`
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          opacity: 0;
+          width: 24px;
+          height: 24px;
+          cursor: pointer;
+          position: absolute;
+          right: 12px;
+          z-index: 30;
+        }
+        input[type="date"]::-webkit-inner-spin-button,
+        input[type="date"]::-webkit-clear-button {
+          display: none;
+        }
+      `}</style>
+      <AsdosPageHeader
+        eyebrow={(!isMobile && isFormOpen) ? "Formulir" : "Kelas Pengganti"}
+        title={(!isMobile && isFormOpen) ? "Ajukan Kelas Pengganti" : "Riwayat Kelas Pengganti"}
+        description={(!isMobile && isFormOpen) ? "Isi formulir untuk mengajukan kelas pengganti." : "Daftar pengajuan Kelas Pengganti Anda."}
+        action={
+          (!isMobile && isFormOpen) ? (
+            <button
+              onClick={handleCloseSheet}
+              disabled={submitLoading || isSuccess}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-4 md:mt-0"
+            >
+              <ArrowLeft size={16} /> Kembali
+            </button>
+          ) : (
+            <AsdosPrimaryButton onClick={handleOpenSheet} icon={<CalendarPlus size={18} />} className="hidden md:flex py-3 px-6 text-[15px] mt-4 md:mt-0">
+              Ajukan Kelas Pengganti
+            </AsdosPrimaryButton>
+          )
+        }
+      />
+
+      <div className="relative w-full overflow-hidden">
+        <div
+          className="flex md:w-[200%] w-full transform-gpu"
+          style={{
+            transform: !isMobile && isFormOpen ? 'translateX(-50%)' : 'translateX(0)',
+            transition: 'transform 500ms cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+        >
+          <div className={`md:w-1/2 w-full shrink-0 transition-opacity duration-300 ${(!isMobile && isFormOpen) ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+
+            <div className="flex flex-col gap-6 w-full pb-28 md:pb-8">
+              {historyLoading && (
+                <div className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 border border-slate-100 flex flex-col gap-6 w-full animate-pulse">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div className="flex flex-col gap-3 w-full md:w-1/3">
+                      <div className="h-6 md:h-8 w-3/4 rounded-lg bg-slate-100" />
+                      <div className="h-4 w-1/2 rounded-lg bg-slate-100" />
+                    </div>
+
+                    <div className="grid grid-cols-2 md:flex gap-4 md:gap-8 w-full md:w-auto">
+                      {Array.from({ length: 4 }, (_, i) => (
+                        <div key={i} className="border-l-2 border-slate-100 pl-4 space-y-2">
+                          <div className="h-3 w-14 rounded bg-slate-100" />
+                          <div className="h-4 w-20 rounded bg-slate-100" />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between md:justify-end w-full md:w-auto gap-3">
+                      <div className="h-9 w-24 rounded-xl bg-slate-100" />
+                      <div className="h-9 w-9 rounded-xl bg-slate-100 md:hidden" />
+                    </div>
+                  </div>
+
+                  <div className="bg-fog rounded-[12px] md:rounded-[20px] p-5 space-y-3">
+                    <div className="h-4 w-40 rounded bg-slate-200/70" />
+                    <div className="h-4 w-full rounded bg-slate-200/70" />
+                    <div className="h-4 w-2/3 rounded bg-slate-200/70" />
+                  </div>
+                  <p className="sr-only">Memuat riwayat...</p>
+                </div>
+              )}
+
+              {historyError && !historyLoading && <AsdosState variant="error" message={historyError} />}
+
+              {!historyLoading && !historyError && history.length === 0 && (
+                <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[12px] md:rounded-[32px] p-10 text-center">
+                  <p className="text-slate-500 font-medium">Belum ada pengajuan kelas pengganti.</p>
+                </div>
+              )}
+
+              {!historyLoading && !historyError && history.map(item => {
+                const cfg = statusConfig[item.status];
+                const isPending = item.status === 'PENDING';
+                const session = item.session;
+                return (
+                  <section
+                    key={item.id}
+                    className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 border border-slate-100 flex flex-col gap-6 w-full"
+                  >
+                    <article className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+
+                      <div className="flex flex-col gap-1 w-full md:w-1/3">
+                        <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 leading-snug line-clamp-2">
+                          {session?.mata_kuliah ?? 'Mata kuliah tidak tersedia'}
+                        </h2>
+                        <p className="text-sm text-slate-500 font-medium">
+                          {session?.nama_kelas ?? 'Kelas tidak tersedia'}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-row gap-6 md:gap-8 w-full md:w-auto flex-wrap">
+                        <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tgl Asli</span>
+                          <span className="text-sm md:text-base font-bold text-slate-800">{formatDate(item.original_date)}</span>
+                        </div>
+                        <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tgl Pengganti</span>
+                          <span className="text-sm md:text-base font-bold text-slate-800">{formatDate(item.substitute_date)}</span>
+                        </div>
+                        <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+                          <span className="text-sm md:text-base font-bold text-slate-800">{item.time_slot}</span>
+                        </div>
+                        <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+                          <span className="text-sm md:text-base font-bold text-slate-800">{item.room}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-row md:flex-col items-center justify-between md:justify-start md:items-end gap-2 mt-2 md:mt-0 w-full md:w-auto shrink-0">
+                        <span className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${cfg.bg} ${cfg.text}`}>
+                          {cfg.label}
+                        </span>
+                        {isPending && (
+                          <button
+                            onClick={() => handleOpenDelete(item.id)}
+                            disabled={deletingId === item.id}
+                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 border border-slate-200 transition-colors disabled:opacity-50">
+                            {deletingId === item.id
+                              ? <div className="w-4 h-4 border-2 border-slate-400/30 border-t-slate-500 rounded-full animate-spin" />
+                              : <Trash2 size={16} />
+                            }
+                          </button>
+                        )}
+                      </div>
+
+                    </article>
+
+                    <div className={`bg-fog rounded-[20px] p-5 grid grid-cols-1 ${item.status === 'REJECTED' && item.coordinator_reason ? 'md:grid-cols-[1fr_auto_1fr] gap-6' : 'gap-2'}`}>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2 text-slate-800">
+                          <Info className="w-[18px] h-[18px] text-slate-800" strokeWidth={2.5} />
+                          <span className="text-sm md:text-base font-bold text-slate-800">Alasan Pengajuan</span>
+                        </div>
+                        <p className="text-sm text-slate-500 mt-1 ml-1 leading-relaxed">
+                          &quot;{item.reason}&quot;
+                        </p>
+                      </div>
+
+                      {item.status === 'REJECTED' && item.coordinator_reason && (
+                        <>
+                          <div className="hidden md:block w-px self-stretch rounded-full bg-slate-300/60" />
+                          <div className="flex flex-col gap-2 pt-4 md:pt-0">
+                            <div className="flex items-center gap-2 text-slate-800">
+                              <XCircle className="w-[18px] h-[18px] text-crimson" strokeWidth={2.5} />
+                              <span className="text-sm md:text-base font-bold text-slate-800">Alasan Ditolak</span>
+                            </div>
+                            <p className="text-sm text-slate-500 mt-1 ml-1 leading-relaxed">
+                              {item.coordinator_reason}
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                  </section>
+                );
+              })}
+
+              {!historyLoading && !historyError && history.length > 0 && (
+                <p className="text-xs font-medium text-slate-400 text-center mt-2">
+                  Menampilkan {history.length} pengajuan kelas pengganti.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {!isMobile && (
+            <div className={`md:w-1/2 w-full shrink-0 transition-opacity duration-300 ${isFormOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <div className="bg-white rounded-[32px] p-6 md:p-8 border border-slate-100 max-w-2xl mx-auto flex flex-col w-full pb-8">
+                {renderFormContent()}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {!isFormOpen && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 p-5 bg-transparent z-10">
+          <div className="max-w-md mx-auto">
+            <button onClick={handleOpenSheet}
+              className="w-full flex items-center justify-center gap-2 bg-crimson text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]">
+              <CalendarPlus size={18} /><span>Ajukan Kelas Pengganti</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      <BottomSheet
+        isOpen={isFormOpen && isMobile}
+        onClose={handleCloseSheet}
+        title="Ajukan Kelas Pengganti"
+        subtitle="Isi formulir untuk mengajukan kelas pengganti."
+        maxWidthClassName="max-w-xl"
+      >
+        <div className="pt-2">
+          {renderFormContent()}
+        </div>
       </BottomSheet>
 
       <BottomSheet
@@ -594,7 +629,7 @@ export default function PengajuanKpPage() {
         maxWidthClassName="max-w-sm"
       >
         <div className="pt-4 pb-2">
-          <div className="flex items-center justify-center w-14 h-14 bg-rose-50 rounded-2xl mx-auto mb-5 text-[#941C2F]">
+          <div className="flex items-center justify-center w-14 h-14 bg-rose-50 rounded-2xl mx-auto mb-5 text-crimson">
             <Trash2 size={24} />
           </div>
           <h2 className="text-[20px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">
@@ -615,13 +650,12 @@ export default function PengajuanKpPage() {
             <button
               onClick={confirmDelete}
               disabled={!!deletingId}
-              className="w-full py-4 rounded-2xl bg-[#941C2F] text-white font-bold text-[15px] shadow-md shadow-[#941C2F]/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-4 rounded-2xl bg-crimson text-white font-bold text-[15px] shadow-md shadow-crimson/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {deletingId ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                'Ya, Batalkan'
-              )}
+              {deletingId
+                ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : 'Ya, Batalkan'
+              }
             </button>
             <button
               onClick={handleCloseDelete}

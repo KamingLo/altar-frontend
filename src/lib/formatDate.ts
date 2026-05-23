@@ -1,4 +1,4 @@
-// src/lib/formatDate.ts
+﻿// src/lib/formatDate.ts
 
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat('en-US', {

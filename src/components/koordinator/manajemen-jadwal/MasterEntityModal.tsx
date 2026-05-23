@@ -43,7 +43,7 @@ const TIPE_SEMESTER_OPTIONS = [
 ];
 
 const inputClass =
-  'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-white focus:border-[#941C2F] focus:ring-1 focus:ring-[#941C2F] outline-none disabled:opacity-60';
+  'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-white focus:border-crimson focus:ring-1 focus:ring-crimson outline-none disabled:opacity-60';
 
 export function MasterEntityModal({ open, mode, resource, initialData, onClose, onSuccess }: Props) {
   const [visible, setVisible] = useState(false);
@@ -247,7 +247,7 @@ export function MasterEntityModal({ open, mode, resource, initialData, onClose, 
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="flex-1 py-3.5 rounded-xl bg-[#941C2F] text-white font-bold text-[15px] shadow-md shadow-[#941C2F]/20 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+              className="flex-1 py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] shadow-md shadow-crimson/20 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {mode === 'create' ? 'Buat' : 'Simpan'}
@@ -473,3 +473,4 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
+
