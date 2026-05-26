@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarPlus, Info, Check, Trash2, XCircle, ArrowLeft, Calendar } from 'lucide-react';
-import { getSubstitutionDetail, createSubstitution, deleteSubstitution } from '@/lib/actions/pergantian-kelas';
+import { getSubstitutionDetail, createSubstitution, deleteSubstitution, getMySubstitutions } from '@/lib/actions/pergantian-kelas';
 import { getRuanganList } from '@/lib/actions/data-master';
 import { getSessionsByDate } from '@/lib/actions/jadwal';
 import type { RuanganItem, SubstituteSessionDetail } from '@/types/api';
@@ -103,24 +103,18 @@ export default function PengajuanKpPage() {
     setHistoryLoading(true);
     setHistoryError(null);
     try {
-      const ids = loadStoredIds(userId);
-      if (ids.length === 0) {
-        setPage(1, [], 0);
-        return;
+      const res = await getMySubstitutions();
+      if (res.success && res.data) {
+        setPage(1, res.data.items, res.data.total);
+      } else {
+        setHistoryError(res.message || 'Gagal memuat riwayat pengajuan.');
       }
-      const results = await Promise.all(
-        ids.map(id => getSubstitutionDetail(id).then(r => r.success && r.data ? r.data : null).catch(() => null))
-      );
-      const valid = results.filter((r): r is SubstituteSessionDetail => r !== null);
-      const validIds = valid.map(v => v.id);
-      if (validIds.length !== ids.length) saveStoredIds(userId, validIds);
-      setPage(1, valid, valid.length);
     } catch (e: unknown) {
       setHistoryError(e instanceof Error ? e.message : 'Terjadi kesalahan jaringan.');
     } finally {
       setHistoryLoading(false);
     }
-  }, [userId, setPage]);
+  }, [setPage]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
   useEffect(() => { setClientToday(todayIso()); }, []);
@@ -190,17 +184,13 @@ export default function PengajuanKpPage() {
       const res = await createSubstitution({
         id_session: idSession,
         id_ruangan: idRuangan,
+        id_asdos1: user?.id_asisten ?? null,
         substitute_date: substituteDate,
         original_date: originalDate,
         slot_option: slotOption,
         reason,
       });
       if (res.success) {
-        const newId = res.data?.id;
-        if (newId) {
-          const existing = loadStoredIds(userId);
-          saveStoredIds(userId, [newId, ...existing.filter(id => id !== newId)]);
-        }
         setIsSuccess(true);
         setTimeout(() => {
           setIsSuccess(false);
@@ -225,7 +215,6 @@ export default function PengajuanKpPage() {
     try {
       const res = await deleteSubstitution(targetDeleteId);
       if (res.success) {
-        saveStoredIds(userId, loadStoredIds(userId).filter(id => id !== targetDeleteId));
         removeItem(targetDeleteId);
         handleCloseDelete();
       } else {
@@ -488,8 +477,12 @@ export default function PengajuanKpPage() {
               {historyError && !historyLoading && <AsdosState variant="error" message={historyError} />}
 
               {!historyLoading && !historyError && history.length === 0 && (
-                <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[12px] md:rounded-[32px] p-10 text-center">
-                  <p className="text-slate-500 font-medium">Belum ada pengajuan kelas pengganti.</p>
+                <div className="bg-white border border-slate-100 rounded-[12px] md:rounded-[32px] p-6 md:p-8 text-center">
+                  <div className="mx-auto mb-4 w-12 h-12 rounded-[14px] bg-fog flex items-center justify-center text-slate-500">
+                    <CalendarPlus size={20} />
+                  </div>
+                  <p className="text-base md:text-lg text-slate-800 font-bold">Belum ada pengajuan.</p>
+                  <p className="text-sm text-slate-400 mt-1">Ajukan kelas pengganti menggunakan tombol di atas.</p>
                 </div>
               )}
 

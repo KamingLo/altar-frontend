@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Trash2 } from 'lucide-react';
 
 export type CustomSelectOption = {
   value: string;
@@ -22,6 +22,9 @@ type CustomSelectProps = {
   icon?: React.ReactNode;
   /** field = full-width trigger; icon = compact square button (e.g. filter) */
   variant?: 'field' | 'icon';
+  onDeleteOption?: (value: string) => void;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 };
 
 export function CustomSelect({
@@ -35,13 +38,28 @@ export function CustomSelect({
   align = 'left',
   icon,
   variant = 'field',
+  onDeleteOption,
+  searchable = false,
+  searchPlaceholder = 'Cari...',
 }: CustomSelectProps) {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
 
   const selected = options.find(o => o.value === value);
   const displayLabel = selected?.label ?? placeholder;
+
+  useEffect(() => {
+    if (!open) {
+      setSearchQuery('');
+    }
+  }, [open]);
+
+  const filteredOptions = options.filter(opt =>
+    opt.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (opt.description && opt.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   const updatePosition = useCallback(() => {
     const el = triggerRef.current;
@@ -101,32 +119,52 @@ export function CustomSelect({
         <div
           role="listbox"
           style={menuStyle}
-          className="z-[9999] bg-white border border-slate-100 rounded-2xl shadow-xl py-2 overflow-y-auto overscroll-contain"
+          className="z-[9999] bg-white border border-slate-100 rounded-2xl shadow-xl py-2 overflow-y-auto overscroll-contain flex flex-col"
         >
-          {options.length === 0 ? (
-            <p className="px-5 py-3 text-sm text-slate-500">Tidak ada opsi</p>
-          ) : (
-            options.map(opt => {
-              const active = opt.value === value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="option"
-                  aria-selected={active}
-                  onClick={() => handleSelect(opt.value)}
-                  className={`w-full text-left px-5 py-3 transition-colors ${
-                    active ? 'bg-slate-50 text-crimson font-bold' : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="block text-sm">{opt.label}</span>
-                  {opt.description && (
-                    <span className="block text-[11px] text-slate-400 font-medium mt-0.5">{opt.description}</span>
-                  )}
-                </button>
-              );
-            })
-          )}
+          <div className="flex-1 overflow-y-auto">
+            {filteredOptions.length === 0 ? (
+              <p className="px-5 py-3 text-sm text-slate-500">Tidak ada opsi ditemukan</p>
+            ) : (
+              filteredOptions.map(opt => {
+                const active = opt.value === value;
+                return (
+                  <div
+                    key={opt.value}
+                    className={`w-full flex items-center justify-between px-5 py-2 transition-colors ${
+                      active ? 'bg-slate-50 text-crimson font-bold' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      onClick={() => handleSelect(opt.value)}
+                      className="flex-1 text-left min-w-0 py-1"
+                    >
+                      <span className="block text-sm truncate">{opt.label}</span>
+                      {opt.description && (
+                        <span className="block text-[11px] text-slate-400 font-medium mt-0.5 truncate">{opt.description}</span>
+                      )}
+                    </button>
+                    {onDeleteOption && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(false);
+                          onDeleteOption(opt.value);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-crimson hover:bg-rose-50 active:scale-95 transition-all ml-2 shrink-0"
+                        title={`Hapus ${opt.label}`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </>,
       document.body,
@@ -135,39 +173,58 @@ export function CustomSelect({
   const isIcon = variant === 'icon';
 
   return (
-    <div className={`relative ${isIcon ? 'shrink-0' : ''} ${className}`}>
-      <button
-        ref={triggerRef}
-        type="button"
-        disabled={disabled}
-        onClick={() => !disabled && setOpen(v => !v)}
-        className={
-          isIcon
-            ? `border p-3.5 md:p-4 rounded-2xl md:rounded-3xl active:scale-95 transition-all flex items-center justify-center
-              ${open ? 'bg-red-50 border-crimson text-crimson' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}
-              ${triggerClassName}`
-            : `w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm font-medium text-left transition-all
-              ${disabled ? 'opacity-60 cursor-not-allowed bg-slate-50' : 'bg-white hover:border-slate-300 active:scale-[0.99]'}
-              ${open ? 'border-crimson ring-1 ring-crimson' : 'border-slate-200'}
-              ${!selected && !disabled ? 'text-slate-400' : 'text-slate-800'}
-              ${triggerClassName}`
-        }
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={isIcon ? displayLabel : undefined}
-      >
-        {isIcon ? (
-          icon
-        ) : (
-          <>
-            {icon && <span className="shrink-0 text-crimson">{icon}</span>}
-            <span className="flex-1 min-w-0 truncate">{displayLabel}</span>
-            <ChevronDown
-              className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
-            />
-          </>
-        )}
-      </button>
+    <div ref={triggerRef} className={`relative ${isIcon ? 'shrink-0' : ''} ${className}`}>
+      {!isIcon && open && searchable ? (
+        <div className="relative w-full">
+          {icon && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-crimson shrink-0 z-10">{icon}</span>}
+          <input
+            type="text"
+            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm font-medium text-left transition-all border-crimson ring-1 ring-crimson outline-none text-slate-800 bg-white ${
+              icon ? 'pl-11' : ''
+            } ${triggerClassName}`}
+            placeholder={selected?.label ?? placeholder}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            autoFocus
+          />
+          <ChevronDown
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 shrink-0 text-slate-400 rotate-180 cursor-pointer"
+            onClick={() => setOpen(false)}
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => !disabled && setOpen(v => !v)}
+          className={
+            isIcon
+              ? `border p-3.5 md:p-4 rounded-2xl md:rounded-3xl active:scale-95 transition-all flex items-center justify-center
+                ${open ? 'bg-red-50 border-crimson text-crimson' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}
+                ${triggerClassName}`
+              : `w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm font-medium text-left transition-all
+                ${disabled ? 'opacity-60 cursor-not-allowed bg-slate-50' : 'bg-white hover:border-slate-300 active:scale-[0.99]'}
+                ${open ? 'border-crimson ring-1 ring-crimson' : 'border-slate-200'}
+                ${!selected && !disabled ? 'text-slate-400' : 'text-slate-800'}
+                ${triggerClassName}`
+          }
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-label={isIcon ? displayLabel : undefined}
+        >
+          {isIcon ? (
+            icon
+          ) : (
+            <>
+              {icon && <span className="shrink-0 text-crimson">{icon}</span>}
+              <span className="flex-1 min-w-0 truncate">{displayLabel}</span>
+              <ChevronDown
+                className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+              />
+            </>
+          )}
+        </button>
+      )}
       {menu}
     </div>
   );

@@ -8,13 +8,13 @@
 ] as const;
 
 export const JAM_OPTIONS = [
-  { value: 1, label: 'Jam 1', range: '07:30 â€“ 09:10' },
-  { value: 2, label: 'Jam 2', range: '09:30 â€“ 11:10' },
-  { value: 3, label: 'Jam 3', range: '11:30 â€“ 13:10' },
-  { value: 4, label: 'Jam 4', range: '13:30 â€“ 15:10' },
-  { value: 5, label: 'Jam 5', range: '15:30 â€“ 17:10' },
-  { value: 6, label: 'Jam 6', range: '17:40 â€“ 19:15' },
-  { value: 7, label: 'Jam 7', range: '19:30 â€“ 21:00' },
+  { value: 1, label: 'Jam 1', range: '07:30 — 09:10' },
+  { value: 2, label: 'Jam 2', range: '09:30 — 11:10' },
+  { value: 3, label: 'Jam 3', range: '11:30 — 13:10' },
+  { value: 4, label: 'Jam 4', range: '13:30 — 15:10' },
+  { value: 5, label: 'Jam 5', range: '15:30 — 17:10' },
+  { value: 6, label: 'Jam 6', range: '17:40 — 19:15' },
+  { value: 7, label: 'Jam 7', range: '19:30 — 21:00' },
 ] as const;
 
 export function opsiHariFromTanggal(tanggal: string): number {

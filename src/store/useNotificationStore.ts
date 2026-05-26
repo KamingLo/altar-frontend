@@ -33,7 +33,6 @@ export const useNotificationStore = create<NotificationState>()(
         pendingCount: state.pendingCount,
         lastSeenKpId: state.lastSeenKpId,
         lastSeenPresensiId: state.lastSeenPresensiId,
-        // hasSeen NOT persisted â€” session only, resets on page reload
       }),
     }
   )

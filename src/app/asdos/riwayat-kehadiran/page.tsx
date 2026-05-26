@@ -14,8 +14,8 @@ type HistoryItem = {
 };
 
 const statusCfg = {
-  BERJALAN: { bg: 'bg-fog', text: 'text-ink', label: 'BERJALAN' },
-  SELESAI: { bg: 'bg-obsidian', text: 'text-white', label: 'SELESAI' },
+  BERJALAN: { bg: 'bg-crimson/10', text: 'text-crimson', label: 'BERJALAN' },
+  SELESAI: { bg: 'bg-crimson', text: 'text-white', label: 'SELESAI' },
 };
 
 function isActivePresensi(item: PresensiResponseDTO) {
@@ -222,8 +222,12 @@ export default function RiwayatKehadiranPage() {
             </section>
           );
         }) : (
-          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[12px] md:rounded-[32px] p-10 text-center">
-            <p className="text-slate-500 font-medium">Belum ada Riwayat Kehadiran.</p>
+          <div className="bg-white border border-slate-100 rounded-[12px] md:rounded-[32px] p-6 md:p-8 text-center">
+            <div className="mx-auto mb-4 w-12 h-12 rounded-[14px] bg-fog flex items-center justify-center text-slate-500">
+              <Clock size={20} />
+            </div>
+            <p className="text-base md:text-lg text-slate-800 font-bold">Belum ada riwayat kehadiran.</p>
+            <p className="text-sm text-slate-400 mt-1">Riwayat akan muncul setelah Anda melakukan check-in.</p>
           </div>
         )}
 

@@ -17,7 +17,6 @@ export const koordinatorMenuItems = [
   { id: 2, title: 'Generate QR', icon: QrCode, href: '/koordinator/generate-qr', desc: 'Buat kode QR untuk sesi' },
   { id: 3, title: 'Manajemen User', icon: Users, href: '/koordinator/manajemen-user', desc: 'Kelola data asisten dosen' },
   { id: 4, title: 'Manajemen KP', icon: CalendarSync, href: '/koordinator/manajemen-kp', desc: 'Jadwal & data kerja praktik' },
-  // { id: 5, title: 'Data Master', icon: Database, href: '/koordinator/data-master', desc: 'Kelola kelas, MK, ruangan, semester' },
   { id: 5, title: 'Manajemen Jadwal', icon: CalendarDays, href: '/koordinator/manajemen-jadwal', desc: 'Kelola sesi jadwal mengajar' },
 ];
 
@@ -225,10 +224,10 @@ export default function KoordinatorHome() {
                       <span className="text-[10px] lg:text-xs text-slate-400 font-medium whitespace-nowrap">{timeAgo(kp.created_at)}</span>
                     </div>
                     <p className="text-[12px] lg:text-xs font-semibold text-crimson mb-1 truncate">
-                      {kp.session?.mata_kuliah}{kp.session?.nama_kelas ? ` â€” ${kp.session.nama_kelas}` : ''}
+                      {kp.session?.mata_kuliah}{kp.session?.nama_kelas ? ` — ${kp.session.nama_kelas}` : ''}
                     </p>
                     <p className="text-[12px] lg:text-xs text-slate-500 mb-3 line-clamp-2">
-                      {formatShortDate(kp.original_date)} â†’ {formatShortDate(kp.substitute_date)}
+                      {formatShortDate(kp.original_date)} → {formatShortDate(kp.substitute_date)}
                     </p>
                     <span className="inline-block text-[10px] lg:text-xs font-bold text-amber-600 bg-amber-50 px-4 py-1.5 rounded-full">
                       Menunggu ACC

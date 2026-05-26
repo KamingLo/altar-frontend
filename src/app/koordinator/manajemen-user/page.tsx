@@ -236,7 +236,7 @@ export default function ManajemenAsdosPage() {
   };
 
   const handleGoToCreateUser = () => {
-    setCreateUserForm({ username: '', email: modalSearchQuery.trim() });
+    setCreateUserForm({ username: modalSearchQuery.trim(), email: '' });
     setFormError('');
     setAddStep('create_user');
   };

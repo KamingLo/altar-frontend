@@ -30,17 +30,15 @@ export function getMonthBounds(year: number, month: number) {
 }
 
 export function semesterLabel(tahun: string, tipe: string) {
-  return `${tahun} Â· ${tipe}`;
+  return `${tahun} · ${tipe}`;
 }
 
-/** Normalisasi tanggal dari API (YYYY-MM-DD atau ISO datetime) */
 export function sessionDateKey(tanggal: string): string {
   return tanggal.trim().slice(0, 10);
 }
 
 export type SessionTipe = 'REGULER' | 'PENGGANTI';
 
-/** Backend bisa mengirim REGULAR/REGULER atau SUBSTITUTE/PENGGANTI */
 export function normalizeSessionTipe(tipe: string): SessionTipe {
   const u = tipe.trim().toUpperCase();
   if (u === 'PENGGANTI' || u === 'SUBSTITUTE') return 'PENGGANTI';
@@ -55,7 +53,6 @@ export function isPenggantiTipe(tipe: string): boolean {
   return normalizeSessionTipe(tipe) === 'PENGGANTI';
 }
 
-/** Key unik per baris list (id_sesi bisa sama untuk beberapa instance tanggal) */
 export function sessionRowKey(session: {
   id_sesi: string;
   tanggal: string;
@@ -76,7 +73,6 @@ export function normalizeLookupLabel(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-/** Cocokkan label dari timeline ke item dropdown (nama bisa sedikit berbeda) */
 export function findByDisplayLabel<T>(
   items: T[],
   label: string,
@@ -92,7 +88,6 @@ export function findByDisplayLabel<T>(
   });
 }
 
-/** Pengajar di timeline bisa berformat "Nama (Substitute Teacher)" */
 export function pengajarDisplayName(pengajar: string): string {
   return pengajar.split('(')[0]?.trim() ?? pengajar.trim();
 }

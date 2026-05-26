@@ -229,7 +229,6 @@ export default function JadwalAjarPage() {
       if (items.length > 0) {
         setSelectedSemesterId(items[0].id);
       } else {
-        setError(res.message || 'Data semester tidak tersedia.');
         setIsLoading(false);
       }
     }).catch(() => {
@@ -255,11 +254,10 @@ export default function JadwalAjarPage() {
           : await getScheduleTimeline(params);
 
         if (cancelled) return;
-        if (res.success && res.data) {
-          setSessions(mapTimelineItems(res.data.items || []));
+        if (res.success) {
+          setSessions(mapTimelineItems(res.data?.items || []));
         } else {
           setSessions([]);
-          setError(res.message || 'Gagal memuat jadwal.');
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -301,6 +299,7 @@ export default function JadwalAjarPage() {
   };
 
   const filtered = sessions.filter(s =>
+    deriveStatus(s.waktu) !== 'Selesai' &&
     (s.mata_kuliah.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.ruangan.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.pengajar.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -316,22 +315,22 @@ export default function JadwalAjarPage() {
 
   const sortedDateKeys = Object.keys(grouped).sort();
 
-  const ScheduleCard = ({ s }: { s: SessionFromAPI }) => {
+  const ScheduleCard = ({ s, gridMode = false }: { s: SessionFromAPI; gridMode?: boolean }) => {
     const status = deriveStatus(s.waktu);
     const cfg = status === 'Berjalan'
-      ? { bg: 'bg-fog', text: 'text-ink', label: 'BERJALAN' }
-      : { bg: 'bg-obsidian', text: 'text-white', label: status === 'Mendatang' ? 'MENDATANG' : 'SELESAI' };
+      ? { bg: 'bg-crimson', text: 'text-white', label: 'BERJALAN' }
+      : { bg: 'bg-crimson/10', text: 'text-crimson', label: status === 'Mendatang' ? 'MENDATANG' : 'SELESAI' };
     const timePart = s.waktu.split(', ')[1] ?? s.waktu;
     const isPengganti = s.tipe_jadwal === 'PENGGANTI';
 
     return (
-      <section className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 border border-slate-100 flex flex-col gap-6 w-full">
-        <article className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="flex flex-col gap-1 w-full md:w-1/3">
-            <h2 className="text-xl md:text-2xl font-bold text-slate-900 leading-snug line-clamp-2 mb-1">
+      <section className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 flex flex-col gap-5 w-full">
+        <article className={`flex flex-col ${!gridMode ? 'md:flex-row md:justify-between md:items-center' : 'flex-1'} gap-5`}>
+          <div className={`flex flex-col gap-1 w-full ${!gridMode ? 'md:w-1/3' : 'flex-1'}`}>
+            <h2 className={`font-bold text-slate-900 leading-snug line-clamp-2 mb-1 ${gridMode ? 'text-sm md:text-base' : 'text-xl md:text-2xl'}`}>
               {s.mata_kuliah}
             </h2>
-            <p className="text-sm text-slate-500 font-medium">{s.nama_kelas || 'Kelas tidak tersedia'}</p>
+            <p className={`text-slate-500 font-medium ${gridMode ? 'text-[11px] md:text-xs' : 'text-sm'}`}>{s.nama_kelas || 'Kelas tidak tersedia'}</p>
             {isPengganti && (
               <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">
                 Pengganti
@@ -339,26 +338,26 @@ export default function JadwalAjarPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full md:w-[480px]">
-            <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
-              <span className="text-sm md:text-base font-bold text-slate-800">{formatDisplayDate(getSessionIso(s.waktu))}</span>
+          <div className={`grid w-full ${gridMode ? 'grid-cols-1 gap-y-2.5 border-t border-slate-100 pt-3 md:grid-cols-2 md:gap-x-6 md:gap-y-4 md:border-t-0 md:pt-0' : 'grid-cols-2 gap-x-6 gap-y-4 md:w-[480px]'}`}>
+            <div className={`flex flex-col gap-0.5 ${!gridMode ? 'border-l-2 border-slate-100 pl-4' : 'md:border-l-2 md:border-slate-100 md:pl-4'}`}>
+              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
+              <span className={`font-bold text-slate-800 ${gridMode ? 'text-xs md:text-xs' : 'text-sm md:text-base'}`}>{formatDisplayDate(getSessionIso(s.waktu))}</span>
             </div>
-            <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
-              <span className="text-sm md:text-base font-bold text-slate-800">{timePart}</span>
+            <div className={`flex flex-col gap-0.5 ${!gridMode ? 'border-l-2 border-slate-100 pl-4' : 'md:border-l-2 md:border-slate-100 md:pl-4'}`}>
+              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+              <span className={`font-bold text-slate-800 ${gridMode ? 'text-xs md:text-xs' : 'text-sm md:text-base'}`}>{timePart}</span>
             </div>
-            <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
-              <span className="text-sm md:text-base font-bold text-slate-800">{s.ruangan}</span>
+            <div className={`flex flex-col gap-0.5 ${!gridMode ? 'border-l-2 border-slate-100 pl-4' : 'md:border-l-2 md:border-slate-100 md:pl-4'}`}>
+              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+              <span className={`font-bold text-slate-800 ${gridMode ? 'text-xs md:text-xs' : 'text-sm md:text-base'}`}>{s.ruangan}</span>
             </div>
-            <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pengajar</span>
-              <span className="text-sm md:text-base font-bold text-slate-800">{s.pengajar || '-'}</span>
+            <div className={`flex flex-col gap-0.5 ${!gridMode ? 'border-l-2 border-slate-100 pl-4' : 'md:border-l-2 md:border-slate-100 md:pl-4'}`}>
+              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pengajar</span>
+              <span className={`font-bold text-slate-800 ${gridMode ? 'text-xs md:text-xs' : 'text-sm md:text-base'}`}>{s.pengajar || '-'}</span>
             </div>
           </div>
 
-          <span className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap mt-2 md:mt-0 ${cfg.bg} ${cfg.text}`}>
+          <span className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap self-start ${cfg.bg} ${cfg.text}`}>
             {cfg.label}
           </span>
         </article>
@@ -435,7 +434,7 @@ export default function JadwalAjarPage() {
       />
 
       <div className="mb-6 flex flex-col md:flex-row md:items-end gap-3 md:gap-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+        <div className="grid grid-cols-2 gap-3 flex-1">
           <div>
             <DatePickerField label="Dari Tanggal" value={startDate} onChange={handleStartDateChange} />
           </div>
@@ -466,7 +465,7 @@ export default function JadwalAjarPage() {
       <div className="flex flex-col gap-6 w-full pb-8">
         {error ? (
           <AsdosState variant="error" message={error} />
-        ) : (isLoading || !selectedSemesterId) ? (
+        ) : isLoading ? (
           <LoadingState />
         ) : filtered.length > 0 ? (
           <>
@@ -475,7 +474,13 @@ export default function JadwalAjarPage() {
                 <div className="flex items-center px-1">
                   <h3 className="text-sm font-bold text-slate-800">{formatDisplayDate(dateKey)}</h3>
                 </div>
-                {grouped[dateKey].map(s => <ScheduleCard key={`${s.id_sesi}-${s.waktu}`} s={s} />)}
+                {viewMode === 'ALL' ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                    {grouped[dateKey].map(s => <ScheduleCard key={`${s.id_sesi}-${s.waktu}`} s={s} gridMode />)}
+                  </div>
+                ) : (
+                  grouped[dateKey].map(s => <ScheduleCard key={`${s.id_sesi}-${s.waktu}`} s={s} />)
+                )}
               </div>
             ))}
 

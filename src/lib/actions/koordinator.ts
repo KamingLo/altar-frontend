@@ -42,7 +42,6 @@ export async function deactivateKiosk() {
 }
 
 export async function generateQRToken() {
-  // We use auth: true because the cookie should have been updated to the kiosk token
   return apiClient.get<{ qr_token: string }>('/koor/kiosk/generate-qr', { auth: true });
 }
 

@@ -158,8 +158,6 @@ export default function GenerateQrPage() {
 
   const refreshQRToken = useCallback(async () => {
     const res = await generateQRToken();
-    // Bungkus state updates dengan startTransition agar tidak bentrok dengan
-    // router.refresh() implicit yang Next.js trigger setelah server action selesai
     startTransition(() => {
       if (res.success && res.data?.qr_token) {
         setQrToken(res.data.qr_token);
@@ -244,7 +242,6 @@ export default function GenerateQrPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isPinModalOpen,
     isExitModalOpen,
@@ -755,7 +752,7 @@ export default function GenerateQrPage() {
               <div className="hidden lg:flex items-center gap-4 text-right">
                 <div>
                   <p className="text-[11px] font-bold text-slate-500 tracking-widest uppercase">{dateStr}</p>
-                  <p className="text-sm font-semibold text-slate-600 mt-0.5">Tahun Ajaran {selectedSemester?.tahun_ajaran || 'â€”'}</p>
+                  <p className="text-sm font-semibold text-slate-600 mt-0.5">Tahun Ajaran {selectedSemester?.tahun_ajaran || '—'}</p>
                 </div>
                 <div className="w-px h-10 bg-slate-200" />
                 <div>
@@ -871,7 +868,7 @@ export default function GenerateQrPage() {
             </div>
 
             <div className="hidden lg:flex justify-between items-center pt-4 shrink-0">
-              <p className="text-xs text-slate-500 font-medium">Â© Altar Kiosk System Â· locked secure session.</p>
+              <p className="text-xs text-slate-500 font-medium">© Altar Kiosk System · locked secure session.</p>
               <button
                 type="button"
                 onClick={openExitModal}

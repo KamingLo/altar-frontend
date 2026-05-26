@@ -1,4 +1,4 @@
-﻿'use server';
+'use server';
 
 import { apiClient } from '@/lib/api/client';
 import type { SubstituteSessionDetail } from '@/types/api';
@@ -11,7 +11,6 @@ type SubstitutionListParams = {
   limit?: number;
 };
 
-// Koordinator/asdos: lihat request, bisa filter by status + pagination
 export async function getAllSubstitutions(params?: SubstitutionStatus | SubstitutionListParams) {
   const normalized: SubstitutionListParams = typeof params === 'string' ? { status: params } : params ?? {};
   const queryParams = new URLSearchParams();
@@ -25,7 +24,6 @@ export async function getAllSubstitutions(params?: SubstitutionStatus | Substitu
   );
 }
 
-// Semua role: lihat detail satu request
 export async function getSubstitutionDetail(id: string) {
   return apiClient.get<SubstituteSessionDetail>(`/substitute-sessions/${id}`, {
     auth: true,
@@ -33,9 +31,16 @@ export async function getSubstitutionDetail(id: string) {
   });
 }
 
-// Asdos: ajukan request pergantian kelas baru
-// slot_option 1-7 â†’ 07:30-09:10, 09:30-11:10, 11:30-13:10, 13:30-15:10,
-//                    15:30-17:10, 17:40-19:15, 19:30-21:00
+export async function getMySubstitutions() {
+  return apiClient.get<{ items: SubstituteSessionDetail[]; total: number }>(
+    '/substitute-sessions/me',
+    {
+      auth: true,
+      cache: 'no-store',
+    }
+  );
+}
+
 export async function createSubstitution(data: {
   id_session: string;
   id_ruangan: string;
@@ -51,13 +56,11 @@ export async function createSubstitution(data: {
   return { success: res.success, message: res.message, data: res.data as SubstituteSessionDetail | undefined };
 }
 
-// Asdos: batalkan request yang masih PENDING
 export async function deleteSubstitution(id: string) {
   const res = await apiClient.delete(`/substitute-sessions/${id}`, { auth: true });
   return { success: res.success, message: res.message };
 }
 
-// Koordinator: approve (VERIFIED) atau reject (REJECTED) request
 export async function updateSubstitutionStatus(
   id: string,
   data: { status: 'VERIFIED' | 'REJECTED'; coordinator_reason?: string | null },

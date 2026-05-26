@@ -2,19 +2,15 @@
 import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem } from '@/types/api';
 
 interface DataMasterState {
-  // Kelas
   kelasList: KelasItem[];
   kelasPage: number;
   kelasHasMore: boolean;
-  // Mata Kuliah
   mkList: MataKuliahItem[];
   mkPage: number;
   mkHasMore: boolean;
-  // Ruangan
   ruanganList: RuanganItem[];
   ruanganPage: number;
   ruanganHasMore: boolean;
-  // Semester
   semesterList: SemesterItem[];
   semesterPage: number;
   semesterHasMore: boolean;

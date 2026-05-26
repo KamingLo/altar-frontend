@@ -40,7 +40,6 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarReady, setSidebarReady] = useState(false);
 
-  // useLayoutEffect runs before browser paint â€” no flash when restoring collapsed/dark state
   useLayoutEffect(() => {
     const stored = localStorage.getItem('sidebar-collapsed');
     if (stored !== null) setIsSidebarCollapsed(stored === 'true');
@@ -357,7 +356,6 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
 
       <div className="flex w-full h-screen overflow-hidden lg:max-w-none shadow-2xl lg:shadow-none relative bg-canvas">
 
-        {/* Background Layer - Moved to root so sidebar glass blurs it perfectly */}
         {bgImage && (
           <div className="absolute top-0 left-0 right-0 h-[45svh] lg:h-[35svh] z-0 pointer-events-none">
             <div
@@ -377,7 +375,6 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
           </div>
         )}
 
-        {/* --- DESKTOP FLOATING SIDEBAR --- */}
         <aside
           id="dashboard-sidebar-desktop"
           className={`relative z-20 hidden lg:flex flex-col h-[calc(100vh-2rem)] my-4 ml-4 rounded-[1.5rem] overflow-hidden shrink-0 backdrop-blur-2xl border bg-crimson/80 border-white/20 shadow-[0_8px_32px_rgba(148,28,47,0.25)] ${sidebarReady ? 'transition-[width,background-color] duration-300 ease-in-out' : ''} ${isSidebarCollapsed ? 'w-[84px]' : 'w-[280px]'}`}
@@ -427,12 +424,10 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
           </div>
         </aside>
 
-        {/* --- MAIN CONTENT AREA --- */}
         <main
           className="relative z-10 w-full max-w-md lg:max-w-none h-screen bg-transparent overflow-hidden flex flex-col mx-auto lg:mx-0 transition-all duration-300"
           style={{ fontFamily: "'Inter', sans-serif" }}
         >
-          {/* Dashboard button(s) â€” top left, next to sidebar */}
           <div id="dashboard-top-left" className="hidden lg:flex absolute top-7 left-7 z-20 items-center gap-2">
             {hasDualRole ? (
               <>
@@ -462,7 +457,6 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             )}
           </div>
 
-          {/* Date/time + notification + dark toggle â€” top right */}
           <div id="dashboard-top-right" className="hidden lg:flex flex-col absolute top-7 right-7 z-20 items-end gap-3">
             <div className="flex items-center gap-4">
               {pathname !== homeHref && !hasSeen && pendingCount > 0 && (
@@ -495,7 +489,6 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
               <Home size={26} strokeWidth={2.5} />
             </Link>
 
-            {/* clock container */}
             <div className="flex flex-col items-center">
               <div id="dashboard-clock-mobile" className={`flex flex-col items-center rounded-xl px-3 py-1.5 transition-all duration-300 ${isScrolled ? 'bg-transparent border border-transparent shadow-none' : 'bg-white/40 backdrop-blur-md shadow-sm border border-white/20'}`}>
                 <p className="text-[8px] font-bold tracking-widest uppercase leading-none text-slate-500">{dateStr}</p>
@@ -522,7 +515,6 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             {children}
           </div>
 
-          {/* --- MOBILE FLOATING SIDEBAR DRAWER --- */}
           <div className={`lg:hidden fixed inset-0 z-50 ${isSidebarOpen ? '' : 'pointer-events-none'}`}>
             <div
               className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ease-in-out ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
@@ -580,7 +572,6 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] transition-opacity duration-300 ease-out ${isLogoutVisible && !isLogoutClosing ? 'opacity-100' : 'opacity-0'}`}
           />
 
-          {/* Desktop popout */}
           <div className="hidden lg:flex fixed inset-0 z-[70] items-center justify-center">
             <div
               className={`bg-white rounded-[1.5rem] shadow-2xl w-full max-w-sm mx-4 overflow-hidden transition-all duration-300 ${isLogoutVisible && !isLogoutClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
@@ -605,7 +596,6 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             </div>
           </div>
 
-          {/* Mobile bottom sheet */}
           <div className="lg:hidden fixed inset-0 z-[70] flex items-end justify-center pointer-events-none">
             <div
               className="w-full max-w-md bg-white rounded-t-[1.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden pointer-events-auto"

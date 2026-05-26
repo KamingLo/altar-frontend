@@ -197,8 +197,8 @@ export default function ManajemenKpPage() {
                     onClick={() => setActiveTab(tab.id)}
                     className={`
                       flex-1 min-w-fit px-5 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] select-none
-                      ${isActive 
-                        ? 'bg-crimson text-white shadow-sm' 
+                      ${isActive
+                        ? 'bg-crimson text-white shadow-sm'
                         : 'bg-transparent text-slate-500 hover:text-slate-800'
                       }
                     `}
@@ -253,8 +253,8 @@ export default function ManajemenKpPage() {
               {isMobileFilterOpen && (
                 <>
 
-                  <div 
-                    className="fixed inset-0 z-30" 
+                  <div
+                    className="fixed inset-0 z-30"
                     onClick={() => setIsMobileFilterOpen(false)}
                   />
 
@@ -278,8 +278,8 @@ export default function ManajemenKpPage() {
                           }}
                           className={`
                             w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold rounded-xl transition-all active:scale-[0.98] select-none
-                            ${isActive 
-                              ? 'bg-crimson/10 text-crimson' 
+                            ${isActive
+                              ? 'bg-crimson/10 text-crimson'
                               : 'bg-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-800'
                             }
                           `}
@@ -330,7 +330,7 @@ export default function ManajemenKpPage() {
             </div>
             <h3 className="text-base font-extrabold text-slate-800">Tidak Ada Pengajuan</h3>
             <p className="text-xs text-slate-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
-              {searchQuery 
+              {searchQuery
                 ? 'Tidak ada pengajuan kelas pengganti yang cocok dengan kata pencarian Anda.'
                 : `Tidak ada permohonan kelas pengganti berstatus "${activeTab === 'ALL' ? 'Semua' : activeTab === 'PENDING' ? 'Pending' : activeTab === 'VERIFIED' ? 'Disetujui' : 'Ditolak'}" saat ini.`
               }
@@ -367,7 +367,7 @@ export default function ManajemenKpPage() {
                       <span
                         className={`
                           text-[10px] font-extrabold tracking-wider px-2.5 py-1 rounded-lg border uppercase shrink-0
-                          ${isPendingStatus 
+                          ${isPendingStatus
                             ? 'bg-amber-50 text-amber-600 border-amber-200'
                             : isVerifiedStatus
                               ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
@@ -511,8 +511,8 @@ export default function ManajemenKpPage() {
                 <div
                   className={`
                     w-12 h-12 rounded-2xl flex items-center justify-center shrink-0
-                    ${modalType === 'APPROVE' 
-                      ? 'bg-emerald-50 text-emerald-600' 
+                    ${modalType === 'APPROVE'
+                      ? 'bg-emerald-50 text-emerald-600'
                       : 'bg-rose-50 text-crimson'
                     }
                   `}
@@ -626,4 +626,3 @@ export default function ManajemenKpPage() {
     </div>
   );
 }
-

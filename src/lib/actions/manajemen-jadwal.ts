@@ -39,7 +39,6 @@ function normalizeAsdosList(data: unknown): AsdosListItem[] {
   return [];
 }
 
-/** Fetch timeline sesi dari backend (GET /sessions) */
 export async function fetchSessions(params: {
   id_semester: string;
   start_date?: string;
@@ -60,7 +59,6 @@ export async function fetchSessions(params: {
   };
 }
 
-/** Data dropdown form â€” kelas, MK, ruangan, semester, asdos, dosen dari DB */
 export async function fetchDropdownData(): Promise<{
   success: boolean;
   message: string;
@@ -114,19 +112,16 @@ export async function fetchSemesters(): Promise<{
   };
 }
 
-/** POST /sessions */
 export async function buatSesi(data: SessionBody) {
   const res = await createSession(data);
   return { success: res.success, message: res.message };
 }
 
-/** PATCH /sessions/:id â€” tanggal instance dikirim di body & query agar backend tahu baris mana */
 export async function editSesi(id: string, data: SessionBody, instanceDate?: string) {
   const res = await updateSession(id, data, instanceDate ?? data.tanggal);
   return { success: res.success, message: res.message };
 }
 
-/** DELETE /sessions/:id atau /substitute-sessions/:id */
 export async function hapusSesi(
   id: string,
   instanceDate?: string,

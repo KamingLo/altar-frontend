@@ -59,7 +59,6 @@ export async function createAsdosAccount(data: {
   nim: string;
   phone_number: string;
 }) {
-  // Step 1: buat user
   const userRes = await apiClient.post(
     '/users',
     { username: data.username, email: data.email },
@@ -67,7 +66,6 @@ export async function createAsdosAccount(data: {
   );
   if (!userRes.success) return { success: false, message: userRes.message };
 
-  // Step 2: cari user yang baru dibuat by email
   const searchRes = await apiClient.get<UserListItem[]>(
     `/users?search=${encodeURIComponent(data.email)}`,
     { auth: true, cache: 'no-store' },
@@ -80,7 +78,6 @@ export async function createAsdosAccount(data: {
   );
   if (!user) return { success: false, message: 'Akun baru tidak ditemukan setelah dibuat.' };
 
-  // Step 3: assign role asdos
   const asdosRes = await apiClient.post(
     '/asdos',
     { user_id: user.id, nim: data.nim, phone_number: data.phone_number },
@@ -97,7 +94,6 @@ export async function createKoorAccount(data: {
   email: string;
   nip: string;
 }) {
-  // Step 1: buat user
   const userRes = await apiClient.post(
     '/users',
     { username: data.username, email: data.email },
@@ -105,7 +101,6 @@ export async function createKoorAccount(data: {
   );
   if (!userRes.success) return { success: false, message: userRes.message };
 
-  // Step 2: cari user yang baru dibuat by email
   const searchRes = await apiClient.get<UserListItem[]>(
     `/users?search=${encodeURIComponent(data.email)}`,
     { auth: true, cache: 'no-store' },
@@ -118,7 +113,6 @@ export async function createKoorAccount(data: {
   );
   if (!user) return { success: false, message: 'Akun baru tidak ditemukan setelah dibuat.' };
 
-  // Step 3: assign role koordinator
   const koorRes = await apiClient.post(
     '/koor',
     { user_id: user.id, nip: data.nip },

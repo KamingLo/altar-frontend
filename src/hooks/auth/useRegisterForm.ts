@@ -35,15 +35,13 @@ export const useRegisterForm = () => {
 
     try {
       const result = await sendOtp({ email: formData.email });
-      
-      // Ambil pesan langsung dari backend untuk feedback ke user
-      setNotification({ 
+
+      setNotification({
         type: result.success ? 'success' : 'error', 
         text: result.message 
       });
 
     } catch {
-      // Tidak perlu menangkap objek error, cukup tampilkan pesan kegagalan sistem
       setNotification({ type: 'error', text: 'Gagal menghubungi server' });
     } finally {
       setLoadingOTP(false);
@@ -64,7 +62,6 @@ export const useRegisterForm = () => {
         setNotification({ type: 'success', text: result.message });
         setTimeout(() => router.push('/auth/login'), 1500);
       } else {
-        // Gunakan pesan error spesifik dari backend (misal: "OTP tidak valid")
         setNotification({ type: 'error', text: result.message });
       }
 

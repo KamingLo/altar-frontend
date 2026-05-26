@@ -337,16 +337,16 @@ export default function ManajemenJadwalPage() {
 
     if (action === 'created') {
       switch (resource) {
-        case 'kelas':    setForm(f => ({ ...f, id_kelas: newId })); break;
-        case 'mk':       setForm(f => ({ ...f, id_mk: newId })); break;
-        case 'ruangan':  setForm(f => ({ ...f, id_ruangan: newId })); break;
+        case 'kelas': setForm(f => ({ ...f, id_kelas: newId })); break;
+        case 'mk': setForm(f => ({ ...f, id_mk: newId })); break;
+        case 'ruangan': setForm(f => ({ ...f, id_ruangan: newId })); break;
         case 'lecturer': setForm(f => ({ ...f, id_dosen: newId, id_asdos1: '', id_asdos2: '' })); break;
       }
     } else if (action === 'deleted') {
       switch (resource) {
-        case 'kelas':    setForm(f => (f.id_kelas === newId ? { ...f, id_kelas: '' } : f)); break;
-        case 'mk':       setForm(f => (f.id_mk === newId ? { ...f, id_mk: '' } : f)); break;
-        case 'ruangan':  setForm(f => (f.id_ruangan === newId ? { ...f, id_ruangan: '' } : f)); break;
+        case 'kelas': setForm(f => (f.id_kelas === newId ? { ...f, id_kelas: '' } : f)); break;
+        case 'mk': setForm(f => (f.id_mk === newId ? { ...f, id_mk: '' } : f)); break;
+        case 'ruangan': setForm(f => (f.id_ruangan === newId ? { ...f, id_ruangan: '' } : f)); break;
         case 'lecturer': setForm(f => (f.id_dosen === newId ? { ...f, id_dosen: '' } : f)); break;
       }
     }
@@ -1074,15 +1074,14 @@ export default function ManajemenJadwalPage() {
           />
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none p-0 md:p-4">
             <div
-              className={`w-full max-w-lg bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[80vh] overflow-hidden pointer-events-auto transition-all duration-300 ${
-                isMd ? (isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''
-              }`}
+              className={`w-full max-w-lg bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[80vh] overflow-hidden pointer-events-auto transition-all duration-300 ${isMd ? (isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''
+                }`}
               style={
                 !isMd
                   ? {
-                      transform: !isModalVisible || isClosing ? 'translateY(100%)' : `translateY(${sheetDragY}px)`,
-                      transition: !isModalVisible || isClosing || sheetDragY === 0 ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
-                    }
+                    transform: !isModalVisible || isClosing ? 'translateY(100%)' : `translateY(${sheetDragY}px)`,
+                    transition: !isModalVisible || isClosing || sheetDragY === 0 ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
+                  }
                   : {}
               }
             >
@@ -1297,18 +1296,17 @@ export default function ManajemenJadwalPage() {
           />
           <div className="fixed inset-0 z-[61] flex items-end md:items-center justify-center pointer-events-none">
             <div
-              className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl overflow-hidden pointer-events-auto mx-0 md:mx-4 transition-all duration-300 ${
-                isMd ? (isDeleteVisible && !isDeleteClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''
-              }`}
+              className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl overflow-hidden pointer-events-auto mx-0 md:mx-4 transition-all duration-300 ${isMd ? (isDeleteVisible && !isDeleteClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''
+                }`}
               style={
                 !isMd
                   ? {
-                      transform: !isDeleteVisible || isDeleteClosing ? 'translateY(100%)' : `translateY(${deleteSheetDragY}px)`,
-                      transition:
-                        !isDeleteVisible || isDeleteClosing || deleteSheetDragY === 0
-                          ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
-                          : 'none',
-                    }
+                    transform: !isDeleteVisible || isDeleteClosing ? 'translateY(100%)' : `translateY(${deleteSheetDragY}px)`,
+                    transition:
+                      !isDeleteVisible || isDeleteClosing || deleteSheetDragY === 0
+                        ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
+                        : 'none',
+                  }
                   : {}
               }
             >

@@ -13,7 +13,6 @@ export interface SessionFromAPI {
   tipe_jadwal: 'REGULAR' | 'PENGGANTI';
 }
 
-// Asdos: jadwal harian milik sendiri
 export async function getSessionsByDate(date: string) {
   return apiClient.get<SessionFromAPI[]>(`/sessions/me?date=${date}`, {
     auth: true,
@@ -21,7 +20,6 @@ export async function getSessionsByDate(date: string) {
   });
 }
 
-// Koordinator: semua sesi dalam rentang tanggal + semester
 export async function getAllSessions(params: {
   id_semester: string;
   start_date?: string;
@@ -44,18 +42,16 @@ export type SessionBody = {
   id_asdos1?: string | null;
   id_asdos2?: string | null;
   id_dosen?: string | null;
-  tanggal: string; // YYYY-MM-DD â€” tanggal spesifik sesi
-  opsi_hari: number; // 1=Senin â€¦ 6=Sabtu
-  opsi_jam: number;  // 1-7 (lihat slot mapping di PANDUAN_API.txt)
+  tanggal: string;
+  opsi_hari: number;
+  opsi_jam: number;
 };
 
-// Koordinator: buat sesi jadwal baru
 export async function createSession(data: SessionBody) {
   const res = await apiClient.post('/sessions/', data, { auth: true });
   return { success: res.success, message: res.message };
 }
 
-// Koordinator: edit sesi jadwal (instanceDate = tanggal baris timeline yang diedit)
 export async function updateSession(id: string, data: SessionBody, instanceDate?: string) {
   const date = instanceDate ?? data.tanggal;
   const q = date ? `?tanggal=${encodeURIComponent(date)}` : '';
@@ -63,14 +59,12 @@ export async function updateSession(id: string, data: SessionBody, instanceDate?
   return { success: res.success, message: res.message };
 }
 
-// Koordinator: hapus sesi jadwal (instanceDate = tanggal baris timeline yang dihapus)
 export async function deleteSession(id: string, instanceDate?: string) {
   const q = instanceDate ? `?tanggal=${encodeURIComponent(instanceDate)}` : '';
   const res = await apiClient.delete(`/sessions/${id}${q}`, { auth: true });
   return { success: res.success, message: res.message };
 }
 
-// Asdos: timeline jadwal sendiri dalam date range
 export async function getMyScheduleTimeline(params: JadwalTimelineParams) {
   const q = new URLSearchParams({
     start_date: params.start_date,
@@ -87,7 +81,6 @@ export async function getMyScheduleTimeline(params: JadwalTimelineParams) {
   }>(`/jadwal/my-sessions?${q.toString()}`, { auth: true, cache: 'no-store' });
 }
 
-// Semua user: timeline semua jadwal (cek jadwal orang lain)
 export async function getScheduleTimeline(params: JadwalTimelineParams) {
   const q = new URLSearchParams({
     start_date: params.start_date,

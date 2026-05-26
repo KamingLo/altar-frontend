@@ -24,7 +24,6 @@ export const RegisterForm = () => {
       <AuthAlert message={notification?.text || null} type={notification?.type || 'error'} />
 
       <form onSubmit={handleRegister} className="space-y-4">
-        {/* 1. Email: Full Width */}
         <input
           type="email"
           placeholder="Email Address"
@@ -34,17 +33,15 @@ export const RegisterForm = () => {
           required
         />
 
-        {/* 2. OTP Row: Input & Button Side by Side */}
         <div className="flex gap-3">
           <input
             type="text"
             inputMode="numeric"
             maxLength={6}
-            placeholder="Kode OTP" // Menggunakan bullet atau underscore sesuai selera
+            placeholder="Kode OTP"
             className="w-full p-4 bg-black border border-zinc-800 rounded-2xl outline-none focus:border-cyan-500/50 transition-all text-white placeholder:text-zinc-600"
             value={formData.otp_code}
             onChange={(e) => {
-                // Memastikan hanya angka yang masuk (opsional tapi disarankan untuk OTP)
                 const val = e.target.value.replace(/\D/g, '');
                 setFormData({ ...formData, otp_code: val.slice(0, 6) });
             }}
@@ -60,7 +57,6 @@ export const RegisterForm = () => {
           </button>
         </div>
 
-        {/* 3. Username: Full Width */}
         <input
           type="text"
           placeholder="Username"
@@ -70,7 +66,6 @@ export const RegisterForm = () => {
           required
         />
 
-        {/* 4. Password: Full Width */}
         <input
           type="password"
           placeholder="Create Password"

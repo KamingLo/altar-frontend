@@ -1,5 +1,4 @@
-﻿/** Segment path koleksi Django â€” wajib trailing slash agar redirect tidak membuang Authorization */
-const COLLECTION_PATH_SEGMENTS = new Set([
+﻿const COLLECTION_PATH_SEGMENTS = new Set([
   'sessions',
   'classes',
   'courses',
@@ -32,7 +31,6 @@ export function isJwtExpired(token: string): boolean {
   return exp * 1000 < Date.now();
 }
 
-/** Hindari redirect 301/307 yang memutus header Bearer pada request berikutnya */
 export function normalizeApiEndpoint(endpoint: string): string {
   const qIdx = endpoint.indexOf('?');
   const path = qIdx === -1 ? endpoint : endpoint.slice(0, qIdx);

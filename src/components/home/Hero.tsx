@@ -50,7 +50,7 @@ const HeroDesktop = () => {
             Masuk
           </a>
           <p className="text-left text-[13px] text-[#8A9BAD] font-medium mt-2">
-            Â© Altar - Universitas Tarumanagara
+            © Altar - Universitas Tarumanagara
           </p>
         </div>
 
@@ -114,7 +114,7 @@ const HeroMobile = () => {
               Masuk
             </a>
             <p className="text-center w-full text-[clamp(12px,3vw,14px)] text-[#8A9BAD] font-medium">
-              Â© Altar - Universitas Tarumanagara
+              © Altar - Universitas Tarumanagara
             </p>
           </div>
 

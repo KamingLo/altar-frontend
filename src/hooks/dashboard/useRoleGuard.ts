@@ -27,7 +27,6 @@ export const useRoleGuard = (expectedRole: UserRole) => {
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 };
 

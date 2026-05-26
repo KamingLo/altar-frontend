@@ -99,12 +99,10 @@ export default function AsdosHome() {
         getMyPresensi(),
       ]);
 
-      // Most recent VERIFIED/REJECTED KP â€” no time cutoff, use ID comparison instead
       const recentKp = (kpRes.success && kpRes.data?.items ? kpRes.data.items : [])
         .filter(item => item.status === 'VERIFIED' || item.status === 'REJECTED')
         .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0] ?? null;
 
-      // Only show if it's a KP the user hasn't acknowledged yet
       const kpToShow = recentKp && recentKp.id !== lastSeenKpId ? recentKp : null;
 
       const verifiedToday = (presensiRes.success && presensiRes.data ? presensiRes.data : [])
@@ -116,7 +114,6 @@ export default function AsdosHome() {
       setPresensiItem(presensiToShow);
       setPendingCount((kpToShow ? 1 : 0) + (presensiToShow ? 1 : 0));
 
-      // Mark these as acknowledged so they don't reappear next visit
       if (recentKp) setLastSeenKpId(recentKp.id);
       if (verifiedToday) setLastSeenPresensiId(verifiedToday.id_presensi);
 

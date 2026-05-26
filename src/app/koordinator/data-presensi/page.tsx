@@ -78,8 +78,8 @@ export default function DataPresensiPage() {
     try {
       const activeSem = (semId !== undefined ? semId : semesterFilter) || undefined;
       const res = await getAllPresensi(undefined, undefined, undefined, activeSem);
-      if (res.success && res.data) {
-        setPresensi(res.data);
+      if (res.success) {
+        setPresensi(res.data ?? []);
         setSelectedIds(new Set());
       } else {
         if (!silent) {

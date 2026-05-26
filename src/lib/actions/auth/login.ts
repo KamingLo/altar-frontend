@@ -25,7 +25,6 @@ export async function loginUser(payload: { email?: string; password?: string }) 
     maxAge: 60 * 60 * 24 * 7, // 7 days
   });
 
-  // Ambil data user langsung setelah login berhasil
   const userRes = await apiClient.get<UserData>('/auth/me', { auth: true });
 
   return { 

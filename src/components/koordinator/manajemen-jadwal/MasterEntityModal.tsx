@@ -10,13 +10,14 @@ import {
   createSemester, updateSemester, deleteSemester,
 } from '@/lib/actions/data-master';
 import { createLecturer, updateLecturer, deleteLecturer, type LecturerItem } from '@/lib/actions/lecturer';
+import { deleteAsdos, type AsdosListItem } from '@/lib/actions/manajemen';
 import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem } from '@/types/api';
 
-export type MasterResource = 'kelas' | 'mk' | 'ruangan' | 'lecturer' | 'semester';
+export type MasterResource = 'kelas' | 'mk' | 'ruangan' | 'lecturer' | 'semester' | 'asdos';
 
-export type MasterItem = KelasItem | MataKuliahItem | RuanganItem | LecturerItem | SemesterItem;
+export type MasterItem = KelasItem | MataKuliahItem | RuanganItem | LecturerItem | SemesterItem | AsdosListItem;
 
-type Mode = 'create' | 'edit';
+type Mode = 'create' | 'edit' | 'delete';
 type Action = 'created' | 'updated' | 'deleted';
 
 type Props = {
@@ -34,6 +35,7 @@ const RESOURCE_LABEL: Record<MasterResource, string> = {
   ruangan: 'Ruangan',
   lecturer: 'Dosen',
   semester: 'Semester',
+  asdos: 'Asisten Dosen',
 };
 
 const TIPE_SEMESTER_OPTIONS = [
@@ -42,8 +44,24 @@ const TIPE_SEMESTER_OPTIONS = [
   { value: 'Pendek', label: 'Pendek' },
 ];
 
+// Direct side-by-side inputs are now used in renderFields for semester academic year
+
 const inputClass =
   'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-white focus:border-crimson focus:ring-1 focus:ring-crimson outline-none disabled:opacity-60';
+
+const getItemDisplayName = (res: MasterResource, item: MasterItem | null | undefined): string => {
+  if (!item) return '';
+  const i = item as any;
+  switch (res) {
+    case 'kelas': return i.nama_kelas || '';
+    case 'mk': return i.nama_mk || '';
+    case 'ruangan': return i.nama_ruangan || '';
+    case 'lecturer': return i.nama || '';
+    case 'asdos': return i.username || '';
+    case 'semester': return `${i.tahun_ajaran} (${i.tipe_semester})` || '';
+    default: return '';
+  }
+};
 
 export function MasterEntityModal({ open, mode, resource, initialData, onClose, onSuccess }: Props) {
   const [visible, setVisible] = useState(false);
@@ -116,8 +134,6 @@ export function MasterEntityModal({ open, mode, resource, initialData, onClose, 
       return;
     }
 
-    // Untuk create: data dari response berisi item dengan id baru
-    // Untuk edit: backend balikin item updated (atau null), kalau null caller bisa refetch
     const item = (res.data as MasterItem) ?? (mode === 'edit' && initialData ? buildOptimisticItem(resource, editingId!, validation.payload) : null);
     onSuccess(mode === 'create' ? 'created' : 'updated', item);
     close();
@@ -127,7 +143,7 @@ export function MasterEntityModal({ open, mode, resource, initialData, onClose, 
     if (!initialData) return;
     setError('');
     setIsSubmitting(true);
-    const id = (initialData as { id: string }).id;
+    const id = (initialData as any).id || (initialData as any).id_asdos;
     const res = await deleteResource(resource, id);
     setIsSubmitting(false);
 
@@ -150,15 +166,14 @@ export function MasterEntityModal({ open, mode, resource, initialData, onClose, 
       />
       <div className="fixed inset-0 z-[81] flex items-end md:items-center justify-center pointer-events-none p-0 md:p-4">
         <div
-          className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-4rem)] md:max-h-[80vh] overflow-hidden pointer-events-auto transition-all duration-300 ${
-            isMd ? (visible && !closing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''
-          }`}
+          className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-4rem)] md:max-h-[80vh] overflow-hidden pointer-events-auto transition-all duration-300 ${isMd ? (visible && !closing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''
+            }`}
           style={
             !isMd
               ? {
-                  transform: !visible || closing ? 'translateY(100%)' : `translateY(${dragY}px)`,
-                  transition: !visible || closing || dragY === 0 ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
-                }
+                transform: !visible || closing ? 'translateY(100%)' : `translateY(${dragY}px)`,
+                transition: !visible || closing || dragY === 0 ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
+              }
               : {}
           }
         >
@@ -173,86 +188,126 @@ export function MasterEntityModal({ open, mode, resource, initialData, onClose, 
 
           <div className="px-5 pt-2 md:pt-6 pb-4 overflow-y-auto flex-1">
             <h2 className="text-[20px] font-extrabold text-[#1F2937]">
-              {mode === 'create' ? `Buat ${RESOURCE_LABEL[resource]} Baru` : `Edit ${RESOURCE_LABEL[resource]}`}
+              {mode === 'delete' ? `Hapus ${RESOURCE_LABEL[resource]}?` : mode === 'create' ? `Buat ${RESOURCE_LABEL[resource]} Baru` : `Edit ${RESOURCE_LABEL[resource]}`}
             </h2>
             <p className="text-sm text-slate-500 mt-1 font-medium">
-              {mode === 'create'
-                ? `Isi data ${RESOURCE_LABEL[resource].toLowerCase()} untuk ditambahkan ke daftar.`
-                : `Perbarui informasi ${RESOURCE_LABEL[resource].toLowerCase()}.`}
+              {mode === 'delete'
+                ? `Konfirmasi penghapusan data ${RESOURCE_LABEL[resource].toLowerCase()}.`
+                : mode === 'create'
+                  ? `Isi data ${RESOURCE_LABEL[resource].toLowerCase()} untuk ditambahkan ke daftar.`
+                  : `Perbarui informasi ${RESOURCE_LABEL[resource].toLowerCase()}.`}
             </p>
 
-            <div className="space-y-4 mt-5">
-              {renderFields(resource, form, setForm, isSubmitting)}
-            </div>
-
-            {error && (
-              <div className="mt-4 flex items-start gap-2.5 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3">
-                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-rose-700 font-semibold leading-relaxed">{error}</p>
-              </div>
-            )}
-
-            {mode === 'edit' && (
-              <div className="mt-6 pt-5 border-t border-slate-100">
-                {!confirmDelete ? (
+            {mode === 'delete' ? (
+              <div className="mt-5 space-y-5">
+                <p className="text-sm text-slate-600 font-semibold leading-relaxed">
+                  Apakah Anda yakin ingin menghapus {RESOURCE_LABEL[resource].toLowerCase()}{' '}
+                  <strong className="text-slate-800">{getItemDisplayName(resource, initialData)}</strong>?
+                </p>
+                <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={() => setConfirmDelete(true)}
+                    onClick={close}
                     disabled={isSubmitting}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-rose-200 text-rose-600 font-bold text-sm hover:bg-rose-50 active:scale-[0.98] transition-all disabled:opacity-50"
+                    className="flex-1 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200/70 text-slate-600 font-bold text-[15px] active:scale-[0.98] transition-all disabled:opacity-50"
                   >
-                    <Trash2 className="w-4 h-4" />
-                    Hapus {RESOURCE_LABEL[resource]}
+                    Batal
                   </button>
-                ) : (
-                  <div className="bg-rose-50 border border-rose-100 rounded-xl p-3.5">
-                    <p className="text-xs text-rose-800 font-semibold mb-3 leading-relaxed">
-                      Yakin hapus? Jika {RESOURCE_LABEL[resource].toLowerCase()} ini masih dipakai sesi lain, backend bakal tolak.
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDelete(false)}
-                        disabled={isSubmitting}
-                        className="flex-1 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 font-bold text-xs active:scale-[0.98] disabled:opacity-50"
-                      >
-                        Batal
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleDelete}
-                        disabled={isSubmitting}
-                        className="flex-1 py-2.5 rounded-lg bg-rose-600 text-white font-bold text-xs active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-1.5"
-                      >
-                        {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                        Ya, Hapus
-                      </button>
-                    </div>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={isSubmitting}
+                    className="flex-1 py-3.5 rounded-xl bg-crimson hover:bg-[#7a1728] text-white font-bold text-[15px] active:scale-[0.98] transition-all shadow-md shadow-crimson/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Ya, Hapus
+                  </button>
+                </div>
+                {error && (
+                  <div className="mt-4 flex items-start gap-2.5 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3">
+                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-rose-700 font-semibold leading-relaxed">{error}</p>
                   </div>
                 )}
               </div>
+            ) : (
+              <>
+                <div className="space-y-4 mt-5">
+                  {renderFields(resource, form, setForm, isSubmitting)}
+                </div>
+
+                {error && (
+                  <div className="mt-4 flex items-start gap-2.5 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3">
+                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-rose-700 font-semibold leading-relaxed">{error}</p>
+                  </div>
+                )}
+
+                {mode === 'edit' && resource !== 'kelas' && resource !== 'mk' && resource !== 'ruangan' && resource !== 'lecturer' && resource !== 'asdos' && (
+                  <div className="mt-6 pt-5 border-t border-slate-100">
+                    {!confirmDelete ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(true)}
+                        disabled={isSubmitting}
+                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-rose-200 text-rose-600 font-bold text-sm hover:bg-rose-50 active:scale-[0.98] transition-all disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Hapus {RESOURCE_LABEL[resource]}
+                      </button>
+                    ) : (
+                      <div className="bg-rose-50 border border-rose-100 rounded-xl p-3.5">
+                        <p className="text-xs text-rose-800 font-semibold mb-3 leading-relaxed">
+                          Yakin hapus? Jika {RESOURCE_LABEL[resource].toLowerCase()} ini masih dipakai sesi lain, backend bakal tolak.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDelete(false)}
+                            disabled={isSubmitting}
+                            className="flex-1 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 font-bold text-xs active:scale-[0.98] disabled:opacity-50"
+                          >
+                            Batal
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDelete}
+                            disabled={isSubmitting}
+                            className="flex-1 py-2.5 rounded-lg bg-rose-600 text-white font-bold text-xs active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-1.5"
+                          >
+                            {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                            Ya, Hapus
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
-          <div className="sticky bottom-0 p-5 border-t border-slate-100 bg-white flex gap-3">
-            <button
-              type="button"
-              onClick={close}
-              disabled={isSubmitting}
-              className="flex-1 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-[15px] active:scale-[0.98] disabled:opacity-50"
-            >
-              Batal
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex-1 py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] shadow-md shadow-crimson/20 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {mode === 'create' ? 'Buat' : 'Simpan'}
-            </button>
-          </div>
+          {mode !== 'delete' && (
+            <div className="sticky bottom-0 p-5 border-t border-slate-100 bg-white flex gap-3">
+              <button
+                type="button"
+                onClick={close}
+                disabled={isSubmitting}
+                className="flex-1 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-[15px] active:scale-[0.98] disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="flex-1 py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] shadow-md shadow-crimson/20 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {mode === 'create' ? 'Buat' : 'Simpan'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -262,11 +317,15 @@ export function MasterEntityModal({ open, mode, resource, initialData, onClose, 
 function initialFormFor(resource: MasterResource, item: MasterItem | null): Record<string, string> {
   if (!item) {
     switch (resource) {
-      case 'kelas':    return { nama_kelas: '', jurusan: '', jumlah_siswa: '' };
-      case 'mk':       return { nama_mk: '', sks: '' };
-      case 'ruangan':  return { nama_ruangan: '', lantai: '', kapasitas: '' };
+      case 'kelas': return { nama_kelas: '', jurusan: '', jumlah_siswa: '' };
+      case 'mk': return { nama_mk: '', sks: '' };
+      case 'ruangan': return { nama_ruangan: '', lantai: '', kapasitas: '' };
       case 'lecturer': return { nama: '', nip: '' };
-      case 'semester': return { tahun_ajaran: '', tipe_semester: 'Ganjil' };
+      case 'asdos': return { username: '', nim: '' };
+      case 'semester': {
+        const y = new Date().getFullYear();
+        return { tahun_ajaran: `${y}/${y + 1}`, tipe_semester: 'Ganjil' };
+      }
     }
   }
   const i = item as unknown as Record<string, unknown>;
@@ -279,6 +338,8 @@ function initialFormFor(resource: MasterResource, item: MasterItem | null): Reco
       return { nama_ruangan: String(i.nama_ruangan ?? ''), lantai: String(i.lantai ?? ''), kapasitas: String(i.kapasitas ?? '') };
     case 'lecturer':
       return { nama: String(i.nama ?? ''), nip: String(i.nip ?? '') };
+    case 'asdos':
+      return { username: String(i.username ?? ''), nim: String(i.nim ?? '') };
     case 'semester':
       return { tahun_ajaran: String(i.tahun_ajaran ?? ''), tipe_semester: String(i.tipe_semester ?? 'Ganjil') };
   }
@@ -344,11 +405,48 @@ function renderFields(
           </Field>
         </>
       );
-    case 'semester':
+    case 'asdos':
+      return (
+        <>
+          <Field label="Username Asdos">
+            <input className={inputClass} placeholder="cth: asdos1" value={form.username ?? ''} onChange={set('username')} disabled={disabled} />
+          </Field>
+          <Field label="NIM">
+            <input className={inputClass} placeholder="cth: 535200001" value={form.nim ?? ''} onChange={set('nim')} disabled={disabled} />
+          </Field>
+        </>
+      );
+    case 'semester': {
+      const [yearStart, yearEnd] = (form.tahun_ajaran || '').split('/');
       return (
         <>
           <Field label="Tahun Ajaran">
-            <input className={inputClass} placeholder="cth: 2026/2027" value={form.tahun_ajaran ?? ''} onChange={set('tahun_ajaran')} disabled={disabled} />
+            <div className="flex items-center gap-3">
+              <input
+                className={`${inputClass} text-center`}
+                type="number"
+                placeholder="Mulai"
+                value={yearStart || ''}
+                onChange={e => {
+                  const start = e.target.value;
+                  const end = start.length === 4 ? String(parseInt(start) + 1) : yearEnd;
+                  setForm(f => ({ ...f, tahun_ajaran: `${start}/${end}` }));
+                }}
+                disabled={disabled}
+              />
+              <span className="text-slate-400 font-bold text-lg">/</span>
+              <input
+                className={`${inputClass} text-center`}
+                type="number"
+                placeholder="Selesai"
+                value={yearEnd || ''}
+                onChange={e => {
+                  const end = e.target.value;
+                  setForm(f => ({ ...f, tahun_ajaran: `${yearStart}/${end}` }));
+                }}
+                disabled={disabled}
+              />
+            </div>
           </Field>
           <Field label="Tipe Semester">
             <CustomSelect
@@ -360,6 +458,7 @@ function renderFields(
           </Field>
         </>
       );
+    }
   }
 }
 
@@ -405,11 +504,29 @@ function validateForm(resource: MasterResource, form: Record<string, string>): V
       if (!nip) return { ok: false, message: 'NIP wajib diisi.' };
       return { ok: true, payload: { nama, nip } };
     }
+    case 'asdos': {
+      const username = trim(form.username);
+      const nim = trim(form.nim);
+      if (!username) return { ok: false, message: 'Username asdos wajib diisi.' };
+      if (!nim) return { ok: false, message: 'NIM wajib diisi.' };
+      return { ok: true, payload: { username, nim } };
+    }
     case 'semester': {
       const tahun_ajaran = trim(form.tahun_ajaran);
       const tipe_semester = trim(form.tipe_semester);
       if (!tahun_ajaran) return { ok: false, message: 'Tahun ajaran wajib diisi.' };
       if (!/^\d{4}\/\d{4}$/.test(tahun_ajaran)) return { ok: false, message: 'Format tahun ajaran: YYYY/YYYY (cth: 2026/2027).' };
+      
+      const [startStr, endStr] = tahun_ajaran.split('/');
+      const start = Number(startStr);
+      const end = Number(endStr);
+      if (start === end) {
+        return { ok: false, message: 'Tahun ajaran awal dan akhir tidak boleh sama.' };
+      }
+      if (Math.abs(start - end) !== 1) {
+        return { ok: false, message: 'Rentang tahun ajaran harus tepat 1 tahun (cth: 2026/2027).' };
+      }
+
       if (!['Ganjil', 'Genap', 'Pendek'].includes(tipe_semester)) return { ok: false, message: 'Tipe semester tidak valid.' };
       return { ok: true, payload: { tahun_ajaran, tipe_semester } };
     }
@@ -426,30 +543,33 @@ async function submitResource(
 ): Promise<SubmitResult> {
   if (mode === 'create') {
     switch (resource) {
-      case 'kelas':    return createKelas(payload as Parameters<typeof createKelas>[0]);
-      case 'mk':       return createMK(payload as Parameters<typeof createMK>[0]);
-      case 'ruangan':  return createRuangan(payload as Parameters<typeof createRuangan>[0]);
+      case 'kelas': return createKelas(payload as Parameters<typeof createKelas>[0]);
+      case 'mk': return createMK(payload as Parameters<typeof createMK>[0]);
+      case 'ruangan': return createRuangan(payload as Parameters<typeof createRuangan>[0]);
       case 'lecturer': return createLecturer(payload as Parameters<typeof createLecturer>[0]);
+      case 'asdos': return { success: false, message: 'Fitur belum didukung' };
       case 'semester': return createSemester(payload as Parameters<typeof createSemester>[0]);
     }
   }
   if (!editingId) return { success: false, message: 'ID untuk edit tidak ditemukan.' };
   switch (resource) {
-    case 'kelas':    return updateKelas(editingId, payload as Parameters<typeof updateKelas>[1]);
-    case 'mk':       return updateMK(editingId, payload as Parameters<typeof updateMK>[1]);
-    case 'ruangan':  return updateRuangan(editingId, payload as Parameters<typeof updateRuangan>[1]);
+    case 'kelas': return updateKelas(editingId, payload as Parameters<typeof updateKelas>[1]);
+    case 'mk': return updateMK(editingId, payload as Parameters<typeof updateMK>[1]);
+    case 'ruangan': return updateRuangan(editingId, payload as Parameters<typeof updateRuangan>[1]);
     case 'lecturer': return updateLecturer(editingId, payload as Parameters<typeof updateLecturer>[1]);
+    case 'asdos': return { success: false, message: 'Fitur belum didukung' };
     case 'semester': return updateSemester(editingId, payload as Parameters<typeof updateSemester>[1]);
   }
 }
 
 async function deleteResource(resource: MasterResource, id: string): Promise<{ success: boolean; message: string }> {
   switch (resource) {
-    case 'kelas':    return deleteKelas(id);
-    case 'mk':       return deleteMK(id);
-    case 'ruangan':  return deleteRuangan(id);
+    case 'kelas': return deleteKelas(id);
+    case 'mk': return deleteMK(id);
+    case 'ruangan': return deleteRuangan(id);
     case 'lecturer': return deleteLecturer(id);
     case 'semester': return deleteSemester(id);
+    case 'asdos': return deleteAsdos(id);
   }
 }
 
@@ -457,10 +577,11 @@ function buildOptimisticItem(resource: MasterResource, id: string, payload: Reco
   const now = new Date().toISOString();
   const base = { id, created_at: now, updated_at: now };
   switch (resource) {
-    case 'kelas':    return { ...base, ...payload } as KelasItem;
-    case 'mk':       return { ...base, ...payload } as MataKuliahItem;
-    case 'ruangan':  return { ...base, ...payload } as RuanganItem;
+    case 'kelas': return { ...base, ...payload } as KelasItem;
+    case 'mk': return { ...base, ...payload } as MataKuliahItem;
+    case 'ruangan': return { ...base, ...payload } as RuanganItem;
     case 'lecturer': return { ...base, ...payload } as LecturerItem;
+    case 'asdos': return { id_asdos: id, ...payload } as unknown as AsdosListItem;
     case 'semester': return { ...base, ...payload } as SemesterItem;
   }
 }
