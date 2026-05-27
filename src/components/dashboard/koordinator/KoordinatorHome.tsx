@@ -74,14 +74,18 @@ export default function KoordinatorHome() {
   }, [markSeen, setPendingCount]);
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto px-1.5 sm:px-2 md:px-0 pb-10 md:pb-12">
 
-      <div className="mb-8 animate-fade-up lg:flex lg:justify-between lg:items-end">
-        <div>
-          <p className="text-sm lg:text-base font-semibold text-crimson tracking-wide uppercase mb-1">
-            Dashboard Koordinator
-          </p>
-        </div>
+      <div className="mb-6 md:mb-8 animate-fade-up">
+        <p className="text-[11px] font-bold text-crimson tracking-[0.15em] uppercase mb-1 md:text-xs">
+          Dashboard Koordinator
+        </p>
+        <h1 className="text-[22px] md:text-[26px] font-extrabold text-slate-900 leading-snug">
+          Ringkasan aktivitas asdos & pengajuan
+        </h1>
+        <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-xl">
+          Pantau pengajuan kuliah pengganti, verifikasi presensi, dan aktivitas asisten secara real-time dalam satu tampilan.
+        </p>
       </div>
 
       {notifLoaded && (kpItem || presensiItem) && (
@@ -130,7 +134,7 @@ export default function KoordinatorHome() {
         </div>
       )}
 
-      <div className="hidden lg:gap-5 lg:mb-10">
+      <div className="hidden lg:grid lg:grid-cols-3 lg:gap-5 lg:mb-10">
         {desktopStats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -153,32 +157,41 @@ export default function KoordinatorHome() {
         })}
       </div>
 
-      <div className="grid grid-cols-4 lg:hidden gap-y-6 gap-x-3 mb-10 w-full px-1">
+      <div className="grid grid-cols-4 lg:hidden gap-y-6 gap-x-3 mb-6 w-full">
         {koordinatorMenuItems.map((item) => {
           const Icon = item.icon;
           return (
-            <Link
-              key={item.id}
-              href={item.href}
-              className="flex flex-col items-center group lg:flex-row lg:items-center lg:bg-white lg:rounded-2xl lg:p-5 lg:gap-4 lg:shadow-sm lg:border lg:border-slate-50 lg:hover:border-crimson/20 lg:hover:shadow-md lg:transition-all lg:duration-300"
-            >
-              <div className="w-14 h-14 lg:w-12 lg:h-12 bg-white lg:bg-crimson/5 rounded-full lg:rounded-xl flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] lg:shadow-none text-crimson group-hover:scale-110 lg:group-hover:scale-100 group-hover:bg-crimson group-hover:text-white group-active:scale-95 transition-all duration-300 mb-3 lg:mb-0 shrink-0">
-                <Icon size={24} className="lg:w-5 lg:h-5" strokeWidth={2} />
+            <Link key={item.id} href={item.href} className="flex flex-col items-center group">
+              <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] text-crimson group-hover:scale-105 group-active:scale-95 transition-all mb-3">
+                <Icon size={24} strokeWidth={2} />
               </div>
-
-              <div className="hidden lg:block flex-1 min-w-0">
-                <p className="font-bold text-sm text-slate-800 group-hover:text-crimson transition-colors leading-tight">
-                  {item.title}
-                </p>
-                <p className="text-xs text-slate-400 mt-0.5">{item.desc}</p>
-              </div>
-
-              <span className="text-[10px] lg:hidden font-semibold text-slate-600 text-center w-16 leading-tight">
+              <span className="text-[10px] font-semibold text-slate-600 text-center w-16 leading-tight">
                 {item.title}
               </span>
-
-              <ChevronRight size={16} className="hidden lg:block text-slate-300 group-hover:text-crimson transition-colors shrink-0" />
             </Link>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8 lg:hidden">
+        {desktopStats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <div
+              key={stat.id}
+              className="bg-white rounded-2xl px-4 py-3 shadow-sm border border-slate-100 flex items-center gap-3"
+            >
+              <div className="w-9 h-9 rounded-xl bg-crimson/5 flex items-center justify-center text-crimson shrink-0">
+                <Icon size={18} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-slate-500 truncate">{stat.label}</p>
+                <p className="text-lg font-extrabold text-slate-900 leading-tight">{stat.value}</p>
+                <p className={`text-[10px] font-semibold mt-0.5 truncate ${stat.positive ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {stat.sub}
+                </p>
+              </div>
+            </div>
           );
         })}
       </div>

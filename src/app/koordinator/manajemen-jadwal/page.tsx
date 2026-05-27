@@ -54,7 +54,7 @@ import {
   type MasterItem,
   type MasterResource,
 } from '@/components/koordinator/manajemen-jadwal/MasterEntityModal';
-import { PageHeader } from '@/components/ui/PageHeader';
+import { AsdosPageShell, AsdosPageHeader, AsdosPrimaryButton } from '@/components/dashboard/asdos/AsdosUI';
 
 function redirectIfSessionExpired(message: string | undefined): boolean {
   if (typeof window !== 'undefined' && isSessionExpiredMessage(message)) {
@@ -740,23 +740,23 @@ export default function ManajemenJadwalPage() {
   }
 
   return (
-    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 min-h-screen pb-24 md:pb-12 font-sans">
+    <AsdosPageShell className="pb-24 md:pb-12">
 
       <div className="shrink-0">
         <div className="mb-4 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between">
           <div>
-            <PageHeader label="Koordinator" title="Manajemen Jadwal" description="Kelola sesi jadwal mengajar per semester â€” data langsung dari server." />
+            <AsdosPageHeader eyebrow="Koordinator" title="Manajemen Jadwal" description="Kelola sesi jadwal mengajar per semester — data langsung dari server." />
           </div>
 
-          <button
+          <AsdosPrimaryButton
             type="button"
             onClick={() => handleOpenModal('add')}
             disabled={!selectedSemesterId}
-            className="hidden md:flex items-center gap-2 px-6 py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] hover:bg-[#7a1728] active:scale-[0.98] transition-all shadow-md shadow-crimson/20 disabled:opacity-50 disabled:cursor-not-allowed mt-4 md:mt-0"
+            icon={<Plus className="w-5 h-5" strokeWidth={2.5} />}
+            className="hidden md:flex py-3.5 px-6 text-[15px] mt-4 md:mt-0"
           >
-            <Plus className="w-5 h-5" strokeWidth={2.5} />
             Buat Sesi Baru
-          </button>
+          </AsdosPrimaryButton>
         </div>
 
 
@@ -1374,7 +1374,7 @@ export default function ManajemenJadwalPage() {
           <p className="text-sm font-bold leading-tight">{toast?.message}</p>
         </div>
       </div>
-    </div>
+    </AsdosPageShell>
   );
 }
 

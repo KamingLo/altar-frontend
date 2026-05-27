@@ -26,7 +26,7 @@ import {
 } from '@/lib/actions/pergantian-kelas';
 import type { SubstituteSessionDetail } from '@/types/api';
 import { usePergantianKelasStore } from '@/store/usePergantianKelasStore';
-import { PageHeader } from '@/components/ui/PageHeader';
+import { AsdosPageShell, AsdosPageHeader, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 
 type TabId = 'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED';
 
@@ -167,13 +167,13 @@ export default function ManajemenKpPage() {
   };
 
   return (
-    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 min-h-screen pb-24 md:pb-12 font-sans">
+    <AsdosPageShell>
 
-      <div className="mb-6 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <PageHeader label="Manajemen KP" title="Kuliah Pengganti" description="Tinjau, setujui, atau tolak permohonan penjadwalan kelas pengganti dari asisten dosen." />
-        </div>
-      </div>
+      <AsdosPageHeader
+        eyebrow="Manajemen KP"
+        title="Kuliah Pengganti"
+        description="Tinjau, setujui, atau tolak permohonan penjadwalan kelas pengganti dari asisten dosen."
+      />
 
       <div className="space-y-6 relative z-10">
 
@@ -221,7 +221,7 @@ export default function ManajemenKpPage() {
                 placeholder="Cari matkul, kelas, atau asdos"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-crimson focus:ring-2 focus:ring-crimson/15 transition-all"
+                className="w-full pl-11 pr-4 py-3.5 rounded-[14px] md:rounded-2xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
               />
               {searchQuery && (
                 <button
@@ -324,18 +324,16 @@ export default function ManajemenKpPage() {
           </div>
         ) : filteredRequests.length === 0 ? (
 
-          <div className="text-center max-w-xl mx-auto mt-12 py-6">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-white/50 border border-slate-200/50 flex items-center justify-center text-slate-400">
-              <Inbox size={28} className="text-slate-400" />
-            </div>
-            <h3 className="text-base font-extrabold text-slate-800">Tidak Ada Pengajuan</h3>
-            <p className="text-xs text-slate-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
-              {searchQuery
+          <AsdosState
+            icon={<Inbox size={24} />}
+            title="Tidak Ada Pengajuan"
+            message={
+              searchQuery
                 ? 'Tidak ada pengajuan kelas pengganti yang cocok dengan kata pencarian Anda.'
                 : `Tidak ada permohonan kelas pengganti berstatus "${activeTab === 'ALL' ? 'Semua' : activeTab === 'PENDING' ? 'Pending' : activeTab === 'VERIFIED' ? 'Disetujui' : 'Ditolak'}" saat ini.`
-              }
-            </p>
-          </div>
+            }
+            className="mt-8"
+          />
         ) : (
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -360,7 +358,7 @@ export default function ManajemenKpPage() {
                           <h4 className="font-extrabold text-[15px] text-[#1F2937] truncate leading-tight">
                             {req.session?.mata_kuliah || 'Kuliah Pengganti'}
                           </h4>
-                          <p className="text-xs font-bold text-slate-400 mt-0.5 truncate">{req.session?.nama_kelas || 'â€”'}</p>
+                          <p className="text-xs font-bold text-slate-400 mt-0.5 truncate">{req.session?.nama_kelas || '—'}</p>
                         </div>
                       </div>
 
@@ -400,7 +398,7 @@ export default function ManajemenKpPage() {
                             </div>
                             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
                               <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span>{req.session?.ruangan || 'â€”'}</span>
+                              <span>{req.session?.ruangan || '—'}</span>
                             </div>
                           </div>
                         </div>
@@ -623,6 +621,6 @@ export default function ManajemenKpPage() {
         </>
       )}
 
-    </div>
+    </AsdosPageShell>
   );
 }

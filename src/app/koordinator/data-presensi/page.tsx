@@ -32,7 +32,7 @@ import { getSemesterList } from '@/lib/actions/data-master';
 import type { SemesterItem } from '@/types/api';
 import { usePresensiStore } from '@/store/usePresensiStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
-import { PageHeader } from '@/components/ui/PageHeader';
+import { AsdosPageShell, AsdosPageHeader, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 
 type TabId = 'ALL' | 'PENDING' | 'VERIFIED';
 type TipeFilter = 'ALL' | 'QR' | 'LINK';
@@ -258,13 +258,13 @@ export default function DataPresensiPage() {
   };
 
   return (
-    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 min-h-screen pb-24 md:pb-12 font-sans">
+    <AsdosPageShell>
 
-      <div className="mb-6 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <PageHeader label="Data Presensi" title="Presensi Asisten" description="Tinjau jurnal mengajar, periksa video bukti kelas malam, dan lakukan verifikasi kehadiran asisten dosen." />
-        </div>
-      </div>
+      <AsdosPageHeader
+        eyebrow="Data Presensi"
+        title="Presensi Asisten"
+        description="Tinjau jurnal mengajar, periksa video bukti kelas malam, dan lakukan verifikasi kehadiran asisten dosen."
+      />
 
       <div className="space-y-6 relative z-10 mb-6">
         <div className="w-full z-20 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -310,7 +310,7 @@ export default function DataPresensiPage() {
                 placeholder="Cari asdos, matkul, atau kelas..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-crimson focus:ring-2 focus:ring-crimson/15 transition-all"
+                className="w-full pl-11 pr-4 py-3.5 rounded-[14px] md:rounded-2xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
               />
               {searchQuery && (
                 <button
@@ -390,18 +390,16 @@ export default function DataPresensiPage() {
 
       ) : filteredList.length === 0 ? (
 
-        <div className="text-center max-w-xl mx-auto mt-16 py-6 relative z-10">
-          <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-white/50 border border-slate-200/50 flex items-center justify-center text-slate-400">
-            <Inbox size={28} className="text-slate-400" />
-          </div>
-          <h3 className="text-base font-extrabold text-slate-800">Tidak Ada Presensi</h3>
-          <p className="text-xs text-slate-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
-            {searchQuery 
+        <AsdosState
+          icon={<Inbox size={24} />}
+          title="Tidak Ada Presensi"
+          message={
+            searchQuery
               ? 'Tidak menemukan rekaman presensi asisten yang cocok dengan kata pencarian Anda.'
               : `Tidak ada berkas presensi asisten dengan status "${activeTab === 'ALL' ? 'Semua' : activeTab === 'PENDING' ? 'Pending' : 'Terverifikasi'}" saat ini.`
-            }
-          </p>
-        </div>
+          }
+          className="mt-8"
+        />
 
       ) : (
 
@@ -712,7 +710,7 @@ export default function DataPresensiPage() {
         </>
       )}
 
-    </div>
+    </AsdosPageShell>
   );
 }
 

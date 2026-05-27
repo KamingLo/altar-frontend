@@ -33,7 +33,7 @@ import { fetchSemesters } from '@/lib/actions/manajemen-jadwal';
 import { semesterLabel, pengajarDisplayName } from '@/lib/jadwal-utils';
 import type { SemesterItem, UnifiedJadwalResponse } from '@/types/api';
 import { CustomSelect } from '@/components/ui/CustomSelect';
-import { PageHeader } from '@/components/ui/PageHeader';
+import { AsdosPageShell, AsdosPageHeader } from '@/components/dashboard/asdos/AsdosUI';
 
 const REFRESH_INTERVAL_SEC = 240; 
 
@@ -536,11 +536,11 @@ export default function GenerateQrPage() {
     <div className="relative min-h-screen w-full bg-transparent text-slate-800 font-sans">
 
       {mode === 'NORMAL' && (
-        <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 min-h-screen pb-24 md:pb-12 font-sans">
+        <AsdosPageShell className="pb-24 md:pb-12">
 
           <div className="mb-4 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div>
-              <PageHeader label="Presensi Asdos" title="Kiosk & QR Presensi" description="Konfigurasi kode QR asisten dosen atau jalankan layar Kiosk Mandiri di kelas Anda." />
+              <AsdosPageHeader eyebrow="Presensi Asdos" title="Kiosk & QR Presensi" description="Konfigurasi kode QR asisten dosen atau jalankan layar Kiosk Mandiri di kelas Anda." />
             </div>
 
             <div className="relative shrink-0 w-full sm:w-48 md:w-56 z-30">
@@ -686,7 +686,7 @@ export default function GenerateQrPage() {
             </div>
 
           </div>
-        </div>
+        </AsdosPageShell>
       )}
 
       {mode === 'KIOSK' && (

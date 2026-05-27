@@ -7,7 +7,8 @@ import {
 } from '@/lib/actions/manajemen';
 import type { UserListItem } from '@/lib/actions/manajemen';
 import { useManajemenStore } from '@/store/useManajemenStore';
-import { PageHeader } from '@/components/ui/PageHeader';
+import { Plus, Search } from 'lucide-react';
+import { AsdosPageShell, AsdosPageHeader, AsdosState, AsdosListSkeleton, AsdosPrimaryButton } from '@/components/dashboard/asdos/AsdosUI';
 
 type TabId = 'asdos' | 'koordinator' | 'user';
 type AddStep = 'role_search' | 'create_user' | 'role_data';
@@ -21,7 +22,6 @@ type ModalForm = {
   phone_number: string;
 };
 
-const SearchIcon = () => <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
 const EditIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>;
 const PhoneIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>;
 const UserIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
@@ -320,23 +320,24 @@ export default function ManajemenAsdosPage() {
   const identifierLabel = activeTab === 'asdos' ? 'NIM / NPM' : activeTab === 'koordinator' ? 'NIP' : 'Email User';
 
   return (
-    <div className="relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 min-h-screen">
+    <AsdosPageShell>
 
-      <div className="mb-4 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between">
-        <div>
-          <PageHeader label="Manajemen User" title="Kelola Akses" description="Atur data asdos, koordinator, dan user dalam satu halaman." />
-        </div>
-
-        {showAddButton && (
-          <button
-            onClick={() => handleOpenModal('add')}
-            className="hidden md:flex items-center gap-2 px-6 py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] hover:bg-red-800 active:scale-[0.98] transition-all shadow-md shadow-crimson/20 mt-4 md:mt-0"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-            Tambah {tabs.find(t => t.id === activeTab)?.short}
-          </button>
-        )}
-      </div>
+      <AsdosPageHeader
+        eyebrow="Manajemen User"
+        title="Kelola Akses"
+        description="Atur data asdos, koordinator, dan user dalam satu halaman."
+        action={
+          showAddButton ? (
+            <AsdosPrimaryButton
+              onClick={() => handleOpenModal('add')}
+              icon={<Plus size={18} strokeWidth={2.5} />}
+              className="hidden md:flex py-3.5 px-6 text-[15px] mt-4 md:mt-0"
+            >
+              Tambah {tabs.find(t => t.id === activeTab)?.short}
+            </AsdosPrimaryButton>
+          ) : undefined
+        }
+      />
 
       <div className="w-full z-20 mb-3 pb-2 md:mb-6 md:pb-0 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="w-full md:w-auto">
@@ -355,14 +356,14 @@ export default function ManajemenAsdosPage() {
 
         <div className="w-full md:w-80 shrink-0">
           <div className="relative md:mt-0">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-              <SearchIcon />
+            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
+              <Search className="w-5 h-5" />
             </div>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-crimson focus:ring-2 focus:ring-crimson/15 transition-all"
+              className="w-full pl-11 pr-4 py-3.5 rounded-[14px] md:rounded-2xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
               placeholder="Ketik nama asdos, koor, user"
             />
           </div>
@@ -370,33 +371,7 @@ export default function ManajemenAsdosPage() {
       </div>
 
       <div className="space-y-3 relative z-10 pb-24 md:pb-12">
-        {isLoading && activeItems.length === 0 && (
-          [1, 2, 3, 4].map(i => (
-            <div
-              key={i}
-              className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex items-center justify-between border border-slate-100"
-            >
-
-              <div className="flex items-center space-x-3 md:space-x-4 min-w-0 md:w-1/3">
-                <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl shrink-0 animate-shimmer" />
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <div className="h-4.5 bg-slate-100 rounded-lg w-28 md:w-36 animate-shimmer" />
-                  <div className="h-3.5 bg-slate-100 rounded-lg w-20 md:hidden animate-shimmer" />
-                </div>
-              </div>
-
-              <div className="hidden md:flex flex-1 items-center px-4">
-                <div className="h-8 bg-slate-100/80 border border-slate-100 rounded-lg w-44 animate-shimmer" />
-              </div>
-
-              {activeTab !== 'user' && (
-                <div className="shrink-0">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100/80 animate-shimmer" />
-                </div>
-              )}
-            </div>
-          ))
-        )}
+        {isLoading && activeItems.length === 0 && <AsdosListSkeleton count={4} />}
 
         {activeItems.map((item) => (
           <div
@@ -437,19 +412,15 @@ export default function ManajemenAsdosPage() {
         ))}
 
         {isEmptyResult && (
-          <div className="bg-white rounded-2xl p-6 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
-            <div className="mx-auto mb-3 md:mb-5 w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-              <UserIcon />
-            </div>
-            <p className="text-sm md:text-base font-semibold text-slate-700">
-              {searchQuery.trim() ? 'Data tidak ditemukan' : 'Belum ada data'}
-            </p>
-            <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-xs mx-auto">
-              {searchQuery.trim()
+          <AsdosState
+            icon={<UserIcon />}
+            title={searchQuery.trim() ? 'Data tidak ditemukan' : 'Belum ada data'}
+            message={
+              searchQuery.trim()
                 ? `Tidak ada hasil untuk "${searchQuery}".`
-                : activeTab !== 'user' ? 'Tekan tombol Tambah untuk menambah data baru.' : 'Belum ada user terdaftar.'}
-            </p>
-          </div>
+                : activeTab !== 'user' ? 'Tekan tombol Tambah untuk menambah data baru.' : 'Belum ada user terdaftar.'
+            }
+          />
         )}
 
         {hasMore && !isLoading && (
@@ -604,8 +575,8 @@ export default function ManajemenAsdosPage() {
                     </div>
 
                     <div className="relative mb-3">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                        <SearchIcon />
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
+                        <Search className="w-5 h-5" />
                       </div>
                       <input
                         type="text"
@@ -830,6 +801,6 @@ export default function ManajemenAsdosPage() {
         </>
       )}
 
-    </div>
+    </AsdosPageShell>
   );
 }
