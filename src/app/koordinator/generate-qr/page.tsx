@@ -88,6 +88,68 @@ export default function GenerateQrPage() {
 
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const formatDisplayDate = useCallback((raw: string) => {
+    if (!raw) return '-';
+    try {
+      const datePart = raw.split('T')[0] || raw;
+      const [y, m, d] = datePart.split('-').map(Number);
+      const dt = y && m && d ? new Date(y, m - 1, d) : new Date(raw);
+      return dt.toLocaleDateString('id-ID', {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return raw;
+    }
+  }, []);
+
+  const SessionCard = useCallback(({ s }: { s: UnifiedJadwalResponse }) => {
+    const timePart = s.waktu.includes(', ') ? s.waktu.split(', ')[1] : s.waktu;
+    const pengajar = pengajarDisplayName(s.pengajar) || '-';
+    const isPengganti = s.tipe === 'PENGGANTI';
+
+    return (
+      <section className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 flex flex-col gap-5 w-full shadow-sm hover:shadow-md transition-all">
+        <article className="flex flex-col gap-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-1 w-full">
+              <h2 className="font-bold text-slate-900 leading-snug line-clamp-2 mb-1 text-sm md:text-base">
+                {s.mata_kuliah}
+              </h2>
+              <p className="text-slate-500 font-medium text-[11px] md:text-xs">{s.nama_kelas || 'Kelas tidak tersedia'}</p>
+              {isPengganti && (
+                <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">
+                  Pengganti
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid w-full grid-cols-1 gap-y-2.5 border-t border-slate-100 pt-3 md:grid-cols-2 md:gap-x-6 md:gap-y-4 md:border-t-0 md:pt-0">
+            <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
+              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
+              <span className="font-bold text-slate-800 text-xs md:text-xs">{formatDisplayDate(s.tanggal)}</span>
+            </div>
+            <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
+              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+              <span className="font-bold text-slate-800 text-xs md:text-xs">{timePart}</span>
+            </div>
+            <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
+              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+              <span className="font-bold text-slate-800 text-xs md:text-xs truncate" title={s.ruangan}>{s.ruangan}</span>
+            </div>
+            <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
+              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pengajar</span>
+              <span className="font-bold text-slate-800 text-xs md:text-xs truncate" title={pengajar}>{pengajar}</span>
+            </div>
+          </div>
+        </article>
+      </section>
+    );
+  }, [formatDisplayDate]);
+
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
@@ -612,7 +674,7 @@ export default function GenerateQrPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[1, 2, 3].map(i => (
-                    <div key={i} className="bg-white rounded-2xl p-4 md:p-5 border border-slate-100 animate-shimmer flex items-center gap-4">
+                    <div key={i} className="bg-white rounded-[12px] md:rounded-[32px] p-4 md:p-6 border border-slate-100 animate-shimmer flex items-center gap-4">
                       <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl bg-slate-100 shrink-0" />
                       <div className="flex-1 space-y-2 md:space-y-3">
                         <div className="h-4 bg-slate-100 rounded-lg w-2/5" />
@@ -627,7 +689,7 @@ export default function GenerateQrPage() {
                 </div>
               ) : todaySessions.length === 0 ? (
 
-                <div className="bg-white rounded-2xl p-8 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
+                <div className="bg-white rounded-[12px] md:rounded-[32px] p-8 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
                   <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
                     <CalendarDays size={26} />
                   </div>
@@ -640,45 +702,8 @@ export default function GenerateQrPage() {
 
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:max-h-[calc(100dvh-22rem)] md:overflow-y-auto md:pr-1 md:[&::-webkit-scrollbar]:w-1.5 md:[&::-webkit-scrollbar-thumb]:rounded-full md:[&::-webkit-scrollbar-thumb]:bg-slate-300/80">
                   {todaySessions.map(s => {
-                    const timePart = s.waktu.includes(', ') ? s.waktu.split(', ')[1] : s.waktu;
                     return (
-                      <div
-                        key={s.id_sesi}
-                        className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all flex flex-col"
-                      >
-
-                        <div className="flex items-start gap-4 w-full">
-                          <div className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-crimson">
-                            <BookOpen size={20} strokeWidth={2} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <h3 className="font-bold text-[14px] md:text-[15px] text-[#1F2937] truncate">{s.mata_kuliah}</h3>
-                              {s.tipe === 'PENGGANTI' && (
-                                <span className="text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded-md tracking-wider">
-                                  PENGGANTI
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-400 font-semibold mt-0.5">{s.nama_kelas}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5 mt-3 pt-3 border-t border-slate-100 w-full">
-                          <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                            <Clock size={13} className="text-slate-400 shrink-0" />
-                            <span className="text-xs font-semibold text-slate-700">{timePart}</span>
-                          </div>
-                          <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                            <MapPin size={13} className="text-slate-400 shrink-0" />
-                            <span className="text-xs font-semibold text-slate-700">{s.ruangan}</span>
-                          </div>
-                          <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                            <User size={13} className="text-slate-400 shrink-0" />
-                            <span className="text-xs font-semibold text-slate-700 truncate">{pengajarDisplayName(s.pengajar)}</span>
-                          </div>
-                        </div>
-                      </div>
+                      <SessionCard key={s.id_sesi} s={s} />
                     );
                   })}
                 </div>
@@ -821,45 +846,8 @@ export default function GenerateQrPage() {
                 ) : (
                   <div className="flex-1 lg:overflow-y-auto overflow-visible grid grid-cols-1 sm:grid-cols-2 gap-3 content-start pr-1 lg:[&::-webkit-scrollbar]:w-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-slate-200">
                     {todaySessions.map(s => {
-                      const timePart = s.waktu.includes(', ') ? s.waktu.split(', ')[1] : s.waktu;
                       return (
-                        <div
-                          key={s.id_sesi}
-                          className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col text-slate-800"
-                        >
-
-                          <div className="flex items-start gap-4 w-full text-slate-800">
-                            <div className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-crimson">
-                              <BookOpen size={20} strokeWidth={2} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <h3 className="font-bold text-[14px] md:text-[15px] text-[#1F2937] truncate">{s.mata_kuliah}</h3>
-                                {s.tipe === 'PENGGANTI' && (
-                                  <span className="text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded-md tracking-wider">
-                                    PENGGANTI
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-slate-400 font-semibold mt-0.5">{s.nama_kelas}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col gap-1.5 mt-3 pt-3 border-t border-slate-100 w-full text-slate-800">
-                            <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                              <Clock size={13} className="text-slate-400 shrink-0" />
-                              <span className="text-xs font-semibold text-slate-700">{timePart}</span>
-                            </div>
-                            <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                              <MapPin size={13} className="text-slate-400 shrink-0" />
-                              <span className="text-xs font-semibold text-slate-700">{s.ruangan}</span>
-                            </div>
-                            <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                              <User size={13} className="text-slate-400 shrink-0" />
-                              <span className="text-xs font-semibold text-slate-700 truncate">{pengajarDisplayName(s.pengajar)}</span>
-                            </div>
-                          </div>
-                        </div>
+                        <SessionCard key={s.id_sesi} s={s} />
                       );
                     })}
                   </div>

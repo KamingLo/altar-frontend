@@ -339,147 +339,119 @@ export default function ManajemenKpPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredRequests.map(req => {
               const isPendingStatus = req.status === 'PENDING';
-              const isVerifiedStatus = req.status === 'VERIFIED';
               const isRejectedStatus = req.status === 'REJECTED';
 
+              const statusCfg =
+                req.status === 'PENDING'
+                  ? { bg: 'bg-fog', text: 'text-ink', label: 'MENUNGGU' }
+                  : req.status === 'VERIFIED'
+                    ? { bg: 'bg-obsidian', text: 'text-white', label: 'DISETUJUI' }
+                    : { bg: 'bg-obsidian', text: 'text-white', label: 'DITOLAK' };
+
               return (
-                <div
+                <section
                   key={req.id}
-                  className="bg-white rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                  className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 flex flex-col gap-5 w-full shadow-sm hover:shadow-md transition-all"
                 >
-                  <div className="space-y-4">
-
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex gap-3.5 items-center min-w-0">
-                        <div className="w-11 h-11 shrink-0 rounded-2xl flex items-center justify-center bg-rose-50 text-crimson">
-                          <BookOpen size={20} strokeWidth={2} />
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-extrabold text-[15px] text-[#1F2937] truncate leading-tight">
-                            {req.session?.mata_kuliah || 'Kuliah Pengganti'}
-                          </h4>
-                          <p className="text-xs font-bold text-slate-400 mt-0.5 truncate">{req.session?.nama_kelas || '—'}</p>
-                        </div>
+                  <article className="flex flex-col gap-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <h2 className="font-bold text-slate-900 leading-snug line-clamp-2 text-base md:text-lg">
+                          {req.session?.mata_kuliah ?? 'Kuliah Pengganti'}
+                        </h2>
+                        <p className="text-slate-500 font-medium text-xs md:text-sm mt-1 truncate">
+                          {req.session?.nama_kelas ?? 'Kelas tidak tersedia'}
+                        </p>
                       </div>
-
-                      <span
-                        className={`
-                          text-[10px] font-extrabold tracking-wider px-2.5 py-1 rounded-lg border uppercase shrink-0
-                          ${isPendingStatus
-                            ? 'bg-amber-50 text-amber-600 border-amber-200'
-                            : isVerifiedStatus
-                              ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                              : 'bg-rose-50 text-rose-600 border-rose-200'
-                          }
-                        `}
-                      >
-                        {req.status}
+                      <span className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${statusCfg.bg} ${statusCfg.text}`}>
+                        {statusCfg.label}
                       </span>
                     </div>
 
-                    <div className="relative pt-2 space-y-4">
-
-                      <div className="absolute left-[11px] top-6 bottom-4 w-0.5 border-l-2 border-dashed border-slate-200 z-0" />
-
-                      <div className="relative z-10 flex gap-3.5 items-start">
-                        <div className="w-[24px] h-[24px] rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5 text-[9px] font-black text-slate-500">
-                          1
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase block">JADWAL ASLI</span>
-                          <div className="mt-1 space-y-1">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                              <CalendarDays className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span>{formatDate(req.original_date)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
-                              <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span>{req.session?.waktu || 'Regular'}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span>{req.session?.ruangan || '—'}</span>
-                            </div>
-                          </div>
-                        </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tgl Asli</span>
+                        <span className="text-sm font-bold text-slate-800">{formatDate(req.original_date)}</span>
                       </div>
-
-                      <div className="relative z-10 flex gap-3.5 items-start">
-                        <div className="w-[24px] h-[24px] rounded-full bg-crimson/5 border border-crimson/15 flex items-center justify-center shrink-0 mt-0.5 text-[9px] font-black text-crimson">
-                          2
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-[10px] font-extrabold text-crimson tracking-wider uppercase block">JADWAL PENGGANTI</span>
-                          <div className="mt-1 space-y-1">
-                            <div className="flex items-center gap-1.5 text-xs font-extrabold text-crimson">
-                              <CalendarDays className="w-3.5 h-3.5 text-crimson/60 shrink-0" />
-                              <span>{formatDate(req.substitute_date)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                              <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span>{req.time_slot}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span>Ruang {req.room}</span>
-                            </div>
-                          </div>
-                        </div>
+                      <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tgl Pengganti</span>
+                        <span className="text-sm font-bold text-slate-800">{formatDate(req.substitute_date)}</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+                        <span className="text-sm font-bold text-slate-800">{req.time_slot}</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+                        <span className="text-sm font-bold text-slate-800 truncate">{req.room}</span>
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-100 space-y-2">
-                      <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                        <User className="w-4 h-4 text-slate-400 shrink-0" />
-                        <span className="text-slate-400 font-semibold">Mengajar:</span>
-                        <span className="truncate">{req.substitute_teacher}</span>
-                      </div>
-
-                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 text-xs font-semibold text-slate-600 italic leading-relaxed relative overflow-hidden flex gap-2">
+                    <div className="bg-fog rounded-[20px] p-4 md:p-5 grid grid-cols-1 gap-2">
+                      <div className="flex items-start gap-2.5">
                         <MessageSquare className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-extrabold text-[10px] tracking-wider uppercase text-slate-400 not-italic block mb-1">
-                            ALASAN ASDOS:
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-extrabold tracking-wider uppercase text-slate-400 block mb-1">
+                            Alasan Pengajuan
                           </span>
-                          {'"'}{req.reason}{'"'}
+                          <p className="text-sm text-slate-600 font-medium leading-relaxed line-clamp-3">
+                            &quot;{req.reason}&quot;
+                          </p>
                         </div>
                       </div>
 
                       {isRejectedStatus && req.coordinator_reason && (
-                        <div className="bg-rose-50/60 border border-rose-100/50 rounded-xl p-3.5 text-xs font-bold text-rose-700 flex gap-2">
-                          <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-extrabold text-[10px] tracking-wider uppercase text-rose-500 block mb-1">
-                              CATATAN PENOLAKAN:
+                        <div className="mt-2 pt-3 border-t border-slate-200/60 flex items-start gap-2.5">
+                          <ShieldAlert className="w-4 h-4 text-crimson shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-extrabold tracking-wider uppercase text-crimson/70 block mb-1">
+                              Catatan Penolakan
                             </span>
-                            {'"'}{req.coordinator_reason}{'"'}
+                            <p className="text-sm text-slate-600 font-medium leading-relaxed line-clamp-3">
+                              {req.coordinator_reason}
+                            </p>
                           </div>
                         </div>
                       )}
                     </div>
-                  </div>
 
-                  {isPendingStatus && (
-                    <div className="pt-5 border-t border-slate-100 flex gap-3 mt-5">
-                      <button
-                        type="button"
-                        onClick={() => openModal(req, 'REJECT')}
-                        className="flex-1 py-3 px-4 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-extrabold text-xs transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        Tolak
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openModal(req, 'APPROVE')}
-                        className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        Setujui
-                      </button>
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-600 min-w-0 group">
+                        <User className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span className="text-slate-400 font-semibold">Mengajar:</span>
+                        <span
+                          className="truncate group-hover:whitespace-normal group-hover:overflow-visible group-hover:text-clip group-hover:underline decoration-slate-300 underline-offset-4"
+                          title={req.substitute_teacher}
+                        >
+                          {req.substitute_teacher}
+                        </span>
+                      </div>
+
+                      {isPendingStatus && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openModal(req, 'REJECT')}
+                            className="w-11 h-11 rounded-full border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95 transition-all flex items-center justify-center"
+                            aria-label="Tolak"
+                            title="Tolak"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openModal(req, 'APPROVE')}
+                            className="w-11 h-11 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-sm flex items-center justify-center"
+                            aria-label="Setujui"
+                            title="Setujui"
+                          >
+                            <Check className="w-5 h-5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </article>
+                </section>
               );
             })}
           </div>

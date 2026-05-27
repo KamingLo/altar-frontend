@@ -4,16 +4,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   BookOpen,
+  Calendar,
   CalendarDays,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Filter,
   MapPin,
   Pencil,
   Plus,
   Search,
+  Trash2,
   User,
   Users,
 } from 'lucide-react';
@@ -37,7 +37,6 @@ import {
 } from '@/lib/constants/jadwal-slots';
 import {
   findByDisplayLabel,
-  getMonthBounds,
   isPenggantiTipe,
   isSubstituteSessionId,
   normalizeSessionTipe,
@@ -45,7 +44,6 @@ import {
   semesterLabel,
   sessionDateKey,
   sessionRowKey,
-  toIsoDate,
 } from '@/lib/jadwal-utils';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { isSessionExpiredMessage } from '@/lib/auth/jwt';
@@ -64,7 +62,6 @@ function redirectIfSessionExpired(message: string | undefined): boolean {
   return false;
 }
 
-const dayNamesGrid = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
 const FILTER_TIPE_OPTIONS = [
   { value: 'ALL', label: 'Semua Tipe' },
   { value: 'REGULER', label: 'Reguler' },
@@ -76,9 +73,54 @@ const JAM_SELECT_OPTIONS = JAM_OPTIONS.map(j => ({
   label: j.label,
   description: j.range,
 }));
-const dayNamesFull = ['MIN', 'SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB'];
 
 type TipeFilter = 'ALL' | 'REGULER' | 'PENGGANTI';
+
+function parseLocalDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function daysBetween(start: string, end: string) {
+  const diff = parseLocalDate(end).getTime() - parseLocalDate(start).getTime();
+  return Math.floor(diff / 86400000);
+}
+
+function toIsoDateFromDate(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function formatDisplayDate(iso: string) {
+  if (!iso) return '-';
+  return parseLocalDate(iso).toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatInputDate(iso: string) {
+  if (!iso) return 'Pilih tanggal';
+  return parseLocalDate(iso).toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function sameMonth(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
 
 type SessionForm = {
   tanggal: string;
@@ -104,6 +146,133 @@ const emptyForm = (tanggal = ''): SessionForm => ({
   id_dosen: '',
 });
 
+function DatePickerField({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  min?: string;
+  max?: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(() => parseLocalDate(value));
+  const minDate = min ? parseLocalDate(min) : null;
+  const maxDate = max ? parseLocalDate(max) : null;
+  const monthStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  const monthEnd = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+  const offset = monthStart.getDay();
+  const days = Array.from({ length: monthEnd.getDate() }, (_, i) =>
+    new Date(viewDate.getFullYear(), viewDate.getMonth(), i + 1),
+  );
+
+  const changeMonth = (delta: number) => {
+    setViewDate(current => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  };
+
+  const pickDate = (date: Date) => {
+    onChange(toIsoDateFromDate(date));
+    setViewDate(date);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full h-[52px] bg-white border border-slate-200 rounded-[14px] px-5 text-sm text-slate-700 focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300 transition-all font-semibold flex items-center justify-between"
+      >
+        <span>{formatInputDate(value)}</span>
+        <Calendar size={18} className="text-slate-400" />
+      </button>
+
+      {open && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-30 cursor-default"
+            aria-label="Tutup kalender"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 bg-white border border-slate-100 rounded-[20px] p-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                type="button"
+                onClick={() => changeMonth(-1)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50"
+              >
+                <span className="sr-only">Bulan sebelumnya</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <p className="text-sm font-bold text-slate-800 capitalize">
+                {viewDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+              </p>
+              <button
+                type="button"
+                onClick={() => changeMonth(1)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50"
+              >
+                <span className="sr-only">Bulan berikutnya</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day, index) => (
+                <div key={`${day}-${index}`} className="h-7 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: offset }).map((_, index) => (
+                <div key={index} />
+              ))}
+              {days.map(day => {
+                const iso = toIsoDateFromDate(day);
+                const selected = iso === value;
+                const disabled = (minDate ? day < minDate : false) || (maxDate ? day > maxDate : false);
+                return (
+                  <button
+                    key={iso}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => pickDate(day)}
+                    className={`h-9 rounded-xl text-xs font-bold transition-all ${
+                      selected
+                        ? 'bg-obsidian text-white'
+                        : disabled
+                          ? 'text-slate-300 cursor-not-allowed'
+                          : sameMonth(day, viewDate)
+                            ? 'text-slate-700 hover:bg-slate-50'
+                            : 'text-slate-300'
+                    }`}
+                  >
+                    {day.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function ManajemenJadwalPage() {
   const [semesters, setSemesters] = useState<SemesterItem[]>([]);
   const [selectedSemesterId, setSelectedSemesterId] = useState('');
@@ -114,9 +283,9 @@ export default function ManajemenJadwalPage() {
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
-  const [selectedDate, setSelectedDate] = useState(() => new Date().getDate().toString());
+  const today = useMemo(() => new Date(), []);
+  const [startDate, setStartDate] = useState(() => toIsoDateFromDate(today));
+  const [endDate, setEndDate] = useState(() => toIsoDateFromDate(addDays(today, 6)));
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipe, setFilterTipe] = useState<TipeFilter>('ALL');
@@ -155,7 +324,7 @@ export default function ManajemenJadwalPage() {
 
   const [masterModal, setMasterModal] = useState<{
     open: boolean;
-    mode: 'create' | 'edit';
+    mode: 'create' | 'edit' | 'delete';
     resource: MasterResource;
     initialData: MasterItem | null;
   }>({ open: false, mode: 'create', resource: 'kelas', initialData: null });
@@ -172,18 +341,7 @@ export default function ManajemenJadwalPage() {
     setTimeout(() => setToast(null), 4000);
   }, []);
 
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const gridOffset = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7;
-  const monthLabel = new Date(currentYear, currentMonth, 1).toLocaleDateString('id-ID', {
-    month: 'long',
-    year: 'numeric',
-  });
-  const calendarDays = Array.from({ length: daysInMonth }, (_, i) => ({
-    date: (i + 1).toString(),
-    dayMobile: dayNamesFull[(gridOffset + i) % 7],
-  }));
-  const selectedIso = toIsoDate(currentYear, currentMonth, parseInt(selectedDate, 10));
-  const { start_date: rangeStart, end_date: rangeEnd } = getMonthBounds(currentYear, currentMonth);
+  const maxEndDate = useMemo(() => toIsoDateFromDate(addDays(parseLocalDate(startDate), 6)), [startDate]);
 
   const selectedSemester = semesters.find(s => s.id === selectedSemesterId);
 
@@ -216,14 +374,39 @@ export default function ManajemenJadwalPage() {
     [lecturerList],
   );
 
+  const handleStartDateChange = (value: string) => {
+    if (!value) return;
+    setStartDate(value);
+    if (!endDate || daysBetween(value, endDate) < 0) {
+      setEndDate(value);
+      return;
+    }
+    if (daysBetween(value, endDate) > 6) {
+      setEndDate(toIsoDateFromDate(addDays(parseLocalDate(value), 6)));
+    }
+  };
+
+  const handleEndDateChange = (value: string) => {
+    if (!value) return;
+    if (daysBetween(startDate, value) < 0) {
+      setEndDate(startDate);
+      return;
+    }
+    if (daysBetween(startDate, value) > 6) {
+      setEndDate(maxEndDate);
+      return;
+    }
+    setEndDate(value);
+  };
+
   const refreshSessions = useCallback(async () => {
     if (!selectedSemesterId) return;
     setLoading(true);
     setFetchError(null);
     const res = await fetchSessions({
       id_semester: selectedSemesterId,
-      start_date: rangeStart,
-      end_date: rangeEnd,
+      start_date: startDate,
+      end_date: endDate,
     });
     if (res.success) {
       setSessions(res.items);
@@ -236,7 +419,7 @@ export default function ManajemenJadwalPage() {
     }
     setLoading(false);
     setIsInitialLoad(false);
-  }, [selectedSemesterId, rangeStart, rangeEnd, showToast]);
+  }, [selectedSemesterId, startDate, endDate, showToast]);
 
   useEffect(() => {
     (async () => {
@@ -303,6 +486,14 @@ export default function ManajemenJadwalPage() {
     setMasterModal({ open: true, mode: 'edit', resource, initialData: item });
   };
 
+  const openMasterDelete = (resource: MasterResource, item: MasterItem | null) => {
+    if (!item) {
+      showToast('Pilih item terlebih dahulu untuk dihapus.');
+      return;
+    }
+    setMasterModal({ open: true, mode: 'delete', resource, initialData: item });
+  };
+
   const closeMasterModal = () =>
     setMasterModal(m => ({ ...m, open: false }));
 
@@ -317,6 +508,7 @@ export default function ManajemenJadwalPage() {
       ruangan: 'Ruangan',
       lecturer: 'Dosen',
       semester: 'Semester',
+      asdos: 'Asisten Dosen',
     };
     const actionLabel = action === 'created' ? 'dibuat' : action === 'updated' ? 'diperbarui' : 'dihapus';
     showToast(`${labelMap[resource]} berhasil ${actionLabel}.`, 'success');
@@ -371,18 +563,9 @@ export default function ManajemenJadwalPage() {
 
   const hasActiveSearch = Boolean(searchTerm.trim()) || filterTipe !== 'ALL';
 
-  const hasSchedule = (date: string) => {
-    const iso = toIsoDate(currentYear, currentMonth, parseInt(date, 10));
-    return sessions.some(s => sessionDateKey(s.tanggal) === iso);
-  };
-
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    const base = hasActiveSearch
-      ? sessions
-      : sessions.filter(s => sessionDateKey(s.tanggal) === selectedIso);
-
-    return base.filter(s => {
+    return sessions.filter(s => {
       const matchSearch =
         !q ||
         s.mata_kuliah.toLowerCase().includes(q) ||
@@ -393,23 +576,7 @@ export default function ManajemenJadwalPage() {
       const matchTipe = filterTipe === 'ALL' || normalizeSessionTipe(s.tipe) === filterTipe;
       return matchSearch && matchTipe;
     });
-  }, [sessions, searchTerm, filterTipe, selectedIso, hasActiveSearch]);
-
-  const handlePrevMonth = () => {
-    if (currentMonth === 0) {
-      setCurrentYear(y => y - 1);
-      setCurrentMonth(11);
-    } else setCurrentMonth(m => m - 1);
-    setSelectedDate('1');
-  };
-
-  const handleNextMonth = () => {
-    if (currentMonth === 11) {
-      setCurrentYear(y => y + 1);
-      setCurrentMonth(0);
-    } else setCurrentMonth(m => m + 1);
-    setSelectedDate('1');
-  };
+  }, [sessions, searchTerm, filterTipe]);
 
   const buildPayload = () => ({
     id_kelas: form.id_kelas,
@@ -480,7 +647,7 @@ export default function ManajemenJadwalPage() {
     setTimeout(() => setIsModalVisible(true), 10);
 
     if (type === 'add') {
-      setForm(emptyForm(selectedIso));
+      setForm(emptyForm(startDate));
       setInstructorType('DOSEN');
     } else if (session) {
       setForm(emptyForm(sessionDateKey(session.tanggal)));
@@ -490,7 +657,7 @@ export default function ManajemenJadwalPage() {
     if (!lists) return;
 
     if (type === 'add') {
-      setForm(emptyForm(selectedIso));
+      setForm(emptyForm(startDate));
       setInstructorType('DOSEN');
     } else if (session) {
       const filled = prefillFromSession(session, {
@@ -660,8 +827,6 @@ export default function ManajemenJadwalPage() {
     else setDeleteSheetDragY(0);
   };
 
-  const selectedDayLabel = calendarDays[parseInt(selectedDate, 10) - 1]?.dayMobile ?? '';
-
   const selectClass =
     'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-white focus:border-crimson focus:ring-1 focus:ring-crimson outline-none disabled:opacity-60';
 
@@ -688,51 +853,29 @@ export default function ManajemenJadwalPage() {
         </div>
 
 
-        <div className="flex flex-col md:flex-row gap-4 lg:gap-6 items-start">
-
-          <div className="w-full md:w-[300px] lg:w-[320px] shrink-0 flex flex-col">
-
-            <div className="hidden md:flex items-center h-7 mb-2 w-full">
-              <div className="h-3.5 w-32 rounded-md animate-shimmer"></div>
-            </div>
-            <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
-              <div className="flex justify-between items-center mb-6">
-                <div className="h-5 w-28 rounded-md animate-shimmer"></div>
-                <div className="flex gap-2">
-                  <div className="w-8 h-8 rounded-full animate-shimmer"></div>
-                  <div className="w-8 h-8 rounded-full animate-shimmer"></div>
-                </div>
-              </div>
-              <div className="grid grid-cols-7 gap-y-4 gap-x-1">
-                {Array.from({ length: 7 }).map((_, i) => (
-                  <div key={`d-${i}`} className="h-3 w-6 rounded mx-auto animate-shimmer"></div>
-                ))}
-                {Array.from({ length: 31 }).map((_, i) => (
-                  <div key={`c-${i}`} className="w-9 h-9 rounded-xl mx-auto flex items-center justify-center animate-shimmer"></div>
-                ))}
-              </div>
-            </div>
+        <div className="flex flex-col gap-4 lg:gap-6 items-start">
+          <div className="grid grid-cols-2 gap-3 w-full">
+            <div className="h-[52px] rounded-[14px] animate-shimmer" />
+            <div className="h-[52px] rounded-[14px] animate-shimmer" />
           </div>
 
-
           <div className="flex-1 w-full space-y-4">
-            <div className="hidden md:flex justify-end h-7 mb-2 items-center">
+            <div className="flex justify-between items-center h-7 mb-2">
+              <div className="h-3.5 w-40 rounded-md animate-shimmer"></div>
               <div className="h-6 w-16 rounded-md animate-shimmer"></div>
             </div>
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={`card-${i}`} className="bg-white rounded-2xl p-4 border border-slate-100 flex items-start gap-4">
-                <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl shrink-0 animate-shimmer"></div>
-                <div className="flex-1 min-w-0 space-y-2">
-                  <div className="h-5 w-2/3 rounded animate-shimmer"></div>
-                  <div className="h-3.5 w-1/3 rounded animate-shimmer"></div>
-                  <div className="flex gap-2 pt-2.5">
-                    <div className="h-6 w-20 border border-slate-100 rounded-lg animate-shimmer"></div>
-                    <div className="h-6 w-20 border border-slate-100 rounded-lg animate-shimmer"></div>
-                    <div className="h-6 w-24 border border-slate-100 rounded-lg animate-shimmer"></div>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={`card-${i}`}
+                  className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 animate-shimmer space-y-6"
+                >
+                  <div className="h-5 w-2/3 rounded"></div>
+                  <div className="h-3.5 w-1/2 rounded"></div>
+                  <div className="h-20 rounded-xl"></div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -783,16 +926,6 @@ export default function ManajemenJadwalPage() {
             >
               <Plus className="w-[18px] h-[18px]" strokeWidth={2.5} />
             </button>
-            <button
-              type="button"
-              onClick={() => openMasterEdit('semester', selectedSemester ?? null)}
-              disabled={!selectedSemester}
-              className="shrink-0 w-11 h-11 md:w-12 md:h-12 flex items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-crimson active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-slate-500"
-              aria-label="Edit semester terpilih"
-              title="Edit semester terpilih"
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
           </div>
 
           <div className="flex gap-3 flex-1 md:max-w-[420px] md:ml-auto w-full">
@@ -824,122 +957,42 @@ export default function ManajemenJadwalPage() {
           </div>
         </div>
 
+      </div>
 
-        <div className="md:hidden flex justify-between items-center mb-3 mt-1 px-1">
-          <h3 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">
-            {hasActiveSearch
-              ? `Hasil pencarian`
-              : `${selectedDayLabel}, ${selectedDate} ${monthLabel}`}
-          </h3>
-          <span className="bg-crimson/10 text-crimson text-[10px] font-bold px-2.5 py-1 rounded-md">
-            {filtered.length} sesi
-          </span>
-        </div>
-
-
-        <div className="md:hidden mb-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-base font-bold text-slate-800">{monthLabel}</h3>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={handlePrevMonth} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl text-slate-500 active:scale-95 shadow-sm">
-                <ChevronLeft className="w-[18px] h-[18px]" />
-              </button>
-              <button type="button" onClick={handleNextMonth} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl text-slate-500 active:scale-95 shadow-sm">
-                <ChevronRight className="w-[18px] h-[18px]" />
-              </button>
-            </div>
+      <div className="mb-6 flex flex-col md:flex-row md:items-end gap-3 md:gap-4">
+        <div className="grid grid-cols-2 gap-3 flex-1">
+          <div>
+            <DatePickerField label="Dari Tanggal" value={startDate} onChange={handleStartDateChange} />
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-3 [&::-webkit-scrollbar]:hidden snap-x">
-            {calendarDays.map(item => {
-              const sel = selectedDate === item.date;
-              return (
-                <button
-                  key={item.date}
-                  type="button"
-                  onClick={() => setSelectedDate(item.date)}
-                  className={`flex flex-col items-center min-w-[64px] py-3.5 rounded-2xl transition-all snap-center shrink-0 border
-                  ${sel ? 'bg-crimson text-white shadow-lg shadow-crimson/20 border-crimson' : 'bg-white text-slate-500 border-slate-100'}`}
-                >
-                  <span className={`text-[10px] font-bold tracking-widest mb-1 ${sel ? 'text-white/80' : 'text-slate-400'}`}>
-                    {item.dayMobile}
-                  </span>
-                  <span className="text-xl font-bold mb-1">{item.date}</span>
-                  <div className={`w-1 h-1 rounded-full ${sel ? 'bg-white' : hasSchedule(item.date) ? 'bg-crimson/50' : 'bg-transparent'}`} />
-                </button>
-              );
-            })}
+          <div>
+            <DatePickerField
+              label="Sampai Tanggal"
+              value={endDate}
+              min={startDate}
+              max={maxEndDate}
+              onChange={handleEndDateChange}
+            />
           </div>
         </div>
       </div>
+      <p className="text-xs font-medium text-slate-400 ml-1 -mt-3 mb-6">
+        Pilih rentang tanggal maksimal 7 hari.
+      </p>
 
       <div className="flex flex-col md:flex-row gap-4 lg:gap-6 items-start">
 
-        <div className="hidden md:flex flex-col w-[300px] lg:w-[320px] shrink-0 md:sticky md:top-24">
-          <div className="hidden md:flex items-center h-7 mb-2 w-full shrink-0">
-            <h3 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">
-              {hasActiveSearch
-                ? `Hasil pencarian`
-                : `${selectedDayLabel}, ${selectedDate} ${monthLabel}`}
-            </h3>
-          </div>
-          <div className="w-full bg-white rounded-[2rem] p-6 md:p-7 shadow-sm border border-slate-100">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-bold text-slate-800">{monthLabel}</h2>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={handlePrevMonth} className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-all">
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button type="button" onClick={handleNextMonth} className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-all">
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-7 gap-y-4 gap-x-1">
-              {dayNamesGrid.map((day, i) => (
-                <div key={i} className="text-center text-[11px] font-bold text-[#8BA3CB] mb-2">
-                  {day}
-                </div>
-              ))}
-              {Array.from({ length: gridOffset }).map((_, i) => (
-                <div key={`sp-${i}`} />
-              ))}
-              {calendarDays.map(item => {
-                const sel = selectedDate === item.date;
-                const hasItem = hasSchedule(item.date);
-                return (
-                  <button
-                    key={item.date}
-                    type="button"
-                    onClick={() => setSelectedDate(item.date)}
-                    className="flex flex-col items-center justify-center group"
-                  >
-                    <div
-                      className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-200
-                      ${sel ? 'bg-crimson text-white shadow-md' : 'bg-transparent text-slate-700 group-hover:bg-slate-100'}`}
-                    >
-                      <span className="text-sm font-bold">{item.date}</span>
-                    </div>
-                    <div
-                      className={`w-1 h-1 rounded-full mt-1.5 transition-all
-                      ${sel && hasItem ? 'bg-crimson' : !sel && hasItem ? 'bg-crimson/50' : 'bg-transparent'}`}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-
         <div className="flex flex-col flex-1 min-w-0 w-full md:min-h-[320px]">
 
-          <div className="hidden md:flex justify-end items-center h-7 mb-2 shrink-0">
+          <div className="flex justify-between items-center h-7 mb-3 shrink-0 px-1">
+            <h3 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">
+              {hasActiveSearch ? 'Hasil pencarian' : `${startDate} — ${endDate}`}
+            </h3>
             <span className="bg-crimson/10 text-crimson text-[10px] font-bold px-2.5 py-1 rounded-md">
               {filtered.length} sesi
             </span>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-6">
             {loading && (
               <div className="flex justify-center py-12">
                 <div className="w-7 h-7 border-2 border-crimson border-t-transparent rounded-full animate-spin" />
@@ -947,89 +1000,112 @@ export default function ManajemenJadwalPage() {
             )}
 
             {!loading &&
-              filtered.map(s => {
-                const timePart = s.waktu.includes(', ') ? s.waktu.split(', ')[1] : s.waktu;
-                return (
-                  <div
-                    key={sessionRowKey(s)}
-                    className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm border border-slate-100 md:hover:shadow-md md:hover:border-slate-200 transition-all group"
-                  >
-                    <div className="flex items-start gap-3 md:gap-4">
-                      <div className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-xl flex items-center justify-center bg-rose-50 text-crimson">
-                        <BookOpen size={20} strokeWidth={2} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{s.mata_kuliah}</h3>
-                          {isPenggantiTipe(s.tipe) && (
-                            <span className="shrink-0 text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded-md tracking-wider">
-                              PENGGANTI
+              (() => {
+                const grouped = filtered.reduce<Record<string, SessionTimeline[]>>((acc, s) => {
+                  const key = sessionDateKey(s.tanggal);
+                  acc[key] = [...(acc[key] || []), s];
+                  return acc;
+                }, {});
+                const keys = Object.keys(grouped).sort();
+
+                const formatDisplayDate = (iso: string) => {
+                  if (!iso) return '-';
+                  return parseLocalDate(iso).toLocaleDateString('id-ID', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  });
+                };
+
+                const ScheduleCard = ({ s }: { s: SessionTimeline }) => {
+                  const timePart = s.waktu.includes(', ') ? s.waktu.split(', ')[1] : s.waktu;
+                  const isPengganti = isPenggantiTipe(s.tipe);
+                  return (
+                    <section className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 flex flex-col gap-5 w-full">
+                      <article className="flex flex-col gap-5">
+                        <div className="flex flex-col gap-1 w-full">
+                          <h2 className="font-bold text-slate-900 leading-snug line-clamp-2 mb-1 text-sm md:text-base">
+                            {s.mata_kuliah}
+                          </h2>
+                          <p className="text-slate-500 font-medium text-[11px] md:text-xs">{s.nama_kelas || 'Kelas tidak tersedia'}</p>
+                          {isPengganti && (
+                            <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">
+                              Pengganti
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 font-medium mt-0.5">
-                          {s.nama_kelas}
-                          {hasActiveSearch && (
-                            <span className="text-slate-400"> Â· {sessionDateKey(s.tanggal)}</span>
-                          )}
-                        </p>
-                        <div className="hidden md:flex flex-wrap gap-2 mt-2.5">
-                          <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700">
-                            <Clock size={12} className="text-slate-400 shrink-0" />
-                            {timePart}
+
+                        <div className="grid w-full grid-cols-1 gap-y-2.5 border-t border-slate-100 pt-3 md:grid-cols-2 md:gap-x-6 md:gap-y-4 md:border-t-0 md:pt-0">
+                          <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
+                            <span className="font-bold text-slate-800 text-xs md:text-xs">{formatDisplayDate(sessionDateKey(s.tanggal))}</span>
                           </div>
-                          <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700">
-                            <MapPin size={12} className="text-slate-400 shrink-0" />
-                            {s.ruangan}
+                          <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+                            <span className="font-bold text-slate-800 text-xs md:text-xs">{timePart}</span>
                           </div>
-                          <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700">
-                            <User size={12} className="text-slate-400 shrink-0" />
-                            {pengajarDisplayName(s.pengajar)}
+                          <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+                            <span className="font-bold text-slate-800 text-xs md:text-xs">{s.ruangan}</span>
+                          </div>
+                          <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pengajar</span>
+                            <span className="font-bold text-slate-800 text-xs md:text-xs">{pengajarDisplayName(s.pengajar) || '-'}</span>
                           </div>
                         </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenModal('edit', s)}
+                              disabled={isPengganti}
+                              className="w-10 h-10 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-crimson active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                              aria-label="Edit sesi"
+                              title={isPengganti ? 'Sesi pengganti tidak bisa diedit di sini' : 'Edit sesi'}
+                            >
+                              <Pencil className="w-4 h-4 mx-auto" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteOpen(s)}
+                              className="w-10 h-10 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-crimson active:scale-95 transition-all"
+                              aria-label="Hapus sesi"
+                              title="Hapus sesi"
+                            >
+                              <Trash2 className="w-4 h-4 mx-auto" />
+                            </button>
+                          </div>
+
+                          {isPengganti && (
+                            <span className="text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-2.5 py-1 rounded-xl uppercase tracking-wider">
+                              Pengganti
+                            </span>
+                          )}
+                        </div>
+                      </article>
+                    </section>
+                  );
+                };
+
+                return (
+                  <>
+                    {keys.map(dateKey => (
+                      <div key={dateKey} className="flex flex-col gap-3">
+                        <div className="flex items-center px-1">
+                          <h3 className="text-sm font-bold text-slate-800">{formatDisplayDate(dateKey)}</h3>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                          {grouped[dateKey].map(s => (
+                            <ScheduleCard key={sessionRowKey(s)} s={s} />
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex flex-row md:flex-col gap-1 shrink-0">
-                        {!isPenggantiTipe(s.tipe) && (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenModal('edit', s)}
-                            className="p-2 rounded-lg text-slate-400 hover:text-crimson hover:bg-rose-50 transition-colors"
-                            aria-label="Edit sesi"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteOpen(s)}
-                          className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                          aria-label="Hapus sesi"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-slate-100 md:hidden">
-                      <div className="flex w-full items-center gap-2.5 bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700">
-                        <Clock size={14} className="text-slate-400 shrink-0" />
-                        <span className="min-w-0 truncate">{timePart}</span>
-                      </div>
-                      <div className="flex w-full items-center gap-2.5 bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700">
-                        <MapPin size={14} className="text-slate-400 shrink-0" />
-                        <span className="min-w-0 truncate">{s.ruangan}</span>
-                      </div>
-                      <div className="flex w-full items-center gap-2.5 bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700">
-                        <User size={14} className="text-slate-400 shrink-0" />
-                        <span className="min-w-0 truncate">{pengajarDisplayName(s.pengajar)}</span>
-                      </div>
-                    </div>
-                  </div>
+                    ))}
+                  </>
                 );
-              })}
+              })()}
 
             {!loading && !fetchError && filtered.length === 0 && (
               <div className="bg-white rounded-2xl p-8 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
@@ -1040,7 +1116,7 @@ export default function ManajemenJadwalPage() {
                 <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-xs mx-auto">
                   {hasActiveSearch
                     ? 'Coba ubah kata kunci atau filter tipe sesi.'
-                    : 'Belum ada sesi pada tanggal ini.'}
+                    : 'Belum ada sesi pada rentang tanggal ini.'}
                 </p>
               </div>
             )}
@@ -1049,7 +1125,7 @@ export default function ManajemenJadwalPage() {
           <p className="shrink-0 text-[11px] font-medium text-slate-400 px-1 pt-2 pb-0.5 border-t border-slate-100/80 mt-1">
             {hasActiveSearch
               ? `Menampilkan ${filtered.length} sesi (pencarian aktif)`
-              : `Menampilkan ${filtered.length} sesi pada ${selectedIso}`}
+              : `Menampilkan ${filtered.length} sesi pada ${startDate} — ${endDate}`}
           </p>
         </div>
       </div>
@@ -1120,42 +1196,96 @@ export default function ManajemenJadwalPage() {
                       label="Kelas"
                       onCreate={() => openMasterCreate('kelas')}
                       onEdit={() => openMasterEdit('kelas', selectedKelasItem)}
+                      onDelete={() => openMasterDelete('kelas', selectedKelasItem)}
                       canEdit={!!selectedKelasItem}
+                      canDelete={!!selectedKelasItem}
                     >
-                      <CustomSelect
-                        value={form.id_kelas}
-                        onChange={v => setForm(f => ({ ...f, id_kelas: v }))}
-                        options={kelasOptions}
-                        placeholder="Pilih kelas"
-                      />
+                      <div className="flex gap-2 items-stretch">
+                        <div className="flex-1 min-w-0">
+                          <CustomSelect
+                            value={form.id_kelas}
+                            onChange={v => setForm(f => ({ ...f, id_kelas: v }))}
+                            options={kelasOptions}
+                            placeholder="Pilih kelas"
+                            searchable
+                            searchPlaceholder="Cari kelas..."
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openMasterDelete('kelas', selectedKelasItem)}
+                          disabled={!selectedKelasItem}
+                          className="w-12 h-12 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-crimson active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Hapus kelas terpilih"
+                          title={selectedKelasItem ? `Hapus ${selectedKelasItem.nama_kelas}` : 'Pilih kelas dulu'}
+                        >
+                          <Trash2 className="w-[18px] h-[18px] mx-auto" />
+                        </button>
+                      </div>
                     </FieldCRUD>
 
                     <FieldCRUD
                       label="Mata Kuliah"
                       onCreate={() => openMasterCreate('mk')}
                       onEdit={() => openMasterEdit('mk', selectedMkItem)}
+                      onDelete={() => openMasterDelete('mk', selectedMkItem)}
                       canEdit={!!selectedMkItem}
+                      canDelete={!!selectedMkItem}
                     >
-                      <CustomSelect
-                        value={form.id_mk}
-                        onChange={v => setForm(f => ({ ...f, id_mk: v }))}
-                        options={mkOptions}
-                        placeholder="Pilih mata kuliah"
-                      />
+                      <div className="flex gap-2 items-stretch">
+                        <div className="flex-1 min-w-0">
+                          <CustomSelect
+                            value={form.id_mk}
+                            onChange={v => setForm(f => ({ ...f, id_mk: v }))}
+                            options={mkOptions}
+                            placeholder="Pilih mata kuliah"
+                            searchable
+                            searchPlaceholder="Cari mata kuliah..."
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openMasterDelete('mk', selectedMkItem)}
+                          disabled={!selectedMkItem}
+                          className="w-12 h-12 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-crimson active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Hapus mata kuliah terpilih"
+                          title={selectedMkItem ? `Hapus ${selectedMkItem.nama_mk}` : 'Pilih mata kuliah dulu'}
+                        >
+                          <Trash2 className="w-[18px] h-[18px] mx-auto" />
+                        </button>
+                      </div>
                     </FieldCRUD>
 
                     <FieldCRUD
                       label="Ruangan"
                       onCreate={() => openMasterCreate('ruangan')}
                       onEdit={() => openMasterEdit('ruangan', selectedRuanganItem)}
+                      onDelete={() => openMasterDelete('ruangan', selectedRuanganItem)}
                       canEdit={!!selectedRuanganItem}
+                      canDelete={!!selectedRuanganItem}
                     >
-                      <CustomSelect
-                        value={form.id_ruangan}
-                        onChange={v => setForm(f => ({ ...f, id_ruangan: v }))}
-                        options={ruanganOptions}
-                        placeholder="Pilih ruangan"
-                      />
+                      <div className="flex gap-2 items-stretch">
+                        <div className="flex-1 min-w-0">
+                          <CustomSelect
+                            value={form.id_ruangan}
+                            onChange={v => setForm(f => ({ ...f, id_ruangan: v }))}
+                            options={ruanganOptions}
+                            placeholder="Pilih ruangan"
+                            searchable
+                            searchPlaceholder="Cari ruangan..."
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openMasterDelete('ruangan', selectedRuanganItem)}
+                          disabled={!selectedRuanganItem}
+                          className="w-12 h-12 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-crimson active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Hapus ruangan terpilih"
+                          title={selectedRuanganItem ? `Hapus ${selectedRuanganItem.nama_ruangan}` : 'Pilih ruangan dulu'}
+                        >
+                          <Trash2 className="w-[18px] h-[18px] mx-auto" />
+                        </button>
+                      </div>
                     </FieldCRUD>
 
                     <Field label="Tanggal Sesi">
@@ -1215,20 +1345,38 @@ export default function ManajemenJadwalPage() {
                         label="Dosen Pengajar"
                         onCreate={() => openMasterCreate('lecturer')}
                         onEdit={() => openMasterEdit('lecturer', selectedLecturerItem)}
+                        onDelete={() => openMasterDelete('lecturer', selectedLecturerItem)}
                         canEdit={!!selectedLecturerItem}
+                        canDelete={!!selectedLecturerItem}
                       >
-                        <CustomSelect
-                          value={form.id_dosen}
-                          onChange={v => setForm(f => ({
-                            ...f,
-                            id_dosen: v,
-                            id_asdos1: '',
-                            id_asdos2: ''
-                          }))}
-                          options={[{ value: '', label: 'Pilih Dosen' }, ...lecturerOptions]}
-                          placeholder="Pilih Dosen"
-                          icon={<User className="w-4 h-4" />}
-                        />
+                        <div className="flex gap-2 items-stretch">
+                          <div className="flex-1 min-w-0">
+                            <CustomSelect
+                              value={form.id_dosen}
+                              onChange={v => setForm(f => ({
+                                ...f,
+                                id_dosen: v,
+                                id_asdos1: '',
+                                id_asdos2: ''
+                              }))}
+                              options={[{ value: '', label: 'Pilih Dosen' }, ...lecturerOptions]}
+                              placeholder="Pilih Dosen"
+                              icon={<User className="w-4 h-4" />}
+                              searchable
+                              searchPlaceholder="Cari dosen..."
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openMasterDelete('lecturer', selectedLecturerItem)}
+                            disabled={!selectedLecturerItem}
+                            className="w-12 h-12 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-crimson active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                            aria-label="Hapus dosen terpilih"
+                            title={selectedLecturerItem ? `Hapus ${selectedLecturerItem.nama}` : 'Pilih dosen dulu'}
+                          >
+                            <Trash2 className="w-[18px] h-[18px] mx-auto" />
+                          </button>
+                        </div>
                       </FieldCRUD>
                     ) : (
                       <>
@@ -1391,13 +1539,17 @@ function FieldCRUD({
   label,
   onCreate,
   onEdit,
+  onDelete,
   canEdit,
+  canDelete,
   children,
 }: {
   label: string;
   onCreate: () => void;
   onEdit: () => void;
+  onDelete?: () => void;
   canEdit: boolean;
+  canDelete?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -1423,6 +1575,18 @@ function FieldCRUD({
           >
             <Pencil className="w-3.5 h-3.5" />
           </button>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={!canDelete}
+              className="text-slate-400 hover:text-red-600 hover:bg-red-50 active:scale-95 p-1 rounded-md disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-all"
+              aria-label={`Hapus ${label}`}
+              title={canDelete ? `Hapus ${label} yang dipilih` : `Pilih ${label.toLowerCase()} dulu untuk hapus`}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
       {children}

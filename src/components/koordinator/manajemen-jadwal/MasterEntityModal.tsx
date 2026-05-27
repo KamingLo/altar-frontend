@@ -201,7 +201,7 @@ export function MasterEntityModal({ open, mode, resource, initialData, onClose, 
             {mode === 'delete' ? (
               <div className="mt-5 space-y-5">
                 <p className="text-sm text-slate-600 font-semibold leading-relaxed">
-                  Apakah Anda yakin ingin menghapus {RESOURCE_LABEL[resource].toLowerCase()}{' '}
+                  Anda Yakin untuk menghapus{' '}
                   <strong className="text-slate-800">{getItemDisplayName(resource, initialData)}</strong>?
                 </p>
                 <div className="flex gap-3">

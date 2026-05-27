@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useTransition } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useTransition } from 'react';
 import {
   CalendarDays,
   MapPin,
@@ -36,6 +36,22 @@ import { AsdosPageShell, AsdosPageHeader, AsdosState } from '@/components/dashbo
 
 type TabId = 'ALL' | 'PENDING' | 'VERIFIED';
 type TipeFilter = 'ALL' | 'QR' | 'LINK';
+type PageTab = 'VERIFY' | 'PAY';
+
+function toMonthKey(dateStr: string) {
+  // Accepts ISO-ish strings; safest for backend formats used here.
+  // Example: 2026-05-27T00:00:00.000Z -> 2026-05
+  const part = (dateStr || '').split('T')[0] || '';
+  const [y, m] = part.split('-');
+  if (!y || !m) return '';
+  return `${y}-${m}`;
+}
+
+function formatMonthLabel(monthKey: string) {
+  const [y, m] = monthKey.split('-').map(Number);
+  if (!y || !m) return monthKey || '-';
+  return new Date(y, m - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+}
 
 const FILTER_TIPE_OPTIONS = [
   { value: 'ALL', label: 'Semua Absensi' },
@@ -46,6 +62,7 @@ const FILTER_TIPE_OPTIONS = [
 export default function DataPresensiPage() {
   const { presensiList, isLoading, setPresensi, verifyPresensiLocal, updatePaymentLocal, setIsLoading } = usePresensiStore();
 
+  const [pageTab, setPageTab] = useState<PageTab>('VERIFY');
   const [activeTab, setActiveTab] = useState<TabId>('PENDING');
   const [tipeFilter, setTipeFilter] = useState<TipeFilter>('ALL');
   const [semesterFilter, setSemesterFilter] = useState<string>('');
@@ -54,6 +71,7 @@ export default function DataPresensiPage() {
   const [bulkPending, setBulkPending] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [semesters, setSemesters] = useState<SemesterItem[]>([]);
+  const [payingMonth, setPayingMonth] = useState<string | null>(null);
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -229,6 +247,86 @@ export default function DataPresensiPage() {
     );
   });
 
+  // For Progress & Pembayaran, we should not depend on the VERIFY tab filters (activeTab).
+  // We still respect semesterFilter because the fetch already scopes data by semester.
+  const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
+    return presensiList.filter((item) => {
+      if (!item.is_verified) return false;
+      if (tipeFilter === 'QR' && item.tipe_absensi !== 'qr') return false;
+      if (tipeFilter === 'LINK' && item.tipe_absensi !== 'link') return false;
+      const search = searchQuery.toLowerCase();
+      const asdosName = (item.nama_asdos || '').toLowerCase();
+      return asdosName.includes(search);
+    });
+  }, [presensiList, tipeFilter, searchQuery]);
+
+  const currentMonthKey = useMemo(() => toMonthKey(new Date().toISOString()), []);
+
+  const paymentSections = useMemo(() => {
+    // Group verified items into month -> asdos rekap
+    const monthMap = new Map<string, PresensiResponseDTO[]>();
+    for (const item of payVerifiedList) {
+      const key = toMonthKey(item.tanggal_mengajar);
+      if (!key) continue;
+      monthMap.set(key, [...(monthMap.get(key) || []), item]);
+    }
+
+    const months = Array.from(monthMap.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([monthKey, items]) => {
+        const asdosMap = new Map<string, PresensiResponseDTO[]>();
+        for (const it of items) {
+          const name = (it.nama_asdos || '—').trim() || '—';
+          asdosMap.set(name, [...(asdosMap.get(name) || []), it]);
+        }
+
+        const asdosRows = Array.from(asdosMap.entries())
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([name, list]) => {
+            const unpaidIds = list.filter(x => !x.is_paid).map(x => x.id_presensi);
+            return {
+              name,
+              totalSessions: list.length,
+              unpaidCount: unpaidIds.length,
+              isPaid: unpaidIds.length === 0,
+              unpaidIds,
+            };
+          });
+
+        const unpaidIdsAll = asdosRows.flatMap(r => r.unpaidIds);
+        const canPay = monthKey < currentMonthKey; // only months strictly before current month
+
+        return {
+          monthKey,
+          monthLabel: formatMonthLabel(monthKey),
+          asdosRows,
+          unpaidIdsAll,
+          canPay,
+        };
+      });
+
+    return months;
+  }, [payVerifiedList, currentMonthKey]);
+
+  const payAllForMonth = useCallback(async (monthKey: string, ids: string[]) => {
+    if (!ids.length) return;
+    setPayingMonth(monthKey);
+    updatePaymentLocal(ids, true);
+    try {
+      const res = await updatePaymentStatus(ids, true);
+      if (res.success) toast.success(`Pembayaran ${formatMonthLabel(monthKey)} ditandai lunas.`);
+      else {
+        toast.error(res.message || 'Gagal memperbarui status pembayaran.');
+        fetchPresensi(true);
+      }
+    } catch {
+      toast.error('Gagal memproses pembayaran.');
+      fetchPresensi(true);
+    } finally {
+      setPayingMonth(null);
+    }
+  }, [fetchPresensi, updatePaymentLocal]);
+
   const formatDate = (dateStr: string) => {
     try {
       const date = new Date(dateStr);
@@ -263,107 +361,138 @@ export default function DataPresensiPage() {
       <AsdosPageHeader
         eyebrow="Data Presensi"
         title="Presensi Asisten"
-        description="Tinjau jurnal mengajar, periksa video bukti kelas malam, dan lakukan verifikasi kehadiran asisten dosen."
+        description=""
       />
 
-      <div className="space-y-6 relative z-10 mb-6">
-        <div className="w-full z-20 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
-          <div className="flex w-full md:w-auto">
-            <div className="p-1 rounded-2xl border border-slate-200/80 bg-white/95 flex gap-1 overflow-x-auto hide-scrollbar w-full md:w-auto">
-              {(
-                [
-                  { id: 'PENDING', label: 'Pending' },
-                  { id: 'VERIFIED', label: 'Terverifikasi' },
-                  { id: 'ALL', label: 'Semua' }
-                ] as const
-              ).map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`
-                      flex-1 md:flex-initial min-w-fit px-5 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] select-none
-                      ${isActive 
-                        ? 'bg-crimson text-white shadow-sm' 
-                        : 'bg-transparent text-slate-500 hover:text-slate-800'
-                      }
-                    `}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex gap-3 flex-1 md:max-w-[420px] md:ml-auto w-full">
-
-            <div className="relative flex-1 min-w-0">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                <Search className="w-5 h-5 text-slate-400" />
-              </span>
-              <input
-                type="text"
-                placeholder="Cari asdos, matkul, atau kelas..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 rounded-[14px] md:rounded-2xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            <div className="relative shrink-0">
-              <CustomSelect
-                variant="icon"
-                align="right"
-                value={tipeFilter}
-                onChange={(v) => setTipeFilter(v as TipeFilter)}
-                options={FILTER_TIPE_OPTIONS}
-                placeholder="Filter tipe"
-                icon={<Filter className="w-[18px] h-[18px]" />}
-                triggerClassName={
-                  tipeFilter !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : ''
-                }
-              />
-            </div>
-
-            {semesters.length > 0 && (
-              <div className="relative shrink-0">
-                <CustomSelect
-                  variant="icon"
-                  align="right"
-                  value={semesterFilter}
-                  onChange={handleSemesterChange}
-                  options={[
-                    { value: '', label: 'Semua Semester' },
-                    ...semesters.map((s) => ({
-                      value: s.id,
-                      label: `${s.tipe_semester} ${s.tahun_ajaran}`,
-                    })),
-                  ]}
-                  placeholder="Semester"
-                  icon={<CalendarDays className="w-[18px] h-[18px]" />}
-                  triggerClassName={semesterFilter ? 'bg-red-50 border-crimson text-crimson' : ''}
-                />
-              </div>
-            )}
-
-          </div>
+      <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-1">
+        <p className="text-sm md:text-base text-slate-500 max-w-2xl leading-relaxed">
+          Tinjau jurnal mengajar, periksa video bukti kelas malam, dan lakukan verifikasi kehadiran asisten dosen.
+        </p>
+        <div className="flex bg-slate-100 p-0.5 rounded-xl w-full md:w-auto md:min-w-[420px]">
+          {(['VERIFY', 'PAY'] as const).map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setPageTab(t)}
+              className={`flex-1 h-[52px] flex items-center justify-center gap-2 px-3 rounded-[10px] text-xs font-semibold transition-all ${
+                pageTab === t ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              {t === 'VERIFY' ? <CheckCircle2 size={14} /> : <Banknote size={14} />}
+              {t === 'VERIFY' ? 'Verifikasi' : 'Progress & Pembayaran'}
+            </button>
+          ))}
         </div>
       </div>
 
-      {isLoading ? (
+      <div className="relative w-full overflow-hidden">
+        <div
+          className="flex w-[200%] transform-gpu"
+          style={{
+            transform: pageTab === 'PAY' ? 'translateX(-50%)' : 'translateX(0)',
+            transition: 'transform 500ms cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
+          <div
+            className={`w-1/2 shrink-0 transition-opacity duration-300 ${
+              pageTab === 'PAY' ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            }`}
+          >
+            <div className="space-y-6 relative z-10 mb-6">
+              <div className="w-full z-20 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex w-full md:w-auto">
+                  <div className="p-1 rounded-2xl border border-slate-200/80 bg-white/95 flex gap-1 overflow-x-auto hide-scrollbar w-full md:w-auto">
+                    {(
+                      [
+                        { id: 'PENDING', label: 'Pending' },
+                        { id: 'VERIFIED', label: 'Terverifikasi' },
+                        { id: 'ALL', label: 'Semua' }
+                      ] as const
+                    ).map((tab) => {
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setActiveTab(tab.id)}
+                          className={`
+                            flex-1 md:flex-initial min-w-fit px-5 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] select-none
+                            ${isActive
+                              ? 'bg-crimson text-white shadow-sm'
+                              : 'bg-transparent text-slate-500 hover:text-slate-800'
+                            }
+                          `}
+                        >
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 flex-1 md:max-w-[420px] md:ml-auto w-full">
+                  <div className="relative flex-1 min-w-0">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                      <Search className="w-5 h-5 text-slate-400" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Cari asdos, matkul, atau kelas..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3.5 rounded-[14px] md:rounded-2xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="relative shrink-0">
+                    <CustomSelect
+                      variant="icon"
+                      align="right"
+                      value={tipeFilter}
+                      onChange={(v) => setTipeFilter(v as TipeFilter)}
+                      options={FILTER_TIPE_OPTIONS}
+                      placeholder="Filter tipe"
+                      icon={<Filter className="w-[18px] h-[18px]" />}
+                      triggerClassName={
+                        tipeFilter !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : ''
+                      }
+                    />
+                  </div>
+
+                  {semesters.length > 0 && (
+                    <div className="relative shrink-0">
+                      <CustomSelect
+                        variant="icon"
+                        align="right"
+                        value={semesterFilter}
+                        onChange={handleSemesterChange}
+                        options={[
+                          { value: '', label: 'Semua Semester' },
+                          ...semesters.map((s) => ({
+                            value: s.id,
+                            label: `${s.tipe_semester} ${s.tahun_ajaran}`,
+                          })),
+                        ]}
+                        placeholder="Semester"
+                        icon={<CalendarDays className="w-[18px] h-[18px]" />}
+                        triggerClassName={semesterFilter ? 'bg-red-50 border-crimson text-crimson' : ''}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {isLoading ? (
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 relative z-10">
           {[1, 2, 3].map((i) => (
@@ -448,17 +577,6 @@ export default function DataPresensiPage() {
                         `}
                       >
                         {isPendingStatus ? 'Pending' : 'Verified'}
-                      </span>
-                      <span
-                        className={`
-                          text-[10px] font-extrabold tracking-wider px-2.5 py-1 rounded-lg border uppercase
-                          ${item.is_paid
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-slate-50 text-slate-500 border-slate-200'
-                          }
-                        `}
-                      >
-                        {item.is_paid ? 'Lunas' : 'Blm Lunas'}
                       </span>
                     </div>
                   </div>
@@ -581,7 +699,7 @@ export default function DataPresensiPage() {
         </div>
       )}
 
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && pageTab === 'VERIFY' && (
         <div className="fixed bottom-6 inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 px-5 py-3.5 flex items-center gap-4 pointer-events-auto max-w-md w-full">
             <div className="flex-1">
@@ -614,6 +732,171 @@ export default function DataPresensiPage() {
           </div>
         </div>
       )}
+          </div>
+          <div
+            className={`w-1/2 shrink-0 transition-opacity duration-300 ${
+              pageTab === 'PAY' ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            <div className="space-y-6 relative z-10 mb-6 px-0 md:px-0">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div className="flex gap-3 flex-1 md:max-w-[520px] w-full">
+                  <div className="relative flex-1 min-w-0">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                      <Search className="w-5 h-5 text-slate-400" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Cari nama asdos..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3.5 rounded-[14px] md:rounded-2xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {semesters.length > 0 && (
+                  <div className="shrink-0">
+                    <CustomSelect
+                      variant="icon"
+                      align="right"
+                      value={semesterFilter}
+                      onChange={handleSemesterChange}
+                      options={[
+                        { value: '', label: 'Semua Semester' },
+                        ...semesters.map((s) => ({
+                          value: s.id,
+                          label: `${s.tipe_semester} ${s.tahun_ajaran}`,
+                        })),
+                      ]}
+                      placeholder="Semester"
+                      icon={<CalendarDays className="w-[18px] h-[18px]" />}
+                      triggerClassName={semesterFilter ? 'bg-red-50 border-crimson text-crimson' : ''}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {(() => {
+                if (isLoading) {
+                  return (
+                    <div className="grid grid-cols-1 gap-6">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 animate-shimmer space-y-4">
+                          <div className="h-5 w-40 rounded" />
+                          <div className="h-10 w-full rounded-2xl" />
+                          <div className="h-24 w-full rounded-2xl" />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+
+                if (paymentSections.length === 0) {
+                  return (
+                    <AsdosState
+                      icon={<Inbox size={24} />}
+                      title="Belum ada progress"
+                      message="Tidak ada presensi terverifikasi untuk pembayaran."
+                      className="mt-2"
+                    />
+                  );
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {paymentSections.map(section => {
+                      const isPayable = section.canPay;
+                      const isBusy = payingMonth === section.monthKey;
+                      const unpaidAll = section.unpaidIdsAll;
+                      const paidCount = section.asdosRows.filter(r => r.isPaid).length;
+                      const totalAsdos = section.asdosRows.length;
+                      return (
+                        <section key={section.monthKey} className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 shadow-sm">
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div className="min-w-0">
+                              <h3 className="text-lg md:text-xl font-extrabold text-slate-900">
+                                {section.monthLabel}
+                              </h3>
+                              <p className="text-xs text-slate-500 font-medium mt-1">
+                                Asdos: <span className="font-bold text-slate-700">{totalAsdos}</span>
+                                <span className="text-slate-300"> · </span>
+                                Sudah digaji: <span className="font-bold text-slate-700">{paidCount}</span>
+                                <span className="text-slate-300"> · </span>
+                                Belum digaji: <span className="font-bold text-slate-700">{totalAsdos - paidCount}</span>
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => payAllForMonth(section.monthKey, unpaidAll)}
+                              disabled={!isPayable || unpaidAll.length === 0 || isBusy}
+                              className={`w-full md:w-auto py-3.5 px-5 rounded-2xl font-extrabold text-xs transition-all active:scale-95 flex items-center justify-center gap-2
+                                ${!isPayable
+                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                  : unpaidAll.length === 0
+                                    ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
+                                    : 'bg-crimson text-white hover:bg-[#7a1728] shadow-md shadow-crimson/10'
+                                }`}
+                              title={
+                                !isPayable
+                                  ? 'Pembayaran hanya bisa dilakukan untuk bulan yang sudah lewat.'
+                                  : unpaidAll.length === 0
+                                    ? 'Semua asdos sudah digaji pada bulan ini.'
+                                    : `Bayar semua asdos untuk ${section.monthLabel}`
+                              }
+                            >
+                              {isBusy ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />}
+                              {isBusy ? 'Memproses...' : `Bayar semua ${section.monthLabel}`}
+                            </button>
+                          </div>
+
+                          {!isPayable && (
+                            <p className="text-[11px] font-semibold text-slate-400 mt-3">
+                              Pembayaran bulan ini akan aktif setelah bulan berakhir.
+                            </p>
+                          )}
+
+                          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+                            {section.asdosRows.map(r => (
+                              <div key={r.name} className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-extrabold text-slate-800 truncate" title={r.name}>{r.name}</p>
+                                  <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                                    Rekap terverifikasi: <span className="font-bold text-slate-700">{r.totalSessions}</span>
+                                    <span className="text-slate-300"> · </span>
+                                    Belum digaji: <span className="font-bold text-slate-700">{r.unpaidCount}</span>
+                                  </p>
+                                </div>
+                                <span className={`shrink-0 text-[10px] font-extrabold tracking-wider px-2.5 py-1 rounded-lg border uppercase ${
+                                  r.isPaid
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}>
+                                  {r.isPaid ? 'Sudah digaji' : 'Belum'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {confirmModal.isOpen && confirmModal.item && (
         <>
@@ -654,22 +937,22 @@ export default function DataPresensiPage() {
               <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-2 mb-5">
                 <div className="flex justify-between items-center text-xs text-slate-400 font-bold border-b border-slate-200/50 pb-2">
                   <span>Asisten Dosen:</span>
-                  <span className="text-slate-800 font-extrabold">{confirmModal.item.nama_asdos}</span>
+                  <span className="text-slate-800 font-extrabold">{confirmModal.item!.nama_asdos}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs text-slate-400 font-bold border-b border-slate-200/50 pb-2">
                   <span>Mata Kuliah:</span>
                   <span className="text-slate-800 font-extrabold max-w-[200px] truncate">
-                    {confirmModal.item.nama_mata_kuliah}
+                    {confirmModal.item!.nama_mata_kuliah}
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-xs text-crimson font-black border-b border-slate-200/50 pb-2">
                   <span>Tanggal Sesi:</span>
-                  <span>{formatDate(confirmModal.item.tanggal_mengajar)}</span>
+                  <span>{formatDate(confirmModal.item!.tanggal_mengajar)}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
                   <span>Tipe Absensi:</span>
                   <span className="text-slate-800 font-extrabold uppercase">
-                    {confirmModal.item.tipe_absensi === 'link' ? 'Video (Malam)' : 'QR Code'}
+                    {confirmModal.item!.tipe_absensi === 'link' ? 'Video (Malam)' : 'QR Code'}
                   </span>
                 </div>
               </div>

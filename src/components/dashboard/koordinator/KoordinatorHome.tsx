@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import Link from 'next/link';
 import {
@@ -20,18 +20,14 @@ export const koordinatorMenuItems = [
   { id: 5, title: 'Manajemen Jadwal', icon: CalendarDays, href: '/koordinator/manajemen-jadwal', desc: 'Kelola sesi jadwal mengajar' },
 ];
 
-const desktopStats = [
-  { id: 1, label: 'Total Asdos', value: '24', sub: '+2 bulan ini', icon: Users, positive: true },
-  { id: 2, label: 'Presensi Hari Ini', value: '18', sub: '75% hadir', icon: CheckCircle2, positive: true },
-  { id: 3, label: 'Menunggu ACC', value: '2', sub: 'Perlu persetujuan', icon: Clock, positive: false },
-];
-
-
-const activities = [
-  { id: 1, name: 'Bima Sakti', action: 'Check-in', subject: 'Basis Data - Ruang M305', time: '08:00 WIB', isCheckIn: true },
-  { id: 2, name: 'Kevin Wijaya', action: 'Check-out', subject: 'Algoritma', time: '10:30 WIB', isCheckIn: false },
-  { id: 3, name: 'Alya Rahma', action: 'Check-in', subject: 'Pemrograman Web - Ruang M402', time: '11:15 WIB', isCheckIn: true },
-];
+function formatTime(value?: string) {
+  if (!value || value === 'null' || String(value).startsWith('0001')) return '--:--';
+  try {
+    return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '--:--';
+  }
+}
 
 function timeAgo(dateStr: string) {
   const ms = Date.now() - new Date(dateStr).getTime();
@@ -53,6 +49,7 @@ export default function KoordinatorHome() {
   const [kpItem, setKpItem] = useState<SubstituteSessionDetail | null>(null);
   const [kpItems, setKpItems] = useState<SubstituteSessionDetail[]>([]);
   const [presensiItem, setPresensiItem] = useState<PresensiResponseDTO | null>(null);
+  const [presensiItems, setPresensiItems] = useState<PresensiResponseDTO[]>([]);
   const [notifLoaded, setNotifLoaded] = useState(false);
 
   useEffect(() => {
@@ -62,16 +59,48 @@ export default function KoordinatorHome() {
         getAllPresensi(false),
       ]);
       const kpData = kpRes.success && kpRes.data?.items ? kpRes.data.items : [];
-      const presensiItems = presensiRes.success && presensiRes.data ? presensiRes.data : [];
+      const presensiData = presensiRes.success && presensiRes.data ? presensiRes.data : [];
       setKpItems(kpData);
       setKpItem(kpData[0] ?? null);
-      setPresensiItem(presensiItems[0] ?? null);
-      setPendingCount(kpData.length + presensiItems.length);
+      setPresensiItems(presensiData);
+      setPresensiItem(presensiData[0] ?? null);
+      setPendingCount(kpData.length + presensiData.length);
       markSeen();
       setNotifLoaded(true);
     }
     fetchNotifications();
   }, [markSeen, setPendingCount]);
+
+  const desktopStats = useMemo(() => {
+    const todayIso = new Date().toISOString().split('T')[0];
+    const todayCount = presensiItems.filter(p => String(p.tanggal_mengajar || '').split('T')[0] === todayIso).length;
+    const pendingPresensi = presensiItems.filter(p => !p.is_verified).length;
+    const uniqAsdos = new Set(presensiItems.map(p => (p.nama_asdos || '').trim()).filter(Boolean));
+    return [
+      { id: 1, label: 'Asdos Tercatat', value: String(uniqAsdos.size), sub: 'Berdasar data presensi', icon: Users, positive: true },
+      { id: 2, label: 'Presensi Hari Ini', value: String(todayCount), sub: `${pendingPresensi} belum diverifikasi`, icon: CheckCircle2, positive: pendingPresensi === 0 },
+      { id: 3, label: 'Menunggu ACC KP', value: String(kpItems.length), sub: kpItems.length ? 'Perlu persetujuan' : 'Tidak ada pending', icon: Clock, positive: kpItems.length === 0 },
+    ];
+  }, [kpItems.length, presensiItems]);
+
+  const activities = useMemo(() => {
+    const sorted = [...presensiItems].sort((a, b) => {
+      const ta = new Date(a.waktu_checkin || a.tanggal_mengajar || 0).getTime();
+      const tb = new Date(b.waktu_checkin || b.tanggal_mengajar || 0).getTime();
+      return tb - ta;
+    });
+    return sorted.slice(0, 3).map((p, idx) => {
+      const hasCheckout = !!p.waktu_checkout && !String(p.waktu_checkout).startsWith('0001');
+      return {
+        id: idx + 1,
+        name: p.nama_asdos || 'Asdos',
+        action: hasCheckout ? 'Check-out' : 'Check-in',
+        subject: `${p.nama_mata_kuliah} - ${p.nama_ruangan}`,
+        time: `${formatTime(hasCheckout ? p.waktu_checkout : p.waktu_checkin)} WIB`,
+        isCheckIn: !hasCheckout,
+      };
+    });
+  }, [presensiItems]);
 
   return (
     <div className="max-w-6xl mx-auto px-1.5 sm:px-2 md:px-0 pb-10 md:pb-12">
