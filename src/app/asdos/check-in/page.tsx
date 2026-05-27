@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Check, Scan, ArrowLeft, X, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 import { submitCheckIn, getMyPresensi } from '@/lib/actions/presensi';
+import { getMySubstitutions, deleteSubstitution } from '@/lib/actions/pergantian-kelas';
 
 import { AsdosQrScanSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 import { decodeJwtPayload } from '@/lib/auth/jwt';
@@ -339,6 +340,24 @@ export default function CheckInPage() {
       id_sesi_pengganti: selectedSession?.tipe_jadwal === 'PENGGANTI' ? selectedSession.id_sesi : undefined,
     });
     if (res.success) {
+      // Auto-hapus pengajuan KP yang masih PENDING untuk sesi yang sama,
+      // karena asdos terbukti hadir (check-in berhasil)
+      try {
+        const subRes = await getMySubstitutions();
+        if (subRes.success && subRes.data) {
+          const pendingUntukSesiIni = subRes.data.items.filter(
+            item =>
+              item.status === 'PENDING' &&
+              item.session?.id_sesi === selectedSessionId,
+          );
+          if (pendingUntukSesiIni.length > 0) {
+            await Promise.all(pendingUntukSesiIni.map(item => deleteSubstitution(item.id)));
+          }
+        }
+      } catch {
+        // Silent fail — check-in sudah berhasil, cleanup KP tidak boleh blokir flow
+      }
+
       handleCloseSheet();
       setTimeout(() => setStep(3), 300);
     }
