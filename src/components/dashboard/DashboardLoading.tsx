@@ -20,23 +20,6 @@ export const DashboardLoading = () => (
 
     {/* Desktop */}
     <div className="hidden lg:flex w-full h-screen overflow-hidden bg-canvas relative">
-
-      {/* Sidebar skeleton */}
-      <aside className="relative z-20 flex flex-col h-[calc(100vh-2rem)] my-4 ml-4 rounded-[1.5rem] overflow-hidden shrink-0 w-[280px] bg-crimson/80 backdrop-blur-2xl border border-white/20 shadow-[0_8px_32px_rgba(148,28,47,0.25)]">
-        <div className="pt-8 pb-6 px-7 border-b border-white/10 shrink-0">
-          <div className="h-9 w-36 bg-white/20 rounded-lg animate-pulse" />
-        </div>
-        <div className="flex-1 px-3 py-6 space-y-2">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-12 rounded-xl bg-white/10 animate-pulse" />
-          ))}
-        </div>
-        <div className="shrink-0 px-3 pb-6 pt-3 border-t border-white/10">
-          <div className="h-12 rounded-xl bg-white/10 animate-pulse" />
-        </div>
-      </aside>
-
-      {/* Main content area */}
       <main className="relative z-10 flex-1 h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-5">
           <div className="relative flex h-10 w-10 items-center justify-center">

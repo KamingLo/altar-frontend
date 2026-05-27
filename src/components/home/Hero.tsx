@@ -76,7 +76,7 @@ const HeroMobile = () => {
       <div className="relative w-full min-h-[100svh] bg-canvas flex flex-col">
 
         <div
-          className="relative w-full h-[58svh] shrink-0"
+          className="relative w-full h-[42svh] min-h-[300px] shrink-0"
           style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.05s both' }}
         >
           <div className="absolute inset-0 bg-gray-300 bg-[url('/gedung-untar.png')] bg-cover bg-[center_top] z-0" />
@@ -88,7 +88,7 @@ const HeroMobile = () => {
           />
         </div>
 
-        <div className="bg-canvas px-[clamp(2rem,6vw,4rem)] pb-[clamp(3rem,8vw,4rem)] flex flex-col flex-1 justify-between relative z-20">
+        <div className="bg-canvas px-[clamp(2rem,6vw,4rem)] pb-[clamp(2rem,7vw,3.5rem)] pt-[clamp(1rem,4vw,2rem)] flex flex-col flex-1 justify-center gap-7 relative z-20">
 
           <div
             className="flex flex-col items-start md:items-center text-left md:text-center"
@@ -104,7 +104,7 @@ const HeroMobile = () => {
           </div>
 
           <div
-            className="w-full mt-6 flex flex-col items-center"
+            className="w-full flex flex-col items-center"
             style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.35s both' }}
           >
             <a

@@ -313,15 +313,16 @@ export default function LoginForm() {
             }} />
           </div>
 
-          <div className="relative z-10 flex flex-col flex-1 px-8 py-[5svh]">
+          <div className="relative z-10 flex min-h-[100svh] flex-col px-8 py-[max(1.5rem,4svh)]">
             <button
               onClick={() => router.push('/')}
               className="self-end shrink-0 w-9 h-9 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-2xl active:scale-95 transition-all hover:bg-slate-50 shadow-sm"
             >
               <ArrowLeft size={18} />
             </button>
-            <div className="grow" />
-            {renderFormArea()}
+            <div className="flex flex-1 items-center pb-[6svh] pt-[4svh]">
+              {renderFormArea()}
+            </div>
           </div>
         </div>
       </div>
