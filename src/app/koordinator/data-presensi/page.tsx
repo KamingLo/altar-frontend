@@ -358,30 +358,34 @@ export default function DataPresensiPage() {
   return (
     <AsdosPageShell>
 
-      <AsdosPageHeader
-        eyebrow="Data Presensi"
-        title="Presensi Asisten"
-        description=""
-      />
-
-      <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-1">
-        <p className="text-sm md:text-base text-slate-500 max-w-2xl leading-relaxed">
-          Tinjau jurnal mengajar, periksa video bukti kelas malam, dan lakukan verifikasi kehadiran asisten dosen.
+      <div className="mb-6 md:mb-8 px-1">
+        <p className="text-[11px] font-black text-crimson tracking-[0.15em] uppercase mb-1 md:text-xs">
+          DATA PRESENSI
         </p>
-        <div className="flex bg-slate-100 p-0.5 rounded-xl w-full md:w-auto md:min-w-[420px]">
-          {(['VERIFY', 'PAY'] as const).map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setPageTab(t)}
-              className={`flex-1 h-[52px] flex items-center justify-center gap-2 px-3 rounded-[10px] text-xs font-semibold transition-all ${
-                pageTab === t ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
-              }`}
-            >
-              {t === 'VERIFY' ? <CheckCircle2 size={14} /> : <Banknote size={14} />}
-              {t === 'VERIFY' ? 'Verifikasi' : 'Progress & Pembayaran'}
-            </button>
-          ))}
+        <h2 className="text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">
+          Presensi Asisten
+        </h2>
+
+        <div className="mt-2 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <p className="text-sm md:text-base text-slate-500 max-w-2xl leading-relaxed">
+            Tinjau jurnal mengajar, periksa video bukti kelas malam, dan lakukan verifikasi kehadiran asisten dosen.
+          </p>
+
+          <div className="flex bg-slate-100 p-0.5 rounded-xl w-full md:w-auto md:min-w-[420px]">
+            {(['VERIFY', 'PAY'] as const).map(t => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setPageTab(t)}
+                className={`flex-1 h-[52px] flex items-center justify-center gap-2 px-3 rounded-[10px] text-xs font-semibold transition-all ${
+                  pageTab === t ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {t === 'VERIFY' ? <CheckCircle2 size={14} /> : <Banknote size={14} />}
+                {t === 'VERIFY' ? 'Verifikasi' : 'Progress & Pembayaran'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -555,9 +559,11 @@ export default function DataPresensiPage() {
                           ? <CheckSquare2 size={20} className="text-crimson" />
                           : <Square size={20} />}
                       </button>
-                      <div className={`w-11 h-11 shrink-0 rounded-2xl flex items-center justify-center ${isLink ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
-                        {isLink ? <Video size={20} /> : <QrCode size={20} />}
-                      </div>
+                      {isLink && (
+                        <div className="w-11 h-11 shrink-0 rounded-2xl flex items-center justify-center bg-rose-50 text-rose-600">
+                          <Video size={20} />
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <h4 className="font-extrabold text-[15px] text-[#1F2937] truncate leading-tight">
                           {item.nama_mata_kuliah}
@@ -699,39 +705,6 @@ export default function DataPresensiPage() {
         </div>
       )}
 
-      {selectedIds.size > 0 && pageTab === 'VERIFY' && (
-        <div className="fixed bottom-6 inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 px-5 py-3.5 flex items-center gap-4 pointer-events-auto max-w-md w-full">
-            <div className="flex-1">
-              <span className="text-sm font-extrabold text-slate-800">{selectedIds.size} terpilih</span>
-            </div>
-            <button
-              type="button"
-              disabled={bulkPending}
-              onClick={() => handleBulkPayment(true)}
-              className="flex items-center gap-1.5 py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-all active:scale-95 disabled:opacity-50"
-            >
-              {bulkPending ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />}
-              Tandai Lunas
-            </button>
-            <button
-              type="button"
-              disabled={bulkPending}
-              onClick={() => handleBulkPayment(false)}
-              className="flex items-center gap-1.5 py-2 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-extrabold transition-all active:scale-95 hover:bg-slate-50 disabled:opacity-50"
-            >
-              Blm Lunas
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </div>
-      )}
           </div>
           <div
             className={`w-1/2 shrink-0 transition-opacity duration-300 ${
@@ -897,6 +870,33 @@ export default function DataPresensiPage() {
           </div>
         </div>
       </div>
+
+      {selectedIds.size > 0 && pageTab === 'VERIFY' && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 pointer-events-none w-full">
+          <div className="mx-auto bg-white rounded-2xl shadow-2xl border border-slate-100 px-5 py-3.5 flex items-center justify-between gap-3 pointer-events-auto w-fit max-w-[calc(100vw-2rem)]">
+            <span className="text-sm font-extrabold text-slate-800 whitespace-nowrap">
+              {selectedIds.size} terpilih
+            </span>
+            <button
+              type="button"
+              disabled={bulkPending}
+              onClick={() => handleBulkPayment(true)}
+              className="flex items-center gap-1.5 py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-all active:scale-95 disabled:opacity-50"
+            >
+              {bulkPending ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />}
+              Tandai Lunas
+            </button>
+            <button
+              type="button"
+              disabled={bulkPending}
+              onClick={() => handleBulkPayment(false)}
+              className="flex items-center gap-1.5 py-2 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-extrabold transition-all active:scale-95 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Blm Lunas
+            </button>
+          </div>
+        </div>
+      )}
 
       {confirmModal.isOpen && confirmModal.item && (
         <>

@@ -348,6 +348,8 @@ export default function ManajemenKpPage() {
                     ? { bg: 'bg-obsidian', text: 'text-white', label: 'DISETUJUI' }
                     : { bg: 'bg-obsidian', text: 'text-white', label: 'DITOLAK' };
 
+              const penggantiName = (req.substitute_teacher || '').replace(/\s*\(pengganti\)\s*/gi, '').trim() || req.substitute_teacher || '—';
+
               return (
                 <section
                   key={req.id}
@@ -368,88 +370,113 @@ export default function ManajemenKpPage() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tgl Asli</span>
-                        <span className="text-sm font-bold text-slate-800">{formatDate(req.original_date)}</span>
-                      </div>
-                      <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tgl Pengganti</span>
-                        <span className="text-sm font-bold text-slate-800">{formatDate(req.substitute_date)}</span>
-                      </div>
-                      <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
-                        <span className="text-sm font-bold text-slate-800">{req.time_slot}</span>
-                      </div>
-                      <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
-                        <span className="text-sm font-bold text-slate-800 truncate">{req.room}</span>
-                      </div>
-                    </div>
-
-                    <div className="bg-fog rounded-[20px] p-4 md:p-5 grid grid-cols-1 gap-2">
-                      <div className="flex items-start gap-2.5">
-                        <MessageSquare className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <span className="text-[10px] font-extrabold tracking-wider uppercase text-slate-400 block mb-1">
-                            Alasan Pengajuan
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tgl Asli</span>
+                          <span className="text-sm font-bold text-slate-800">{formatDate(req.original_date)}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+                          <span className="text-sm font-bold text-slate-800">{req.session?.waktu || '—'}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+                          <span className="text-sm font-bold text-slate-800 truncate" title={req.session?.ruangan || ''}>
+                            {req.session?.ruangan || '—'}
                           </span>
-                          <p className="text-sm text-slate-600 font-medium leading-relaxed line-clamp-3">
-                            &quot;{req.reason}&quot;
-                          </p>
                         </div>
                       </div>
 
-                      {isRejectedStatus && req.coordinator_reason && (
-                        <div className="mt-2 pt-3 border-t border-slate-200/60 flex items-start gap-2.5">
-                          <ShieldAlert className="w-4 h-4 text-crimson shrink-0 mt-0.5" />
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tgl Pengganti</span>
+                          <span className="text-sm font-bold text-slate-800">{formatDate(req.substitute_date)}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+                          <span className="text-sm font-bold text-slate-800">{req.time_slot}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+                          <span className="text-sm font-bold text-slate-800 truncate" title={req.room}>
+                            {req.room}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <div className="text-[11px] font-extrabold tracking-widest uppercase text-slate-400 mb-2">
+                        Mengajar
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-start gap-2 text-sm font-semibold text-slate-700">
+                          <User className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                           <div className="min-w-0">
-                            <span className="text-[10px] font-extrabold tracking-wider uppercase text-crimson/70 block mb-1">
-                              Catatan Penolakan
-                            </span>
-                            <p className="text-sm text-slate-600 font-medium leading-relaxed line-clamp-3">
-                              {req.coordinator_reason}
+                            <p className="truncate" title={req.substitute_teacher}>
+                              {penggantiName} <span className="text-slate-400 font-bold">(Pengganti)</span>
+                            </p>
+                            <p className="truncate text-slate-500 font-semibold" title={req.session?.pengajar || ''}>
+                              {req.session?.pengajar || '—'}
                             </p>
                           </div>
                         </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2">
-                      <div className="flex items-center gap-2 text-xs font-bold text-slate-600 min-w-0 group">
-                        <User className="w-4 h-4 text-slate-400 shrink-0" />
-                        <span className="text-slate-400 font-semibold">Mengajar:</span>
-                        <span
-                          className="truncate group-hover:whitespace-normal group-hover:overflow-visible group-hover:text-clip group-hover:underline decoration-slate-300 underline-offset-4"
-                          title={req.substitute_teacher}
-                        >
-                          {req.substitute_teacher}
-                        </span>
                       </div>
-
-                      {isPendingStatus && (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => openModal(req, 'REJECT')}
-                            className="w-11 h-11 rounded-full border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95 transition-all flex items-center justify-center"
-                            aria-label="Tolak"
-                            title="Tolak"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openModal(req, 'APPROVE')}
-                            className="w-11 h-11 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-sm flex items-center justify-center"
-                            aria-label="Setujui"
-                            title="Setujui"
-                          >
-                            <Check className="w-5 h-5" />
-                          </button>
-                        </div>
-                      )}
                     </div>
+
+                    <div className="bg-fog rounded-[20px] p-4 md:p-5 border border-slate-200/40">
+                      <div className="flex items-start gap-2.5">
+                        <MessageSquare className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                        <div className="min-w-0 w-full">
+                          <span className="text-[10px] font-extrabold tracking-wider uppercase text-slate-400 block mb-1">
+                            Kotak Alasan Pengajuan
+                          </span>
+                          <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                            &quot;{req.reason}&quot;
+                          </p>
+
+                          {isRejectedStatus && req.coordinator_reason && (
+                            <div className="mt-4 pt-4 border-t border-slate-200/70">
+                              <div className="flex items-start gap-2.5">
+                                <ShieldAlert className="w-4 h-4 text-crimson shrink-0 mt-0.5" />
+                                <div className="min-w-0">
+                                  <span className="text-[10px] font-extrabold tracking-wider uppercase text-crimson/80 block mb-1">
+                                    Ditolak
+                                  </span>
+                                  <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                                    {req.coordinator_reason}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {isPendingStatus && (
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openModal(req, 'REJECT')}
+                          className="w-11 h-11 rounded-full border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95 transition-all flex items-center justify-center"
+                          aria-label="Tolak"
+                          title="Tolak"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openModal(req, 'APPROVE')}
+                          className="w-11 h-11 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-sm flex items-center justify-center"
+                          aria-label="Setujui"
+                          title="Setujui"
+                        >
+                          <Check className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
                   </article>
                 </section>
               );

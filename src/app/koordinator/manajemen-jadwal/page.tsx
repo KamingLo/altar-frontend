@@ -70,8 +70,7 @@ const FILTER_TIPE_OPTIONS = [
 const HARI_SELECT_OPTIONS = HARI_OPTIONS.map(h => ({ value: String(h.value), label: h.label }));
 const JAM_SELECT_OPTIONS = JAM_OPTIONS.map(j => ({
   value: String(j.value),
-  label: j.label,
-  description: j.range,
+  label: j.range,
 }));
 
 type TipeFilter = 'ALL' | 'REGULER' | 'PENGGANTI';
@@ -886,49 +885,67 @@ export default function ManajemenJadwalPage() {
     <AsdosPageShell className="pb-24 md:pb-12">
 
       <div className="shrink-0">
-        <div className="mb-4 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between">
-          <div>
-            <AsdosPageHeader eyebrow="Koordinator" title="Manajemen Jadwal" description="Kelola sesi jadwal mengajar per semester — data langsung dari server." />
-          </div>
+        <div className="mb-4 md:mb-8 relative z-10 flex items-center justify-between gap-4">
+          <AsdosPageHeader
+            eyebrow="Koordinator"
+            title="Manajemen Jadwal"
+            description="Kelola sesi jadwal mengajar per semester — data langsung dari server."
+          />
 
           <AsdosPrimaryButton
             type="button"
             onClick={() => handleOpenModal('add')}
             disabled={!selectedSemesterId}
             icon={<Plus className="w-5 h-5" strokeWidth={2.5} />}
-            className="hidden md:flex py-3.5 px-6 text-[15px] mt-4 md:mt-0"
+            className="hidden md:flex py-3.5 px-6 text-[15px]"
           >
             Buat Sesi Baru
           </AsdosPrimaryButton>
         </div>
 
+        <div className="mb-5 md:mb-6 flex flex-col md:flex-row gap-3 relative z-20 w-full items-stretch md:items-center">
+          <div className="flex flex-col md:flex-row md:items-end gap-3 w-full">
+            <div className="flex flex-col sm:flex-row items-end gap-3 w-full md:w-auto shrink-0">
+              <div className="flex gap-3 w-full sm:w-auto">
+                <div className="w-full sm:w-[190px] md:w-[200px]">
+                  <DatePickerField label="Dari Tanggal" value={startDate} onChange={handleStartDateChange} />
+                </div>
+                <div className="w-full sm:w-[190px] md:w-[200px]">
+                  <DatePickerField
+                    label="Sampai Tanggal"
+                    value={endDate}
+                    min={startDate}
+                    max={maxEndDate}
+                    onChange={handleEndDateChange}
+                  />
+                </div>
+              </div>
 
-        <div className="mb-5 md:mb-6 flex flex-col md:flex-row gap-3 relative z-20 w-full justify-between items-stretch md:items-center">
-
-          <div className="relative shrink-0 w-full sm:w-auto md:w-auto z-30 flex items-center gap-2">
-            <div className="flex-1 sm:w-48 md:w-56">
-              <CustomSelect
-                value={selectedSemesterId}
-                onChange={setSelectedSemesterId}
-                options={semesterOptions}
-                placeholder="Semester"
-                disabled={!semesters.length}
-                icon={<CalendarDays className="w-[18px] h-[18px]" />}
-                triggerClassName="rounded-2xl py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-              />
+              <div className="relative shrink-0 w-full sm:w-auto z-30 flex items-end gap-2">
+                <div className="w-full sm:w-52 md:w-56">
+                  <CustomSelect
+                    value={selectedSemesterId}
+                    onChange={setSelectedSemesterId}
+                    options={semesterOptions}
+                    placeholder="Semester"
+                    disabled={!semesters.length}
+                    icon={<CalendarDays className="w-[18px] h-[18px]" />}
+                    triggerClassName="rounded-2xl py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openMasterCreate('semester')}
+                  className="shrink-0 w-11 h-11 md:w-12 md:h-12 flex items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-crimson active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                  aria-label="Buat semester baru"
+                  title="Buat semester baru"
+                >
+                  <Plus className="w-[18px] h-[18px]" strokeWidth={2.5} />
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => openMasterCreate('semester')}
-              className="shrink-0 w-11 h-11 md:w-12 md:h-12 flex items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-crimson active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-              aria-label="Buat semester baru"
-              title="Buat semester baru"
-            >
-              <Plus className="w-[18px] h-[18px]" strokeWidth={2.5} />
-            </button>
-          </div>
 
-          <div className="flex gap-3 flex-1 md:max-w-[420px] md:ml-auto w-full">
+            <div className="flex gap-3 w-full md:ml-auto md:w-auto md:max-w-[360px]">
             <div className="relative flex-1 min-w-0">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 pointer-events-none" />
               <input
@@ -949,29 +966,10 @@ export default function ManajemenJadwalPage() {
                 options={FILTER_TIPE_OPTIONS}
                 placeholder="Filter tipe"
                 icon={<Filter className="w-[18px] h-[18px]" />}
-                triggerClassName={
-                  filterTipe !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : ''
-                }
+                triggerClassName={filterTipe !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : ''}
               />
             </div>
           </div>
-        </div>
-
-      </div>
-
-      <div className="mb-6 flex flex-col md:flex-row md:items-end gap-3 md:gap-4">
-        <div className="grid grid-cols-2 gap-3 flex-1">
-          <div>
-            <DatePickerField label="Dari Tanggal" value={startDate} onChange={handleStartDateChange} />
-          </div>
-          <div>
-            <DatePickerField
-              label="Sampai Tanggal"
-              value={endDate}
-              min={startDate}
-              max={maxEndDate}
-              onChange={handleEndDateChange}
-            />
           </div>
         </div>
       </div>
@@ -1196,9 +1194,7 @@ export default function ManajemenJadwalPage() {
                       label="Kelas"
                       onCreate={() => openMasterCreate('kelas')}
                       onEdit={() => openMasterEdit('kelas', selectedKelasItem)}
-                      onDelete={() => openMasterDelete('kelas', selectedKelasItem)}
                       canEdit={!!selectedKelasItem}
-                      canDelete={!!selectedKelasItem}
                     >
                       <div className="flex gap-2 items-stretch">
                         <div className="flex-1 min-w-0">
@@ -1209,6 +1205,10 @@ export default function ManajemenJadwalPage() {
                             placeholder="Pilih kelas"
                             searchable
                             searchPlaceholder="Cari kelas..."
+                            onDeleteOption={(id) => {
+                              const item = kelasList.find(k => k.id === id) ?? null;
+                              openMasterDelete('kelas', item);
+                            }}
                           />
                         </div>
                         <button
@@ -1228,9 +1228,7 @@ export default function ManajemenJadwalPage() {
                       label="Mata Kuliah"
                       onCreate={() => openMasterCreate('mk')}
                       onEdit={() => openMasterEdit('mk', selectedMkItem)}
-                      onDelete={() => openMasterDelete('mk', selectedMkItem)}
                       canEdit={!!selectedMkItem}
-                      canDelete={!!selectedMkItem}
                     >
                       <div className="flex gap-2 items-stretch">
                         <div className="flex-1 min-w-0">
@@ -1241,6 +1239,10 @@ export default function ManajemenJadwalPage() {
                             placeholder="Pilih mata kuliah"
                             searchable
                             searchPlaceholder="Cari mata kuliah..."
+                            onDeleteOption={(id) => {
+                              const item = mkList.find(m => m.id === id) ?? null;
+                              openMasterDelete('mk', item);
+                            }}
                           />
                         </div>
                         <button
@@ -1260,9 +1262,7 @@ export default function ManajemenJadwalPage() {
                       label="Ruangan"
                       onCreate={() => openMasterCreate('ruangan')}
                       onEdit={() => openMasterEdit('ruangan', selectedRuanganItem)}
-                      onDelete={() => openMasterDelete('ruangan', selectedRuanganItem)}
                       canEdit={!!selectedRuanganItem}
-                      canDelete={!!selectedRuanganItem}
                     >
                       <div className="flex gap-2 items-stretch">
                         <div className="flex-1 min-w-0">
@@ -1273,6 +1273,10 @@ export default function ManajemenJadwalPage() {
                             placeholder="Pilih ruangan"
                             searchable
                             searchPlaceholder="Cari ruangan..."
+                            onDeleteOption={(id) => {
+                              const item = ruanganList.find(r => r.id === id) ?? null;
+                              openMasterDelete('ruangan', item);
+                            }}
                           />
                         </div>
                         <button
@@ -1345,9 +1349,7 @@ export default function ManajemenJadwalPage() {
                         label="Dosen Pengajar"
                         onCreate={() => openMasterCreate('lecturer')}
                         onEdit={() => openMasterEdit('lecturer', selectedLecturerItem)}
-                        onDelete={() => openMasterDelete('lecturer', selectedLecturerItem)}
                         canEdit={!!selectedLecturerItem}
-                        canDelete={!!selectedLecturerItem}
                       >
                         <div className="flex gap-2 items-stretch">
                           <div className="flex-1 min-w-0">
@@ -1364,6 +1366,11 @@ export default function ManajemenJadwalPage() {
                               icon={<User className="w-4 h-4" />}
                               searchable
                               searchPlaceholder="Cari dosen..."
+                              onDeleteOption={(id) => {
+                                if (!id) return;
+                                const item = lecturerList.find(l => l.id === id) ?? null;
+                                openMasterDelete('lecturer', item);
+                              }}
                             />
                           </div>
                           <button
@@ -1539,17 +1546,13 @@ function FieldCRUD({
   label,
   onCreate,
   onEdit,
-  onDelete,
   canEdit,
-  canDelete,
   children,
 }: {
   label: string;
   onCreate: () => void;
   onEdit: () => void;
-  onDelete?: () => void;
   canEdit: boolean;
-  canDelete?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -1575,18 +1578,6 @@ function FieldCRUD({
           >
             <Pencil className="w-3.5 h-3.5" />
           </button>
-          {onDelete && (
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={!canDelete}
-              className="text-slate-400 hover:text-red-600 hover:bg-red-50 active:scale-95 p-1 rounded-md disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-all"
-              aria-label={`Hapus ${label}`}
-              title={canDelete ? `Hapus ${label} yang dipilih` : `Pilih ${label.toLowerCase()} dulu untuk hapus`}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
         </div>
       </div>
       {children}
