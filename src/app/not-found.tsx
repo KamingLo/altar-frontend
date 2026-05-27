@@ -14,11 +14,9 @@ import { asdosMenuItems } from '@/components/dashboard/asdos/AsdosHome';
 import { koordinatorMenuItems } from '@/components/dashboard/koordinator/KoordinatorHome';
 import { logoutUser } from '@/lib/actions/auth/session';
 
-/* ---- types ------------------------------------ */
 interface MenuItem { id: number; title: string; icon: React.ElementType; href: string }
 interface MenuGroup { id: string; title: string; items: MenuItem[] }
 
-/* ---- shared Three.js canvas hook -------------- */
 function useParticleCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -220,7 +218,7 @@ function useParticleCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>)
             any = true;
           }
         }
-        if (any) { mouse.down = true; canvas!.style.cursor = 'grabbing'; try { canvas!.setPointerCapture(e.pointerId); } catch (_) {} }
+        if (any) { mouse.down = true; canvas!.style.cursor = 'grabbing'; try { canvas!.setPointerCapture(e.pointerId); } catch {} }
       }
       function onUp() {
         if (!state.ready) return;
@@ -290,10 +288,253 @@ function useParticleCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>)
   }, [canvasRef]);
 }
 
-/* ---- Guest 404 (belum login) ------------------- */
+function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let animId = 0;
+    let cleanupFn: (() => void) | undefined;
+
+    async function init() {
+      const THREE = await import('three');
+      const renderer = new THREE.WebGLRenderer({ canvas: canvas!, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor(0x000000, 0);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+      camera.position.set(0, 0, 7.6);
+
+      const cube = new THREE.Group();
+      scene.add(cube);
+
+      const SIDE = 2.4;
+      const HALF = SIDE / 2;
+      const SAMPLE_RES = 256;
+      const DOT_STEP = 7;
+      const sampler = document.createElement('canvas');
+      sampler.width = sampler.height = SAMPLE_RES;
+      const sctx = sampler.getContext('2d');
+      if (!sctx) return;
+
+      function sampleLetter(ch: string) {
+        sctx!.fillStyle = '#fff';
+        sctx!.fillRect(0, 0, SAMPLE_RES, SAMPLE_RES);
+        sctx!.fillStyle = '#000';
+        const isWord = ch.length > 1;
+        const fontPx = isWord ? Math.round(SAMPLE_RES * 0.22) : Math.round(SAMPLE_RES * 0.78);
+        sctx!.font = `900 ${fontPx}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+        sctx!.textAlign = 'center';
+        sctx!.textBaseline = 'middle';
+        sctx!.fillText(ch, SAMPLE_RES / 2, SAMPLE_RES / 2 + SAMPLE_RES * 0.02);
+
+        const img = sctx!.getImageData(0, 0, SAMPLE_RES, SAMPLE_RES).data;
+        const pts: { u: number; v: number }[] = [];
+        for (let y = 0; y < SAMPLE_RES; y += DOT_STEP) {
+          for (let x = 0; x < SAMPLE_RES; x += DOT_STEP) {
+            const i = (y * SAMPLE_RES + x) * 4;
+            if (img[i] >= 128) {
+              const jx = (Math.random() - 0.5) * 0.4;
+              const jy = (Math.random() - 0.5) * 0.4;
+              pts.push({
+                u: (x + jx) / SAMPLE_RES - 0.5,
+                v: -((y + jy) / SAMPLE_RES - 0.5),
+              });
+            }
+          }
+        }
+        return pts;
+      }
+
+      const faces = [
+        { right: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 1, 0), normal: new THREE.Vector3(0, 0, 1), content: 'A' },
+        { right: new THREE.Vector3(0, 0, -1), up: new THREE.Vector3(0, 1, 0), normal: new THREE.Vector3(1, 0, 0), content: 'L' },
+        { right: new THREE.Vector3(-1, 0, 0), up: new THREE.Vector3(0, 1, 0), normal: new THREE.Vector3(0, 0, -1), content: 'T' },
+        { right: new THREE.Vector3(0, 0, 1), up: new THREE.Vector3(0, 1, 0), normal: new THREE.Vector3(-1, 0, 0), content: 'A' },
+        { right: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 0, 1), normal: new THREE.Vector3(0, 1, 0), content: 'R' },
+        { right: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 0, 1), normal: new THREE.Vector3(0, -1, 0), content: 'ALTAR' },
+      ];
+
+      const positionsArr: number[] = [];
+      const normalsArr: number[] = [];
+      const seedsArr: number[] = [];
+      const phaseAxisArr: number[] = [];
+      const letterArr: number[] = [];
+
+      for (let fi = 0; fi < faces.length; fi++) {
+        const f = faces[fi];
+        const pts = sampleLetter(f.content);
+        const scale = SIDE * 0.92;
+        for (const p of pts) {
+          const x = f.right.x * p.u * scale + f.up.x * p.v * scale + f.normal.x * HALF;
+          const y = f.right.y * p.u * scale + f.up.y * p.v * scale + f.normal.y * HALF;
+          const z = f.right.z * p.u * scale + f.up.z * p.v * scale + f.normal.z * HALF;
+          positionsArr.push(x, y, z);
+          normalsArr.push(f.normal.x, f.normal.y, f.normal.z);
+          seedsArr.push(Math.random());
+          phaseAxisArr.push(p.u + 0.5);
+          letterArr.push(fi);
+        }
+      }
+
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positionsArr), 3));
+      geom.setAttribute('aNormal', new THREE.BufferAttribute(new Float32Array(normalsArr), 3));
+      geom.setAttribute('aSeed', new THREE.BufferAttribute(new Float32Array(seedsArr), 1));
+      geom.setAttribute('aAxis', new THREE.BufferAttribute(new Float32Array(phaseAxisArr), 1));
+      geom.setAttribute('aLetter', new THREE.BufferAttribute(new Float32Array(letterArr), 1));
+
+      const mat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        uniforms: {
+          uTime: { value: 0 },
+          uPixelRatio: { value: renderer.getPixelRatio() },
+          uSize: { value: 1.6 },
+          uColor: { value: new THREE.Color(0x0c0c0d) },
+        },
+        vertexShader: `
+          uniform float uTime;
+          uniform float uPixelRatio;
+          uniform float uSize;
+          attribute vec3 aNormal;
+          attribute float aSeed;
+          attribute float aLetter;
+          varying float vAlpha;
+
+          void main(){
+            float a = mix(0.78, 1.0, aSeed);
+            vec3 wN = normalize((modelMatrix * vec4(aNormal, 0.0)).xyz);
+            vec3 toCam = normalize(cameraPosition - (modelMatrix * vec4(position,1.0)).xyz);
+            float facing = clamp(dot(wN, toCam), -1.0, 1.0);
+            float backFade = smoothstep(-0.05, 0.40, facing);
+            vAlpha = a * backFade;
+            vec3 pos = position;
+            float bob = sin(uTime * 0.65 + aLetter * 1.9) * 0.012;
+            pos += aNormal * bob;
+            vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+            gl_PointSize = uSize * uPixelRatio * (28.0 / -mv.z);
+            gl_Position = projectionMatrix * mv;
+          }
+        `,
+        fragmentShader: `
+          precision highp float;
+          uniform vec3 uColor;
+          varying float vAlpha;
+          void main(){
+            vec2 c = gl_PointCoord - 0.5;
+            float d = length(c);
+            float disk = smoothstep(0.5, 0.38, d);
+            if (disk * vAlpha <= 0.01) discard;
+            gl_FragColor = vec4(uColor, disk * vAlpha);
+          }
+        `,
+      });
+
+      const points = new THREE.Points(geom, mat);
+      cube.add(points);
+
+      const edgeGeometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(SIDE, SIDE, SIDE));
+      const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x0c0c0d, transparent: true, opacity: 0.08 });
+      const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+      cube.add(edges);
+
+      function resize() {
+        const rect = canvas!.getBoundingClientRect();
+        const w = Math.max(1, rect.width);
+        const h = Math.max(1, rect.height);
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.position.z = h > w ? 7.6 : 6.4;
+        camera.updateProjectionMatrix();
+        mat.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+      }
+
+      const initialRotX = -0.95;
+      const initialRotY = 0.10;
+      const rot = { x: initialRotX, y: initialRotY };
+      const target = { x: initialRotX, y: initialRotY };
+      let dragging = false;
+      let lastX = 0;
+      let lastY = 0;
+      let userHasInteracted = false;
+      let lastInteract = performance.now();
+
+      function onPointerDown(e: PointerEvent) {
+        dragging = true;
+        userHasInteracted = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        try { canvas!.setPointerCapture(e.pointerId); } catch {}
+      }
+
+      function onPointerMove(e: PointerEvent) {
+        if (!dragging) return;
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        target.y += dx * 0.01;
+        target.x += dy * 0.01;
+        target.x = Math.max(-1.4, Math.min(1.4, target.x));
+        lastInteract = performance.now();
+      }
+
+      function endDrag() {
+        dragging = false;
+        lastInteract = performance.now();
+      }
+
+      const clock = new THREE.Clock();
+      function tick() {
+        const t = clock.getElapsedTime();
+        mat.uniforms.uTime.value = t;
+        const sinceMove = (performance.now() - lastInteract) / 1000;
+        const autoFactor = Math.min(1, Math.max(0, (sinceMove - 0.3) / 1.5));
+        if (!dragging && userHasInteracted) target.y += 0.0035 * autoFactor;
+        rot.x += (target.x - rot.x) * 0.08;
+        rot.y += (target.y - rot.y) * 0.08;
+        cube.rotation.x = rot.x;
+        cube.rotation.y = rot.y;
+        renderer.render(scene, camera);
+        animId = requestAnimationFrame(tick);
+      }
+
+      const onResize = () => requestAnimationFrame(resize);
+      window.addEventListener('resize', onResize);
+      canvas!.addEventListener('pointerdown', onPointerDown);
+      canvas!.addEventListener('pointermove', onPointerMove);
+      canvas!.addEventListener('pointerup', endDrag);
+      canvas!.addEventListener('pointercancel', endDrag);
+
+      resize();
+      tick();
+
+      cleanupFn = () => {
+        window.removeEventListener('resize', onResize);
+        canvas!.removeEventListener('pointerdown', onPointerDown);
+        canvas!.removeEventListener('pointermove', onPointerMove);
+        canvas!.removeEventListener('pointerup', endDrag);
+        canvas!.removeEventListener('pointercancel', endDrag);
+        cancelAnimationFrame(animId);
+        renderer.dispose();
+        geom.dispose();
+        mat.dispose();
+        edgeGeometry.dispose();
+        edgeMaterial.dispose();
+      };
+    }
+
+    init();
+    return () => cleanupFn?.();
+  }, [canvasRef]);
+}
 function NotFoundGuest() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cubeCanvasRef = useRef<HTMLCanvasElement>(null);
   useParticleCanvas(canvasRef);
+  useCubeCanvas(cubeCanvasRef);
 
   const gridStyle: React.CSSProperties = {
     zIndex: 2,
@@ -310,7 +551,8 @@ function NotFoundGuest() {
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
 
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }} />
+      <canvas ref={cubeCanvasRef} className="absolute inset-0 w-full h-full lg:hidden touch-none" style={{ zIndex: 1 }} />
+      <canvas ref={canvasRef} className="absolute inset-0 hidden w-full h-full lg:block" style={{ zIndex: 1 }} />
       <div className="absolute inset-0 pointer-events-none" style={gridStyle} />
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6" style={{ zIndex: 3 }}>
@@ -335,11 +577,11 @@ function NotFoundGuest() {
     </div>
   );
 }
-
-/* ---- Authenticated 404 (sudah login) ----------- */
 function NotFoundAuth() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cubeCanvasRef = useRef<HTMLCanvasElement>(null);
   useParticleCanvas(canvasRef);
+  useCubeCanvas(cubeCanvasRef);
 
   const router   = useRouter();
   const pathname = usePathname();
@@ -347,11 +589,10 @@ function NotFoundAuth() {
 
   const [collapsed,   setCollapsed]   = useState(false);
   const [drawerOpen,  setDrawerOpen]  = useState(false);
-  const [openGroups,  setOpenGroups]  = useState<Set<string>>(new Set());
+  const [openGroups,  setOpenGroups]  = useState<Set<string>>(new Set(['koordinator', 'asdos']));
   const [timeStr,     setTimeStr]     = useState('');
   const [dateStr,     setDateStr]     = useState('');
 
-  /* clock */
   useEffect(() => {
     const tick = () => {
       const now = new Date();
@@ -381,15 +622,16 @@ function NotFoundAuth() {
   const isActive    = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
   const toggleGroup = (id: string) =>
-    setOpenGroups(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setOpenGroups(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
 
   const handleLogout = async () => {
     await logoutUser(); clearUser(); router.replace('/auth/login');
   };
-
-  useEffect(() => {
-    if (menuGroups.length > 0) setOpenGroups(new Set(menuGroups.map(g => g.id)));
-  }, [menuGroups]);
 
   const sidebarBg  = 'bg-crimson/80 border-white/20 shadow-[0_8px_32px_rgba(148,28,47,0.25)]';
   const drawerBg   = 'bg-crimson/85';
@@ -410,7 +652,6 @@ function NotFoundAuth() {
     WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%,#000 30%,transparent 80%)',
   };
 
-  /* --- nav item renderers ------------------------ */
   const renderDesktopItem = (item: MenuItem) => {
     const Icon = item.icon;
     const active = isActive(item.href);
@@ -505,7 +746,6 @@ function NotFoundAuth() {
     );
   };
 
-  /* --- render ------------------------------------ */
   return (
     <div
       className="min-h-screen w-full flex items-center justify-center transition-colors duration-300"
@@ -518,10 +758,10 @@ function NotFoundAuth() {
         style={{ backgroundColor: 'var(--color-canvas)' }}
       >
 
-        {/* --- DESKTOP SIDEBAR ------------------------ */}
+
         <aside className={`relative z-20 hidden lg:flex flex-col h-[calc(100vh-2rem)] my-4 ml-4 rounded-[1.5rem] overflow-hidden shrink-0 backdrop-blur-2xl border transition-[width,background-color] duration-300 ease-in-out ${sidebarBg} ${collapsed ? 'w-[84px]' : 'w-[280px]'}`}>
 
-          {/* header */}
+
           <div className={`pt-8 pb-6 border-b border-white/10 flex items-center shrink-0 transition-all duration-300 ${collapsed ? 'justify-center px-2' : 'justify-between px-7'}`}>
             <div className={`overflow-hidden transition-all duration-300 ${collapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'}`}>
               <Image src="/logo-sb.png" alt="Logo" width={160} height={36} className="h-9 w-auto object-contain drop-shadow-md" style={{ width: 'auto' }} />
@@ -532,7 +772,7 @@ function NotFoundAuth() {
             </button>
           </div>
 
-          {/* nav */}
+
           <div className="flex-1 min-h-0 px-3 py-6 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
             {menuGroups.length > 0 ? renderDesktopNav() : (
               <div className={`flex flex-col items-center justify-center h-full gap-3 ${collapsed ? '' : 'px-4'}`}>
@@ -548,7 +788,7 @@ function NotFoundAuth() {
             )}
           </div>
 
-          {/* footer */}
+
           {user && (
             <div className="shrink-0 px-3 pb-6 pt-3 border-t border-white/10">
               <button onClick={handleLogout} title={collapsed ? 'Keluar' : undefined}
@@ -564,16 +804,15 @@ function NotFoundAuth() {
           )}
         </aside>
 
-        {/* --- MAIN CONTENT --------------------------- */}
         <main className="relative flex-1 h-screen flex flex-col overflow-hidden">
 
-          {/* canvas */}
-          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }} />
 
-          {/* grid wash */}
+          <canvas ref={cubeCanvasRef} className="absolute inset-0 w-full h-full lg:hidden touch-none" style={{ zIndex: 1 }} />
+          <canvas ref={canvasRef} className="absolute inset-0 hidden w-full h-full lg:block" style={{ zIndex: 1 }} />
+
           <div className="absolute inset-0 pointer-events-none" style={gridStyle} />
 
-          {/* content overlay */}
+
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6" style={{ zIndex: 3 }}>
             <div className="h-[clamp(180px,34vh,320px)] w-full" />
 
@@ -592,14 +831,12 @@ function NotFoundAuth() {
             </div>
           </div>
 
-          {/* --- MOBILE NAVBAR ---------------------- */}
           <header className="lg:hidden absolute top-0 left-0 right-0 flex items-center justify-between gap-3 px-6 py-3.5 z-20">
             <Link href={homeHref}
               className={`shrink-0 hover:scale-105 active:scale-90 rounded-full transition-all duration-200 p-2.5 flex items-center justify-center ${mobileIconCls}`}>
               <Home size={26} strokeWidth={2.5} />
             </Link>
 
-            {/* clock */}
             <div className={`flex flex-col items-center rounded-xl px-3 py-1.5 backdrop-blur-md shadow-sm border ${clockPillCls}`}>
               <p className={`text-[8px] font-bold tracking-widest uppercase leading-none ${clockDateCls}`}>{dateStr}</p>
               <div className="flex items-baseline gap-1 mt-1">
@@ -614,9 +851,7 @@ function NotFoundAuth() {
             </button>
           </header>
 
-          {/* --- DESKTOP TOP-RIGHT ------------------- */}
           <div className="hidden lg:flex flex-col absolute top-7 right-7 z-20 items-end gap-3">
-            {/* clock */}
             <div className="flex items-center gap-4 text-right">
               <div>
                 <p className={`text-[11px] font-bold tracking-widest uppercase leading-none drop-shadow-sm ${clockDateCls}`}>{dateStr.split(', ')[0]}</p>
@@ -629,7 +864,6 @@ function NotFoundAuth() {
               </div>
             </div>
 
-            {/* dashboard buttons */}
             <div className="flex gap-2">
               {user?.id_koordinator && user?.id_asisten ? (
                 <>
@@ -653,7 +887,6 @@ function NotFoundAuth() {
         </main>
       </div>
 
-      {/* --- MOBILE SIDEBAR DRAWER -------------------- */}
       <div className={`lg:hidden fixed inset-0 z-50 ${drawerOpen ? '' : 'pointer-events-none'}`}>
         <div onClick={() => setDrawerOpen(false)}
           className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${drawerOpen ? 'opacity-100' : 'opacity-0'}`} />
@@ -687,7 +920,6 @@ function NotFoundAuth() {
   );
 }
 
-/* ---- root export ------------------------------- */
 export default function NotFound() {
   const { user } = useUserStore();
 
