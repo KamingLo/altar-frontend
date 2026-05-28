@@ -304,7 +304,7 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-      camera.position.set(0, 0, 7.6);
+      camera.position.set(0, 0, 21.0);
 
       const cube = new THREE.Group();
       scene.add(cube);
@@ -446,7 +446,8 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         const h = Math.max(1, rect.height);
         renderer.setSize(w, h, false);
         camera.aspect = w / h;
-        camera.position.z = h > w ? 7.6 : 6.4;
+        camera.position.z = h > w ? 21.0 : 6.4;
+        cube.position.y = h > w ? 1.1 : 0.0;
         camera.updateProjectionMatrix();
         mat.uniforms.uPixelRatio.value = renderer.getPixelRatio();
       }
@@ -458,8 +459,43 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       let dragging = false;
       let lastX = 0;
       let lastY = 0;
-      let userHasInteracted = false;
-      let lastInteract = performance.now();
+      let userHasInteracted = true;
+      let lastInteract = performance.now() - 2000;
+
+      // Gyroscope states
+      const gyro = { x: 0, y: 0 };
+      let initialBeta: number | null = null;
+      let initialGamma: number | null = null;
+
+      function onDeviceOrientation(e: DeviceOrientationEvent) {
+        if (dragging) return;
+        const beta = e.beta;  // tilt front/back [-180, 180]
+        const gamma = e.gamma; // tilt left/right [-90, 90]
+        if (beta === null || gamma === null) return;
+
+        // Calibrate based on initial holding angle
+        if (initialBeta === null || initialGamma === null) {
+          initialBeta = beta;
+          initialGamma = gamma;
+          return;
+        }
+
+        const deltaBeta = beta - initialBeta;
+        const deltaGamma = gamma - initialGamma;
+
+        // Subtle parallax displacement
+        gyro.x = Math.max(-0.6, Math.min(0.6, deltaBeta * 0.012));
+        gyro.y = Math.max(-0.6, Math.min(0.6, deltaGamma * 0.012));
+      }
+
+      // Bind gyroscope immediately on Android/standard browsers
+      if (
+        typeof window !== 'undefined' &&
+        // @ts-expect-error vendor-specific API not in types
+        !(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function')
+      ) {
+        window.addEventListener('deviceorientation', onDeviceOrientation);
+      }
 
       function onPointerDown(e: PointerEvent) {
         dragging = true;
@@ -467,6 +503,22 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         lastX = e.clientX;
         lastY = e.clientY;
         try { canvas!.setPointerCapture(e.pointerId); } catch {}
+
+        // Request iOS gyroscope permission on first touch interaction
+        if (
+          typeof DeviceOrientationEvent !== 'undefined' &&
+          // @ts-expect-error vendor-specific API not in types
+          typeof DeviceOrientationEvent.requestPermission === 'function'
+        ) {
+          // @ts-expect-error vendor-specific API not in types
+          DeviceOrientationEvent.requestPermission()
+            .then((state: string) => {
+              if (state === 'granted') {
+                window.addEventListener('deviceorientation', onDeviceOrientation);
+              }
+            })
+            .catch(console.error);
+        }
       }
 
       function onPointerMove(e: PointerEvent) {
@@ -493,10 +545,13 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         const sinceMove = (performance.now() - lastInteract) / 1000;
         const autoFactor = Math.min(1, Math.max(0, (sinceMove - 0.3) / 1.5));
         if (!dragging && userHasInteracted) target.y += 0.0035 * autoFactor;
-        rot.x += (target.x - rot.x) * 0.08;
-        rot.y += (target.y - rot.y) * 0.08;
+        
+        // Combine auto-rotation target + gyroscope parallax offset smoothly
+        rot.x += (target.x + gyro.x - rot.x) * 0.08;
+        rot.y += (target.y + gyro.y - rot.y) * 0.08;
         cube.rotation.x = rot.x;
         cube.rotation.y = rot.y;
+        
         renderer.render(scene, camera);
         animId = requestAnimationFrame(tick);
       }
@@ -513,6 +568,7 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
 
       cleanupFn = () => {
         window.removeEventListener('resize', onResize);
+        window.removeEventListener('deviceorientation', onDeviceOrientation);
         canvas!.removeEventListener('pointerdown', onPointerDown);
         canvas!.removeEventListener('pointermove', onPointerMove);
         canvas!.removeEventListener('pointerup', endDrag);
@@ -633,7 +689,7 @@ function NotFoundAuth() {
     await logoutUser(); clearUser(); router.replace('/auth/login');
   };
 
-  const sidebarBg  = 'bg-crimson/80 border-white/20 shadow-[0_8px_32px_rgba(148,28,47,0.25)]';
+  const sidebarBg  = 'bg-crimson border-[#7a1727] shadow-[0_8px_32px_rgba(148,28,47,0.25)]';
   const drawerBg   = 'bg-crimson/85';
   const headingCls = 'text-slate-800';
   const subCls     = 'text-slate-500';
@@ -759,7 +815,7 @@ function NotFoundAuth() {
       >
 
 
-        <aside className={`relative z-20 hidden lg:flex flex-col h-[calc(100vh-2rem)] my-4 ml-4 rounded-[1.5rem] overflow-hidden shrink-0 backdrop-blur-2xl border transition-[width,background-color] duration-300 ease-in-out ${sidebarBg} ${collapsed ? 'w-[84px]' : 'w-[280px]'}`}>
+        <aside className={`relative z-20 hidden lg:flex flex-col h-[calc(100vh-2rem)] my-4 ml-4 rounded-[1.5rem] overflow-hidden shrink-0 border transition-[width,background-color] duration-300 ease-in-out ${sidebarBg} ${collapsed ? 'w-[84px]' : 'w-[280px]'}`}>
 
 
           <div className={`pt-8 pb-6 border-b border-white/10 flex items-center shrink-0 transition-all duration-300 ${collapsed ? 'justify-center px-2' : 'justify-between px-7'}`}>
@@ -826,7 +882,7 @@ function NotFoundAuth() {
             <div className="pointer-events-auto mt-6">
               <Link href={homeHref}
                 className="inline-flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-crimson text-white text-sm font-bold shadow-md shadow-crimson/20 hover:bg-[#7a1727] hover:-translate-y-px active:scale-95 transition-all duration-200">
-                <Home size={15} strokeWidth={2.5} /> Dashboard
+                Dashboard
               </Link>
             </div>
           </div>
@@ -851,7 +907,8 @@ function NotFoundAuth() {
             </button>
           </header>
 
-          <div className="hidden lg:flex flex-col absolute top-7 right-7 z-20 items-end gap-3">
+          {/* Clock pill on the top right */}
+          <div className="hidden lg:flex absolute top-7 right-7 z-20 flex-col items-end gap-3">
             <div className="flex items-center gap-4 text-right">
               <div>
                 <p className={`text-[11px] font-bold tracking-widest uppercase leading-none drop-shadow-sm ${clockDateCls}`}>{dateStr.split(', ')[0]}</p>
@@ -863,26 +920,27 @@ function NotFoundAuth() {
                 <p className={`text-[10px] font-extrabold tracking-widest text-right mt-1 drop-shadow-sm ${clockDateCls}`}>WIB</p>
               </div>
             </div>
+          </div>
 
-            <div className="flex gap-2">
-              {user?.id_koordinator && user?.id_asisten ? (
-                <>
-                  <Link href="/koordinator"
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 text-sm font-bold ${dashBtnCls}`}>
-                    <Home size={16} strokeWidth={2.5} /> Dash Koor
-                  </Link>
-                  <Link href="/asdos"
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 text-sm font-bold ${dashBtnCls}`}>
-                    <Home size={16} strokeWidth={2.5} /> Dash Asdos
-                  </Link>
-                </>
-              ) : (
-                <Link href={homeHref}
-                  className={`flex items-center gap-2 px-4 py-2.5 backdrop-blur-md border shadow-sm hover:shadow-md hover:scale-105 active:scale-95 rounded-2xl transition-all duration-300 text-sm font-bold ${dashBtnCls}`}>
-                  <Home size={17} strokeWidth={2.5} /> Dashboard
+          {/* Dashboard button(s) on the top left, next to the sidebar */}
+          <div className="hidden lg:flex absolute top-7 left-7 z-20 gap-2">
+            {user?.id_koordinator && user?.id_asisten ? (
+              <>
+                <Link href="/koordinator"
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 text-sm font-bold ${dashBtnCls}`}>
+                  <Home size={16} strokeWidth={2.5} /> Dash Koor
                 </Link>
-              )}
-            </div>
+                <Link href="/asdos"
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 text-sm font-bold ${dashBtnCls}`}>
+                  <Home size={16} strokeWidth={2.5} /> Dash Asdos
+                </Link>
+              </>
+            ) : (
+              <Link href={homeHref}
+                className={`flex items-center gap-2 px-4 py-2.5 backdrop-blur-md border shadow-sm hover:shadow-md hover:scale-105 active:scale-95 rounded-2xl transition-all duration-300 text-sm font-bold ${dashBtnCls}`}>
+                <Home size={17} strokeWidth={2.5} /> Dashboard
+              </Link>
+            )}
           </div>
         </main>
       </div>

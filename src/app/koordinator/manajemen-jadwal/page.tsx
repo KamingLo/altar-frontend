@@ -3,13 +3,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
-  BookOpen,
   Calendar,
   CalendarDays,
   CheckCircle2,
-  Clock,
   Filter,
-  MapPin,
   Pencil,
   Plus,
   Search,
@@ -98,15 +95,6 @@ function addDays(date: Date, days: number) {
   return next;
 }
 
-function formatDisplayDate(iso: string) {
-  if (!iso) return '-';
-  return parseLocalDate(iso).toLocaleDateString('id-ID', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 function formatInputDate(iso: string) {
   if (!iso) return 'Pilih tanggal';
@@ -151,12 +139,14 @@ function DatePickerField({
   min,
   max,
   onChange,
+  align = 'left',
 }: {
   label: string;
   value: string;
   min?: string;
   max?: string;
   onChange: (value: string) => void;
+  align?: 'left' | 'right';
 }) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => parseLocalDate(value));
@@ -181,7 +171,7 @@ function DatePickerField({
 
   return (
     <div className="relative">
-      <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+      <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-1 ml-1">
         {label}
       </label>
       <button
@@ -201,7 +191,7 @@ function DatePickerField({
             aria-label="Tutup kalender"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 bg-white border border-slate-100 rounded-[20px] p-4 shadow-xl">
+          <div className={`absolute top-[calc(100%+8px)] z-40 w-[280px] bg-white border border-slate-100 rounded-[20px] p-4 shadow-xl ${align === 'right' ? 'right-0' : 'left-0'}`}>
             <div className="flex items-center justify-between mb-4">
               <button
                 type="button"
@@ -250,15 +240,14 @@ function DatePickerField({
                     type="button"
                     disabled={disabled}
                     onClick={() => pickDate(day)}
-                    className={`h-9 rounded-xl text-xs font-bold transition-all ${
-                      selected
-                        ? 'bg-obsidian text-white'
-                        : disabled
-                          ? 'text-slate-300 cursor-not-allowed'
-                          : sameMonth(day, viewDate)
-                            ? 'text-slate-700 hover:bg-slate-50'
-                            : 'text-slate-300'
-                    }`}
+                    className={`h-9 rounded-xl text-xs font-bold transition-all ${selected
+                      ? 'bg-obsidian text-white'
+                      : disabled
+                        ? 'text-slate-300 cursor-not-allowed'
+                        : sameMonth(day, viewDate)
+                          ? 'text-slate-700 hover:bg-slate-50'
+                          : 'text-slate-300'
+                      }`}
                   >
                     {day.getDate()}
                   </button>
@@ -268,6 +257,58 @@ function DatePickerField({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-[13px] font-bold text-[#1F2937] mb-1.5 ml-1">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function FieldCRUD({
+  label,
+  onCreate,
+  onEdit,
+  canEdit,
+  children,
+}: {
+  label: string;
+  onCreate: () => void;
+  onEdit: () => void;
+  canEdit: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5 px-1">
+        <label className="text-[13px] font-bold text-[#1F2937]">{label}</label>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onCreate}
+            className="text-[11px] font-bold text-crimson hover:bg-rose-50 active:scale-95 transition-all flex items-center gap-1 px-2 py-1 rounded-md"
+          >
+            <Plus className="w-3 h-3" strokeWidth={2.5} />
+            Buat baru
+          </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            disabled={!canEdit}
+            className="text-slate-400 hover:text-crimson hover:bg-rose-50 active:scale-95 p-1 rounded-md disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-all"
+            aria-label={`Edit ${label}`}
+            title={canEdit ? `Edit ${label} yang dipilih` : `Pilih ${label.toLowerCase()} dulu untuk edit`}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+      {children}
     </div>
   );
 }
@@ -311,6 +352,12 @@ export default function ManajemenJadwalPage() {
   const [isDeleteClosing, setIsDeleteClosing] = useState(false);
   const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
 
+  const [isDeleteSemesterOpen, setIsDeleteSemesterOpen] = useState(false);
+  const [isDeleteSemesterVisible, setIsDeleteSemesterVisible] = useState(false);
+  const [isDeleteSemesterClosing, setIsDeleteSemesterClosing] = useState(false);
+  const [isDeleteSemesterSubmitting, setIsDeleteSemesterSubmitting] = useState(false);
+  const [deleteSemesterTargetId, setDeleteSemesterTargetId] = useState<string | null>(null);
+
   const [isMd, setIsMd] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : false
   );
@@ -332,6 +379,14 @@ export default function ManajemenJadwalPage() {
   const [sheetStartY, setSheetStartY] = useState(0);
   const [deleteSheetDragY, setDeleteSheetDragY] = useState(0);
   const [deleteSheetStartY, setDeleteSheetStartY] = useState(0);
+  const [deleteSemesterSheetDragY, setDeleteSemesterSheetDragY] = useState(0);
+  const [deleteSemesterSheetStartY, setDeleteSemesterSheetStartY] = useState(0);
+
+  const [isSemesterSheetOpen, setIsSemesterSheetOpen] = useState(false);
+  const [isSemesterSheetVisible, setIsSemesterSheetVisible] = useState(false);
+  const [isSemesterSheetClosing, setIsSemesterSheetClosing] = useState(false);
+  const [semesterSheetDragY, setSemesterSheetDragY] = useState(0);
+  const [semesterSheetStartY, setSemesterSheetStartY] = useState(0);
 
   const initialSemesterLoaded = useRef(false);
 
@@ -343,21 +398,22 @@ export default function ManajemenJadwalPage() {
   const maxEndDate = useMemo(() => toIsoDateFromDate(addDays(parseLocalDate(startDate), 6)), [startDate]);
 
   const selectedSemester = semesters.find(s => s.id === selectedSemesterId);
+  const deleteSemesterTarget = semesters.find(s => s.id === deleteSemesterTargetId);
 
   const semesterOptions = useMemo(
     () => semesters.map(s => ({ value: s.id, label: semesterLabel(s.tahun_ajaran, s.tipe_semester) })),
     [semesters],
   );
   const kelasOptions = useMemo(
-    () => kelasList.map(k => ({ value: k.id, label: k.nama_kelas, description: k.jurusan })),
+    () => kelasList.map(k => ({ value: k.id, label: k.nama_kelas, description: `${k.jurusan} - ${k.jumlah_siswa} Siswa` })),
     [kelasList],
   );
   const mkOptions = useMemo(
-    () => mkList.map(m => ({ value: m.id, label: m.nama_mk, description: `${m.sks} SKS` })),
+    () => mkList.map(m => ({ value: m.id, label: m.nama_mk, description: `${m.kode_mk} - ${m.sks} SKS` })),
     [mkList],
   );
   const ruanganOptions = useMemo(
-    () => ruanganList.map(r => ({ value: r.id, label: r.nama_ruangan, description: `Lantai ${r.lantai}` })),
+    () => ruanganList.map(r => ({ value: r.id, label: r.nama_ruangan, description: `Lantai ${r.lantai} - Kapasitas ${r.kapasitas}` })),
     [ruanganList],
   );
   const asdosOptions = useMemo(
@@ -420,29 +476,27 @@ export default function ManajemenJadwalPage() {
     setIsInitialLoad(false);
   }, [selectedSemesterId, startDate, endDate, showToast]);
 
-  useEffect(() => {
-    (async () => {
-      const res = await fetchSemesters();
-      if (res.success && res.items.length) {
-        setSemesters(res.items);
-        if (!initialSemesterLoaded.current) {
-          setSelectedSemesterId(res.items[0].id);
-          initialSemesterLoaded.current = true;
-        }
-      } else {
-        setIsInitialLoad(false);
-        if (!res.success && !redirectIfSessionExpired(res.message)) {
-          showToast(res.message);
-        }
+  const sortSemestersByNewest = (items: SemesterItem[]) => {
+    return [...items].sort((a, b) => {
+      // 1. Coba urutkan berdasarkan created_at terlebih dahulu (jika ada dan berbeda)
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (timeA !== timeB && timeA > 0 && timeB > 0) {
+        return timeB - timeA;
       }
-    })();
-  }, [showToast]);
 
-  useEffect(() => {
-    if (!selectedSemesterId) return;
-    const t = setTimeout(() => refreshSessions(), 0);
-    return () => clearTimeout(t);
-  }, [selectedSemesterId, refreshSessions]);
+      // 2. Fallback 1: Urutkan berdasarkan tahun ajaran secara descending (cth: "2026/2027" > "2025/2026")
+      const yearCompare = (b.tahun_ajaran || '').localeCompare(a.tahun_ajaran || '');
+      if (yearCompare !== 0) {
+        return yearCompare;
+      }
+
+      // 3. Fallback 2: Urutkan berdasarkan tipe semester secara descending (Pendek > Genap > Ganjil)
+      const weight = { 'Pendek': 3, 'Genap': 2, 'Ganjil': 1 };
+      const getWeight = (t: string) => weight[t as keyof typeof weight] || 0;
+      return getWeight(b.tipe_semester || '') - getWeight(a.tipe_semester || '');
+    });
+  };
 
   const loadDropdownData = useCallback(async (): Promise<DropdownData | null> => {
     setDropdownLoading(true);
@@ -461,17 +515,125 @@ export default function ManajemenJadwalPage() {
     return res.data;
   }, [showToast]);
 
+  useEffect(() => {
+    (async () => {
+      const [res] = await Promise.all([
+        fetchSemesters(),
+        loadDropdownData(),
+      ]);
+      if (res.success && res.items.length) {
+        const sorted = sortSemestersByNewest(res.items);
+        setSemesters(sorted);
+        if (!initialSemesterLoaded.current) {
+          setSelectedSemesterId(sorted[0].id);
+          initialSemesterLoaded.current = true;
+        }
+      } else {
+        setIsInitialLoad(false);
+        if (!res.success && !redirectIfSessionExpired(res.message)) {
+          showToast(res.message);
+        }
+      }
+    })();
+  }, [showToast, loadDropdownData]);
+
+  useEffect(() => {
+    if (!selectedSemesterId) return;
+    const t = setTimeout(() => refreshSessions(), 0);
+    return () => clearTimeout(t);
+  }, [selectedSemesterId, refreshSessions]);
+
   const refreshSemesters = useCallback(async () => {
     const res = await fetchSemesters();
     if (res.success) {
-      setSemesters(res.items);
-      return res.items;
+      const sorted = sortSemestersByNewest(res.items);
+      setSemesters(sorted);
+      return sorted;
     }
     if (!redirectIfSessionExpired(res.message)) {
       showToast(res.message || 'Gagal memuat daftar semester.');
     }
     return null;
   }, [showToast]);
+
+  const handleDeleteSemesterOpen = (semesterId: string) => {
+    if (!semesterId) return;
+    setDeleteSemesterTargetId(semesterId);
+    setIsDeleteSemesterClosing(false);
+    setDeleteSemesterSheetDragY(0);
+    setIsDeleteSemesterOpen(true);
+    setTimeout(() => setIsDeleteSemesterVisible(true), 10);
+  };
+
+  const handleCloseDeleteSemester = () => {
+    setIsDeleteSemesterClosing(true);
+    setIsDeleteSemesterVisible(false);
+    setTimeout(() => {
+      setIsDeleteSemesterOpen(false);
+      setIsDeleteSemesterClosing(false);
+      setDeleteSemesterSheetDragY(0);
+      setDeleteSemesterTargetId(null);
+    }, 300);
+  };
+
+  const handleConfirmDeleteSemester = async () => {
+    if (!deleteSemesterTargetId) return;
+    setIsDeleteSemesterSubmitting(true);
+    try {
+      const res = await fetch(`/api/semesters/${deleteSemesterTargetId}`, { method: 'DELETE' }).then(r => r.json());
+      setIsDeleteSemesterSubmitting(false);
+      if (res.success) {
+        showToast("Semester berhasil dihapus.", "success");
+        if (selectedSemesterId === deleteSemesterTargetId) {
+          setSelectedSemesterId("");
+        }
+        handleCloseDeleteSemester();
+        await refreshSemesters();
+      } else {
+        showToast(res.message || "Gagal menghapus semester.");
+      }
+    } catch {
+      setIsDeleteSemesterSubmitting(false);
+      showToast("Terjadi kesalahan saat menghapus semester.");
+    }
+  };
+
+  const handleDeleteSemesterTouchStart = (e: React.TouchEvent) => setDeleteSemesterSheetStartY(e.touches[0].clientY);
+  const handleDeleteSemesterTouchMove = (e: React.TouchEvent) => {
+    const delta = e.touches[0].clientY - deleteSemesterSheetStartY;
+    if (delta > 0) setDeleteSemesterSheetDragY(delta);
+  };
+  const handleDeleteSemesterTouchEnd = () => {
+    if (deleteSemesterSheetDragY > 100) handleCloseDeleteSemester();
+    else setDeleteSemesterSheetDragY(0);
+  };
+
+  const handleOpenSemesterSheet = () => {
+    setIsSemesterSheetClosing(false);
+    setSemesterSheetDragY(0);
+    setIsSemesterSheetOpen(true);
+    setTimeout(() => setIsSemesterSheetVisible(true), 10);
+  };
+
+  const handleCloseSemesterSheet = () => {
+    setIsSemesterSheetClosing(true);
+    setIsSemesterSheetVisible(false);
+    setTimeout(() => {
+      setIsSemesterSheetOpen(false);
+      setIsSemesterSheetClosing(false);
+      setSemesterSheetDragY(0);
+    }, 300);
+  };
+
+  const handleSemesterSheetTouchStart = (e: React.TouchEvent) => setSemesterSheetStartY(e.touches[0].clientY);
+  const handleSemesterSheetTouchMove = (e: React.TouchEvent) => {
+    const delta = e.touches[0].clientY - semesterSheetStartY;
+    if (delta > 0) setSemesterSheetDragY(delta);
+  };
+  const handleSemesterSheetTouchEnd = () => {
+    if (semesterSheetDragY > 100) handleCloseSemesterSheet();
+    else setSemesterSheetDragY(0);
+  };
 
   const openMasterCreate = (resource: MasterResource) => {
     setMasterModal({ open: true, mode: 'create', resource, initialData: null });
@@ -863,7 +1025,7 @@ export default function ManajemenJadwalPage() {
               <div className="h-3.5 w-40 rounded-md animate-shimmer"></div>
               <div className="h-6 w-16 rounded-md animate-shimmer"></div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={`card-${i}`}
@@ -885,110 +1047,115 @@ export default function ManajemenJadwalPage() {
     <AsdosPageShell className="pb-24 md:pb-12">
 
       <div className="shrink-0">
-        <div className="mb-4 md:mb-8 relative z-10 flex items-center justify-between gap-4">
-          <AsdosPageHeader
-            eyebrow="Koordinator"
-            title="Manajemen Jadwal"
-            description="Kelola sesi jadwal mengajar per semester — data langsung dari server."
-          />
+        <AsdosPageHeader
+          eyebrow="Koordinator"
+          title="Manajemen Jadwal"
+          description="Kelola sesi jadwal mengajar per semester."
+          className="!mb-2 md:!mb-5"
+          action={
+            <div className="relative shrink-0 flex flex-col sm:flex-row sm:items-end gap-3 z-30 w-full md:w-auto">
+              {/* Desktop: semester select */}
+              <div className="hidden md:flex relative w-full sm:w-[200px] md:w-[220px] flex-col gap-[10px]">
+                <div className="flex items-center justify-between w-full px-1">
+                  <label className="block text-[11px] font-bold text-slate-400/90 tracking-widest uppercase">
+                    Semester
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => openMasterCreate('semester')}
+                    className="flex items-center gap-0.5 text-[11px] font-extrabold text-crimson hover:text-[#7a1727] hover:bg-rose-50 active:scale-95 transition-all px-1.5 py-0.5 rounded-md uppercase tracking-wider"
+                  >
+                    <Plus className="w-3 h-3" strokeWidth={2.5} />
+                    Buat
+                  </button>
+                </div>
+                <CustomSelect
+                  value={selectedSemesterId}
+                  onChange={setSelectedSemesterId}
+                  options={semesterOptions}
+                  placeholder="Semester"
+                  disabled={!semesters.length}
+                  icon={<CalendarDays className="w-[18px] h-[18px]" />}
+                  triggerClassName="rounded-2xl py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                  onDeleteOption={handleDeleteSemesterOpen}
+                />
+              </div>
 
-          <AsdosPrimaryButton
-            type="button"
-            onClick={() => handleOpenModal('add')}
-            disabled={!selectedSemesterId}
-            icon={<Plus className="w-5 h-5" strokeWidth={2.5} />}
-            className="hidden md:flex py-3.5 px-6 text-[15px]"
-          >
-            Buat Sesi Baru
-          </AsdosPrimaryButton>
-        </div>
+              {/* Buat Sesi Baru Button (desktop only) */}
+              <AsdosPrimaryButton
+                type="button"
+                onClick={() => handleOpenModal('add')}
+                disabled={!selectedSemesterId}
+                icon={<Plus className="w-5 h-5" strokeWidth={2.5} />}
+                className="hidden md:flex py-3.5 px-6 text-[15px] h-[52px] items-center justify-center hover:scale-[1.03] hover:shadow-lg hover:shadow-crimson/30"
+              >
+                Buat Sesi Baru
+              </AsdosPrimaryButton>
+            </div>
+          }
+        />
 
-        <div className="mb-5 md:mb-6 flex flex-col md:flex-row gap-3 relative z-20 w-full items-stretch md:items-center">
+        <div className="mb-6 md:mb-2 flex flex-col gap-2 relative z-20 w-full">
           <div className="flex flex-col md:flex-row md:items-end gap-3 w-full">
             <div className="flex flex-col sm:flex-row items-end gap-3 w-full md:w-auto shrink-0">
-              <div className="flex gap-3 w-full sm:w-auto">
-                <div className="w-full sm:w-[190px] md:w-[200px]">
-                  <DatePickerField label="Dari Tanggal" value={startDate} onChange={handleStartDateChange} />
+              <div className="flex flex-col w-full sm:w-auto">
+                <div className="flex gap-3 w-full sm:w-auto">
+                  <div className="w-full sm:w-[190px] md:w-[200px]">
+                    <DatePickerField label="Dari Tanggal" value={startDate} onChange={handleStartDateChange} />
+                  </div>
+                  <div className="w-full sm:w-[190px] md:w-[200px]">
+                    <DatePickerField
+                      label="Sampai Tanggal"
+                      value={endDate}
+                      min={startDate}
+                      max={maxEndDate}
+                      onChange={handleEndDateChange}
+                      align="right"
+                    />
+                  </div>
                 </div>
-                <div className="w-full sm:w-[190px] md:w-[200px]">
-                  <DatePickerField
-                    label="Sampai Tanggal"
-                    value={endDate}
-                    min={startDate}
-                    max={maxEndDate}
-                    onChange={handleEndDateChange}
-                  />
-                </div>
-              </div>
-
-              <div className="relative shrink-0 w-full sm:w-auto z-30 flex items-end gap-2">
-                <div className="w-full sm:w-52 md:w-56">
-                  <CustomSelect
-                    value={selectedSemesterId}
-                    onChange={setSelectedSemesterId}
-                    options={semesterOptions}
-                    placeholder="Semester"
-                    disabled={!semesters.length}
-                    icon={<CalendarDays className="w-[18px] h-[18px]" />}
-                    triggerClassName="rounded-2xl py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => openMasterCreate('semester')}
-                  className="shrink-0 w-11 h-11 md:w-12 md:h-12 flex items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-crimson active:scale-95 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-                  aria-label="Buat semester baru"
-                  title="Buat semester baru"
-                >
-                  <Plus className="w-[18px] h-[18px]" strokeWidth={2.5} />
-                </button>
+                <p className="text-xs font-medium text-slate-400 mt-1.5 md:hidden">
+                  Pilih rentang tanggal maksimal 7 hari.
+                </p>
               </div>
             </div>
 
-            <div className="flex gap-3 w-full md:ml-auto md:w-auto md:max-w-[360px]">
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Cari MK, kelas, ruangan, pengajar..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-crimson focus:ring-2 focus:ring-crimson/15 transition-all"
-              />
-            </div>
+            <div className="flex gap-3 w-full md:ml-auto md:w-auto md:max-w-[300px]">
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Cari MK, kelas, ruangan, pengajar..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-crimson focus:ring-2 focus:ring-crimson/15 transition-all"
+                />
+              </div>
 
-            <div className="relative shrink-0">
-              <CustomSelect
-                variant="icon"
-                align="right"
-                value={filterTipe}
-                onChange={v => setFilterTipe(v as TipeFilter)}
-                options={FILTER_TIPE_OPTIONS}
-                placeholder="Filter tipe"
-                icon={<Filter className="w-[18px] h-[18px]" />}
-                triggerClassName={filterTipe !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : ''}
-              />
+              <div className="relative shrink-0">
+                <CustomSelect
+                  variant="icon"
+                  align="right"
+                  value={filterTipe}
+                  onChange={v => setFilterTipe(v as TipeFilter)}
+                  options={FILTER_TIPE_OPTIONS}
+                  placeholder="Filter tipe"
+                  icon={<Filter className="w-[18px] h-[18px]" />}
+                  triggerClassName={filterTipe !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : ''}
+                />
+              </div>
             </div>
           </div>
-          </div>
+          {/* Hint khusus desktop — di luar baris filter agar tidak ganggu alignment */}
+          <p className="hidden md:block text-xs font-medium text-slate-400">
+            Pilih rentang tanggal maksimal 7 hari.
+          </p>
         </div>
       </div>
-      <p className="text-xs font-medium text-slate-400 ml-1 -mt-3 mb-6">
-        Pilih rentang tanggal maksimal 7 hari.
-      </p>
 
       <div className="flex flex-col md:flex-row gap-4 lg:gap-6 items-start">
 
         <div className="flex flex-col flex-1 min-w-0 w-full md:min-h-[320px]">
-
-          <div className="flex justify-between items-center h-7 mb-3 shrink-0 px-1">
-            <h3 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">
-              {hasActiveSearch ? 'Hasil pencarian' : `${startDate} — ${endDate}`}
-            </h3>
-            <span className="bg-crimson/10 text-crimson text-[10px] font-bold px-2.5 py-1 rounded-md">
-              {filtered.length} sesi
-            </span>
-          </div>
 
           <div className="space-y-6">
             {loading && (
@@ -1019,19 +1186,26 @@ export default function ManajemenJadwalPage() {
                 const ScheduleCard = ({ s }: { s: SessionTimeline }) => {
                   const timePart = s.waktu.includes(', ') ? s.waktu.split(', ')[1] : s.waktu;
                   const isPengganti = isPenggantiTipe(s.tipe);
+                  const mkInfo = findByDisplayLabel(mkList, s.mata_kuliah, m => m.nama_mk);
+                  const kelasInfo = findByDisplayLabel(kelasList, s.nama_kelas, k => k.nama_kelas);
+                  const ruanganInfo = findByDisplayLabel(ruanganList, s.ruangan, r => r.nama_ruangan);
+
                   return (
-                    <section className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 flex flex-col gap-5 w-full">
-                      <article className="flex flex-col gap-5">
+                    <section className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 flex flex-col w-full">
+                      <article className="flex flex-col flex-1 gap-5">
                         <div className="flex flex-col gap-1 w-full">
                           <h2 className="font-bold text-slate-900 leading-snug line-clamp-2 mb-1 text-sm md:text-base">
                             {s.mata_kuliah}
                           </h2>
-                          <p className="text-slate-500 font-medium text-[11px] md:text-xs">{s.nama_kelas || 'Kelas tidak tersedia'}</p>
-                          {isPengganti && (
-                            <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">
-                              Pengganti
-                            </span>
+                          {mkInfo && (
+                            <p className="text-[11px] font-semibold text-slate-400">
+                              {mkInfo.kode_mk} - {mkInfo.sks} SKS
+                            </p>
                           )}
+                          <p className="text-slate-500 font-medium text-[11px] md:text-xs">
+                            {s.nama_kelas || 'Kelas tidak tersedia'}
+                            {kelasInfo && ` - ${kelasInfo.jumlah_siswa} Siswa`}
+                          </p>
                         </div>
 
                         <div className="grid w-full grid-cols-1 gap-y-2.5 border-t border-slate-100 pt-3 md:grid-cols-2 md:gap-x-6 md:gap-y-4 md:border-t-0 md:pt-0">
@@ -1045,7 +1219,10 @@ export default function ManajemenJadwalPage() {
                           </div>
                           <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
                             <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
-                            <span className="font-bold text-slate-800 text-xs md:text-xs">{s.ruangan}</span>
+                            <span className="font-bold text-slate-800 text-xs md:text-xs">
+                              {s.ruangan}
+                              {ruanganInfo && ` - Kapasitas ${ruanganInfo.kapasitas}`}
+                            </span>
                           </div>
                           <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
                             <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pengajar</span>
@@ -1053,7 +1230,15 @@ export default function ManajemenJadwalPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                        {/* Mobile: tombol kanan, badge di atas tombol */}
+                        <div className="md:hidden flex flex-col items-end pt-4 pb-1 border-t border-slate-100 gap-2 mt-auto">
+                          <div className="h-[22px] flex items-center">
+                            {isPengganti && (
+                              <span className="text-[10px] font-bold bg-crimson/10 text-crimson border border-crimson/20 px-2.5 py-1 rounded-xl uppercase tracking-wider">
+                                Pengganti
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
@@ -1075,9 +1260,33 @@ export default function ManajemenJadwalPage() {
                               <Trash2 className="w-4 h-4 mx-auto" />
                             </button>
                           </div>
+                        </div>
 
+                        {/* Desktop: tombol kiri, badge kanan */}
+                        <div className="hidden md:flex items-center justify-between pt-3 border-t border-slate-100 mt-auto">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenModal('edit', s)}
+                              disabled={isPengganti}
+                              className="w-10 h-10 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-crimson active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                              aria-label="Edit sesi"
+                              title={isPengganti ? 'Sesi pengganti tidak bisa diedit di sini' : 'Edit sesi'}
+                            >
+                              <Pencil className="w-4 h-4 mx-auto" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteOpen(s)}
+                              className="w-10 h-10 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-crimson active:scale-95 transition-all"
+                              aria-label="Hapus sesi"
+                              title="Hapus sesi"
+                            >
+                              <Trash2 className="w-4 h-4 mx-auto" />
+                            </button>
+                          </div>
                           {isPengganti && (
-                            <span className="text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-2.5 py-1 rounded-xl uppercase tracking-wider">
+                            <span className="text-[10px] font-bold bg-crimson/10 text-crimson border border-crimson/20 px-2.5 py-1 rounded-xl uppercase tracking-wider">
                               Pengganti
                             </span>
                           )}
@@ -1094,7 +1303,7 @@ export default function ManajemenJadwalPage() {
                         <div className="flex items-center px-1">
                           <h3 className="text-sm font-bold text-slate-800">{formatDisplayDate(dateKey)}</h3>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                           {grouped[dateKey].map(s => (
                             <ScheduleCard key={sessionRowKey(s)} s={s} />
                           ))}
@@ -1120,15 +1329,21 @@ export default function ManajemenJadwalPage() {
             )}
           </div>
 
-          <p className="shrink-0 text-[11px] font-medium text-slate-400 px-1 pt-2 pb-0.5 border-t border-slate-100/80 mt-1">
-            {hasActiveSearch
-              ? `Menampilkan ${filtered.length} sesi (pencarian aktif)`
-              : `Menampilkan ${filtered.length} sesi pada ${startDate} — ${endDate}`}
+          <p className="shrink-0 text-[10px] md:text-[11px] font-extrabold text-slate-400/70 tracking-widest uppercase px-1 pt-3 pb-0.5 border-t border-slate-100/80 mt-2 text-center">
+            End
           </p>
         </div>
       </div>
 
 
+      <button
+        type="button"
+        onClick={handleOpenSemesterSheet}
+        className="md:hidden fixed bottom-24 right-4 w-14 h-14 bg-white text-slate-600 border border-slate-200/80 rounded-full flex items-center justify-center shadow-md z-20 active:scale-90 transition-transform"
+        aria-label="Pilih semester"
+      >
+        <CalendarDays className="w-5 h-5" />
+      </button>
       <button
         type="button"
         onClick={() => handleOpenModal('add')}
@@ -1148,8 +1363,7 @@ export default function ManajemenJadwalPage() {
           />
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none p-0 md:p-4">
             <div
-              className={`w-full max-w-lg bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[80vh] overflow-hidden pointer-events-auto transition-all duration-300 ${isMd ? (isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''
-                }`}
+              className={`w-full max-w-lg bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[80vh] overflow-hidden pointer-events-auto transition-all duration-300 ${isMd ? (isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''}`}
               style={
                 !isMd
                   ? {
@@ -1196,32 +1410,18 @@ export default function ManajemenJadwalPage() {
                       onEdit={() => openMasterEdit('kelas', selectedKelasItem)}
                       canEdit={!!selectedKelasItem}
                     >
-                      <div className="flex gap-2 items-stretch">
-                        <div className="flex-1 min-w-0">
-                          <CustomSelect
-                            value={form.id_kelas}
-                            onChange={v => setForm(f => ({ ...f, id_kelas: v }))}
-                            options={kelasOptions}
-                            placeholder="Pilih kelas"
-                            searchable
-                            searchPlaceholder="Cari kelas..."
-                            onDeleteOption={(id) => {
-                              const item = kelasList.find(k => k.id === id) ?? null;
-                              openMasterDelete('kelas', item);
-                            }}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => openMasterDelete('kelas', selectedKelasItem)}
-                          disabled={!selectedKelasItem}
-                          className="w-12 h-12 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-crimson active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                          aria-label="Hapus kelas terpilih"
-                          title={selectedKelasItem ? `Hapus ${selectedKelasItem.nama_kelas}` : 'Pilih kelas dulu'}
-                        >
-                          <Trash2 className="w-[18px] h-[18px] mx-auto" />
-                        </button>
-                      </div>
+                      <CustomSelect
+                        value={form.id_kelas}
+                        onChange={v => setForm(f => ({ ...f, id_kelas: v }))}
+                        options={kelasOptions}
+                        placeholder="Pilih kelas"
+                        searchable
+                        searchPlaceholder="Cari kelas..."
+                        onDeleteOption={(id) => {
+                          const item = kelasList.find(k => k.id === id) ?? null;
+                          openMasterDelete('kelas', item);
+                        }}
+                      />
                     </FieldCRUD>
 
                     <FieldCRUD
@@ -1230,32 +1430,18 @@ export default function ManajemenJadwalPage() {
                       onEdit={() => openMasterEdit('mk', selectedMkItem)}
                       canEdit={!!selectedMkItem}
                     >
-                      <div className="flex gap-2 items-stretch">
-                        <div className="flex-1 min-w-0">
-                          <CustomSelect
-                            value={form.id_mk}
-                            onChange={v => setForm(f => ({ ...f, id_mk: v }))}
-                            options={mkOptions}
-                            placeholder="Pilih mata kuliah"
-                            searchable
-                            searchPlaceholder="Cari mata kuliah..."
-                            onDeleteOption={(id) => {
-                              const item = mkList.find(m => m.id === id) ?? null;
-                              openMasterDelete('mk', item);
-                            }}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => openMasterDelete('mk', selectedMkItem)}
-                          disabled={!selectedMkItem}
-                          className="w-12 h-12 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-crimson active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                          aria-label="Hapus mata kuliah terpilih"
-                          title={selectedMkItem ? `Hapus ${selectedMkItem.nama_mk}` : 'Pilih mata kuliah dulu'}
-                        >
-                          <Trash2 className="w-[18px] h-[18px] mx-auto" />
-                        </button>
-                      </div>
+                      <CustomSelect
+                        value={form.id_mk}
+                        onChange={v => setForm(f => ({ ...f, id_mk: v }))}
+                        options={mkOptions}
+                        placeholder="Pilih mata kuliah"
+                        searchable
+                        searchPlaceholder="Cari mata kuliah..."
+                        onDeleteOption={(id) => {
+                          const item = mkList.find(m => m.id === id) ?? null;
+                          openMasterDelete('mk', item);
+                        }}
+                      />
                     </FieldCRUD>
 
                     <FieldCRUD
@@ -1264,32 +1450,18 @@ export default function ManajemenJadwalPage() {
                       onEdit={() => openMasterEdit('ruangan', selectedRuanganItem)}
                       canEdit={!!selectedRuanganItem}
                     >
-                      <div className="flex gap-2 items-stretch">
-                        <div className="flex-1 min-w-0">
-                          <CustomSelect
-                            value={form.id_ruangan}
-                            onChange={v => setForm(f => ({ ...f, id_ruangan: v }))}
-                            options={ruanganOptions}
-                            placeholder="Pilih ruangan"
-                            searchable
-                            searchPlaceholder="Cari ruangan..."
-                            onDeleteOption={(id) => {
-                              const item = ruanganList.find(r => r.id === id) ?? null;
-                              openMasterDelete('ruangan', item);
-                            }}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => openMasterDelete('ruangan', selectedRuanganItem)}
-                          disabled={!selectedRuanganItem}
-                          className="w-12 h-12 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-crimson active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                          aria-label="Hapus ruangan terpilih"
-                          title={selectedRuanganItem ? `Hapus ${selectedRuanganItem.nama_ruangan}` : 'Pilih ruangan dulu'}
-                        >
-                          <Trash2 className="w-[18px] h-[18px] mx-auto" />
-                        </button>
-                      </div>
+                      <CustomSelect
+                        value={form.id_ruangan}
+                        onChange={v => setForm(f => ({ ...f, id_ruangan: v }))}
+                        options={ruanganOptions}
+                        placeholder="Pilih ruangan"
+                        searchable
+                        searchPlaceholder="Cari ruangan..."
+                        onDeleteOption={(id) => {
+                          const item = ruanganList.find(r => r.id === id) ?? null;
+                          openMasterDelete('ruangan', item);
+                        }}
+                      />
                     </FieldCRUD>
 
                     <Field label="Tanggal Sesi">
@@ -1351,39 +1523,25 @@ export default function ManajemenJadwalPage() {
                         onEdit={() => openMasterEdit('lecturer', selectedLecturerItem)}
                         canEdit={!!selectedLecturerItem}
                       >
-                        <div className="flex gap-2 items-stretch">
-                          <div className="flex-1 min-w-0">
-                            <CustomSelect
-                              value={form.id_dosen}
-                              onChange={v => setForm(f => ({
-                                ...f,
-                                id_dosen: v,
-                                id_asdos1: '',
-                                id_asdos2: ''
-                              }))}
-                              options={[{ value: '', label: 'Pilih Dosen' }, ...lecturerOptions]}
-                              placeholder="Pilih Dosen"
-                              icon={<User className="w-4 h-4" />}
-                              searchable
-                              searchPlaceholder="Cari dosen..."
-                              onDeleteOption={(id) => {
-                                if (!id) return;
-                                const item = lecturerList.find(l => l.id === id) ?? null;
-                                openMasterDelete('lecturer', item);
-                              }}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => openMasterDelete('lecturer', selectedLecturerItem)}
-                            disabled={!selectedLecturerItem}
-                            className="w-12 h-12 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-crimson active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                            aria-label="Hapus dosen terpilih"
-                            title={selectedLecturerItem ? `Hapus ${selectedLecturerItem.nama}` : 'Pilih dosen dulu'}
-                          >
-                            <Trash2 className="w-[18px] h-[18px] mx-auto" />
-                          </button>
-                        </div>
+                        <CustomSelect
+                          value={form.id_dosen}
+                          onChange={v => setForm(f => ({
+                            ...f,
+                            id_dosen: v,
+                            id_asdos1: '',
+                            id_asdos2: ''
+                          }))}
+                          options={[{ value: '', label: 'Pilih Dosen' }, ...lecturerOptions]}
+                          placeholder="Pilih Dosen"
+                          icon={<User className="w-4 h-4" />}
+                          searchable
+                          searchPlaceholder="Cari dosen..."
+                          onDeleteOption={(id) => {
+                            if (!id) return;
+                            const item = lecturerList.find(l => l.id === id) ?? null;
+                            openMasterDelete('lecturer', item);
+                          }}
+                        />
                       </FieldCRUD>
                     ) : (
                       <>
@@ -1451,8 +1609,7 @@ export default function ManajemenJadwalPage() {
           />
           <div className="fixed inset-0 z-[61] flex items-end md:items-center justify-center pointer-events-none">
             <div
-              className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl overflow-hidden pointer-events-auto mx-0 md:mx-4 transition-all duration-300 ${isMd ? (isDeleteVisible && !isDeleteClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''
-                }`}
+              className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl overflow-hidden pointer-events-auto mx-0 md:mx-4 transition-all duration-300 ${isMd ? (isDeleteVisible && !isDeleteClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''}`}
               style={
                 !isMd
                   ? {
@@ -1504,6 +1661,152 @@ export default function ManajemenJadwalPage() {
       )}
 
 
+      {isDeleteSemesterOpen && (
+        <>
+          <div
+            className={`fixed inset-0 bg-slate-900/45 backdrop-blur-[2px] z-[60] transition-opacity duration-300 ${isDeleteSemesterVisible && !isDeleteSemesterClosing ? 'opacity-100' : 'opacity-0'}`}
+            onClick={handleCloseDeleteSemester}
+          />
+          <div className="fixed inset-0 z-[61] flex items-end md:items-center justify-center pointer-events-none">
+            <div
+              className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-2xl overflow-hidden pointer-events-auto mx-0 md:mx-4 transition-all duration-300 ${isMd ? (isDeleteSemesterVisible && !isDeleteSemesterClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95') : ''}`}
+              style={
+                !isMd
+                  ? {
+                    transform: !isDeleteSemesterVisible || isDeleteSemesterClosing ? 'translateY(100%)' : `translateY(${deleteSemesterSheetDragY}px)`,
+                    transition:
+                      !isDeleteSemesterVisible || isDeleteSemesterClosing || deleteSemesterSheetDragY === 0
+                        ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
+                        : 'none',
+                  }
+                  : {}
+              }
+            >
+              <div
+                className="w-full flex md:hidden items-center justify-center pt-4 pb-2 touch-none"
+                onTouchStart={handleDeleteSemesterTouchStart}
+                onTouchMove={handleDeleteSemesterTouchMove}
+                onTouchEnd={handleDeleteSemesterTouchEnd}
+              >
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+              </div>
+              <div className="px-5 pt-2 md:pt-6 pb-6 md:pb-8">
+                <h2 className="text-[20px] font-extrabold text-[#1F2937]">Hapus Semester?</h2>
+                <p className="text-sm text-slate-500 mt-2">
+                  Apakah anda yakin untuk menghapus semester <span className="font-semibold text-slate-700">{deleteSemesterTarget ? semesterLabel(deleteSemesterTarget.tahun_ajaran, deleteSemesterTarget.tipe_semester) : ''}</span>? Semua data sesi pada semester ini akan dihapus permanen.
+                </p>
+                <div className="mt-6 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleCloseDeleteSemester}
+                    disabled={isDeleteSemesterSubmitting}
+                    className="flex-1 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmDeleteSemester}
+                    disabled={isDeleteSemesterSubmitting}
+                    className="flex-1 py-3.5 rounded-xl bg-crimson text-white font-bold shadow-md shadow-crimson/20 disabled:opacity-60"
+                  >
+                    {isDeleteSemesterSubmitting ? 'Menghapus...' : 'Ya, Hapus'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {isSemesterSheetOpen && (
+        <>
+          <div
+            className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] transition-opacity duration-300 ${isSemesterSheetVisible && !isSemesterSheetClosing ? 'opacity-100' : 'opacity-0'}`}
+            onClick={handleCloseSemesterSheet}
+          />
+          <div className="fixed inset-0 z-[61] flex items-end justify-center pointer-events-none">
+            <div
+              className="w-full max-w-lg bg-white rounded-t-[28px] shadow-2xl flex flex-col overflow-hidden pointer-events-auto"
+              style={{
+                maxHeight: '80dvh',
+                transform: !isSemesterSheetVisible || isSemesterSheetClosing ? 'translateY(100%)' : `translateY(${semesterSheetDragY}px)`,
+                transition: !isSemesterSheetVisible || isSemesterSheetClosing || semesterSheetDragY === 0 ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
+              }}
+            >
+              <div
+                className="w-full flex items-center justify-center pt-4 pb-2 touch-none shrink-0"
+                onTouchStart={handleSemesterSheetTouchStart}
+                onTouchMove={handleSemesterSheetTouchMove}
+                onTouchEnd={handleSemesterSheetTouchEnd}
+              >
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+              </div>
+
+              <div className="px-5 pt-1 pb-3 flex items-center justify-between shrink-0">
+                <h2 className="text-[18px] font-extrabold text-[#1F2937]">Pilih Semester</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleCloseSemesterSheet();
+                    setTimeout(() => openMasterCreate('semester'), 350);
+                  }}
+                  className="text-[11px] font-extrabold text-crimson hover:text-[#7a1727] active:scale-95 transition-all uppercase tracking-wider flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" strokeWidth={2.5} />
+                  Buat
+                </button>
+              </div>
+
+              <div className="px-4 pb-8 overflow-y-auto flex-1">
+                {semesters.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-8">Belum ada semester.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {semesters.map(s => {
+                      const isSelected = s.id === selectedSemesterId;
+                      return (
+                        <div
+                          key={s.id}
+                          className={`flex items-center gap-3 p-4 rounded-2xl border transition-colors ${isSelected ? 'bg-crimson/5 border-crimson/20' : 'bg-slate-50 border-transparent'}`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedSemesterId(s.id);
+                              handleCloseSemesterSheet();
+                            }}
+                            className="flex-1 text-left flex items-center gap-3 min-w-0"
+                          >
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-crimson' : 'border-slate-300'}`}>
+                              {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-crimson" />}
+                            </div>
+                            <span className={`font-bold text-sm truncate ${isSelected ? 'text-crimson' : 'text-slate-800'}`}>
+                              {semesterLabel(s.tahun_ajaran, s.tipe_semester)}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleCloseSemesterSheet();
+                              setTimeout(() => handleDeleteSemesterOpen(s.id), 350);
+                            }}
+                            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 active:scale-95 transition-all"
+                            aria-label="Hapus semester"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       <MasterEntityModal
         open={masterModal.open}
         mode={masterModal.mode}
@@ -1530,57 +1833,5 @@ export default function ManajemenJadwalPage() {
         </div>
       </div>
     </AsdosPageShell>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-[13px] font-bold text-[#1F2937] mb-1.5 ml-1">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function FieldCRUD({
-  label,
-  onCreate,
-  onEdit,
-  canEdit,
-  children,
-}: {
-  label: string;
-  onCreate: () => void;
-  onEdit: () => void;
-  canEdit: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5 px-1">
-        <label className="text-[13px] font-bold text-[#1F2937]">{label}</label>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onCreate}
-            className="text-[11px] font-bold text-crimson hover:bg-rose-50 active:scale-95 transition-all flex items-center gap-1 px-2 py-1 rounded-md"
-          >
-            <Plus className="w-3 h-3" strokeWidth={2.5} />
-            Buat baru
-          </button>
-          <button
-            type="button"
-            onClick={onEdit}
-            disabled={!canEdit}
-            className="text-slate-400 hover:text-crimson hover:bg-rose-50 active:scale-95 p-1 rounded-md disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-all"
-            aria-label={`Edit ${label}`}
-            title={canEdit ? `Edit ${label} yang dipilih` : `Pilih ${label.toLowerCase()} dulu untuk edit`}
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-      {children}
-    </div>
   );
 }

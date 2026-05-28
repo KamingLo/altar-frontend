@@ -45,16 +45,16 @@ export function CustomSelect({
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const [isMobile] = useState(() => typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
   const triggerRef = useRef<HTMLDivElement>(null);
+
+  const closeDropdown = useCallback(() => {
+    setOpen(false);
+    setSearchQuery('');
+  }, []);
 
   const selected = options.find(o => o.value === value);
   const displayLabel = selected?.label ?? placeholder;
-
-  useEffect(() => {
-    if (!open) {
-      setSearchQuery('');
-    }
-  }, [open]);
 
   const filteredOptions = options.filter(opt =>
     opt.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -99,72 +99,89 @@ export function CustomSelect({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') closeDropdown();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open]);
+  }, [open, closeDropdown]);
 
   const handleSelect = (next: string) => {
     onChange(next);
-    setOpen(false);
+    closeDropdown();
   };
+
+  const optionList = (
+    <div className="overflow-y-auto overscroll-contain py-1.5">
+      {filteredOptions.length === 0 ? (
+        <p className="px-5 py-3 text-sm text-slate-500">Tidak ada opsi ditemukan</p>
+      ) : (
+        filteredOptions.map(opt => {
+          const active = opt.value === value;
+          return (
+            <div
+              key={opt.value}
+              className={`w-full flex items-center justify-between px-5 py-2 transition-colors ${
+                active ? 'bg-slate-50 text-crimson font-bold' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <button
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => handleSelect(opt.value)}
+                className="flex-1 text-left min-w-0 py-1"
+              >
+                <span className="block text-sm truncate">{opt.label}</span>
+                {opt.description && (
+                  <span className="block text-[11px] text-slate-400 font-medium mt-0.5 truncate">{opt.description}</span>
+                )}
+              </button>
+              {onDeleteOption && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeDropdown();
+                    onDeleteOption(opt.value);
+                  }}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-crimson hover:bg-rose-50 active:scale-95 transition-all ml-2 shrink-0"
+                  title={`Hapus ${opt.label}`}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
 
   const menu =
     open &&
     typeof document !== 'undefined' &&
     createPortal(
       <>
-        <div className="fixed inset-0 z-[9998]" aria-hidden onClick={() => setOpen(false)} />
+        <div className="fixed inset-0 z-[9998]" aria-hidden onClick={closeDropdown} />
         <div
           role="listbox"
           style={menuStyle}
-          className="z-[9999] bg-white border border-slate-100 rounded-2xl shadow-xl py-2 overflow-y-auto overscroll-contain flex flex-col"
+          className="z-[9999] bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden flex flex-col"
         >
-          <div className="flex-1 overflow-y-auto">
-            {filteredOptions.length === 0 ? (
-              <p className="px-5 py-3 text-sm text-slate-500">Tidak ada opsi ditemukan</p>
-            ) : (
-              filteredOptions.map(opt => {
-                const active = opt.value === value;
-                return (
-                  <div
-                    key={opt.value}
-                    className={`w-full flex items-center justify-between px-5 py-2 transition-colors ${
-                      active ? 'bg-slate-50 text-crimson font-bold' : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      onClick={() => handleSelect(opt.value)}
-                      className="flex-1 text-left min-w-0 py-1"
-                    >
-                      <span className="block text-sm truncate">{opt.label}</span>
-                      {opt.description && (
-                        <span className="block text-[11px] text-slate-400 font-medium mt-0.5 truncate">{opt.description}</span>
-                      )}
-                    </button>
-                    {onDeleteOption && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpen(false);
-                          onDeleteOption(opt.value);
-                        }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-crimson hover:bg-rose-50 active:scale-95 transition-all ml-2 shrink-0"
-                        title={`Hapus ${opt.label}`}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
+          {/* Mobile: search inside portal */}
+          {searchable && isMobile && (
+            <div className="px-3 pt-3 pb-1 shrink-0">
+              <input
+                type="text"
+                placeholder={searchPlaceholder}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                onClick={e => e.stopPropagation()}
+                className="w-full px-3 py-2 text-sm font-medium border border-slate-200 rounded-xl outline-none focus:border-crimson focus:ring-1 focus:ring-crimson/30 text-slate-800 placeholder-slate-400 bg-slate-50"
+              />
+            </div>
+          )}
+          {optionList}
         </div>
       </>,
       document.body,
@@ -174,7 +191,8 @@ export function CustomSelect({
 
   return (
     <div ref={triggerRef} className={`relative ${isIcon ? 'shrink-0' : ''} ${className}`}>
-      {!isIcon && open && searchable ? (
+      {/* Desktop searchable: replace trigger with input */}
+      {!isIcon && open && searchable && !isMobile ? (
         <div className="relative w-full">
           {icon && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-crimson shrink-0 z-10">{icon}</span>}
           <input
@@ -189,7 +207,7 @@ export function CustomSelect({
           />
           <ChevronDown
             className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 shrink-0 text-slate-400 rotate-180 cursor-pointer"
-            onClick={() => setOpen(false)}
+            onClick={closeDropdown}
           />
         </div>
       ) : (
@@ -229,4 +247,3 @@ export function CustomSelect({
     </div>
   );
 }
-

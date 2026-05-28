@@ -21,33 +21,25 @@ export default function LoginForm() {
     handleForgotPassword
   } = useAuthForm();
 
-  const [showErrorToast, setShowErrorToast] = React.useState(false);
+  const showErrorToast = !!errorMessage;
+  const showSuccessToast = !!successMessage;
   const [showPassword, setShowPassword] = React.useState(false);
-  const [showSuccessToast, setShowSuccessToast] = React.useState(false);
+  const [isExiting, setIsExiting] = React.useState(false);
+  const [isEntering, setIsEntering] = React.useState(true);
+
+  const handleBackToHome = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      router.push('/');
+    }, 500);
+  };
 
   useEffect(() => {
-    const t = setTimeout(() => setShowErrorToast(!!errorMessage), 0);
-    return () => clearTimeout(t);
-  }, [errorMessage]);
-
-  useEffect(() => {
-    if (showErrorToast) {
-      const timer = setTimeout(() => setShowErrorToast(false), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [showErrorToast]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setShowSuccessToast(!!successMessage), 0);
-    return () => clearTimeout(t);
-  }, [successMessage]);
-
-  useEffect(() => {
-    if (showSuccessToast) {
-      const timer = setTimeout(() => setShowSuccessToast(false), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [showSuccessToast]);
+    const timer = setTimeout(() => {
+      setIsEntering(false);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   const renderToasts = () => (
     <>
@@ -97,14 +89,14 @@ export default function LoginForm() {
           <div className="text-left">
             <h1 className="text-[38px] font-extrabold tracking-[-1px] leading-[1.1] mb-3">
               <span className="text-[#0D1B2A]">Altar</span>
-              <span className="text-crimson">.</span>
+              <span className="text-[#941C2F]">.</span>
             </h1>
             <p className="text-[14px] text-[#4B5563] leading-[1.6] font-medium max-w-[280px]">
               Masukkan email yang telah terdaftar.
             </p>
           </div>
           <button
-            onClick={() => router.push('/')}
+            onClick={handleBackToHome}
             className="hidden lg:flex shrink-0 w-9 h-9 items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-2xl active:scale-95 transition-all hover:bg-slate-50 shadow-sm"
           >
             <ArrowLeft size={18} />
@@ -119,7 +111,7 @@ export default function LoginForm() {
           <input
             type="email"
             placeholder="Alamat Email"
-            className="w-full px-5 py-4 bg-white border border-[#E2E8F0] rounded-2xl text-[#0F172A] text-[14px] font-semibold outline-none transition-all duration-200 placeholder:text-[#94A3B8] placeholder:font-medium focus:border-crimson focus:ring-4 focus:ring-crimson/10 disabled:opacity-60 disabled:bg-[#F8FAFC] disabled:cursor-not-allowed"
+            className="w-full px-5 py-4 bg-white border border-[#E2E8F0] rounded-2xl text-[#0F172A] text-[14px] font-semibold outline-none transition-all duration-200 placeholder:text-[#94A3B8] placeholder:font-medium focus:border-[#941C2F] focus:ring-4 focus:ring-[#941C2F]/10 disabled:opacity-60 disabled:bg-[#F8FAFC] disabled:cursor-not-allowed"
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             required
@@ -130,7 +122,7 @@ export default function LoginForm() {
             <input
               type={showPassword ? 'text' : 'password'}
               placeholder="Kata Sandi"
-              className="w-full px-5 py-4 pr-12 bg-white border border-[#E2E8F0] rounded-2xl text-[#0F172A] text-[14px] font-semibold outline-none transition-all duration-200 placeholder:text-[#94A3B8] placeholder:font-medium focus:border-crimson focus:ring-4 focus:ring-crimson/10 disabled:opacity-60 disabled:bg-[#F8FAFC] disabled:cursor-not-allowed"
+              className="w-full px-5 py-4 pr-12 bg-white border border-[#E2E8F0] rounded-2xl text-[#0F172A] text-[14px] font-semibold outline-none transition-all duration-200 placeholder:text-[#94A3B8] placeholder:font-medium focus:border-[#941C2F] focus:ring-4 focus:ring-[#941C2F]/10 disabled:opacity-60 disabled:bg-[#F8FAFC] disabled:cursor-not-allowed"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               required
@@ -139,7 +131,7 @@ export default function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-crimson transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#941C2F] transition-colors"
               tabIndex={-1}
             >
               {showPassword ? (
@@ -158,7 +150,7 @@ export default function LoginForm() {
             <button
               type="button"
               onClick={() => toggleView('forgot')}
-              className="bg-transparent border-none cursor-pointer text-[13px] font-bold text-crimson py-1 hover:opacity-80"
+              className="bg-transparent border-none cursor-pointer text-[13px] font-bold text-[#941C2F] py-1 hover:opacity-80"
             >
               Lupa password?
             </button>
@@ -167,7 +159,7 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="flex items-center justify-center w-full bg-crimson text-white py-4 rounded-2xl text-[15px] font-bold transition-all shadow-[0_8px_25px_-4px_rgba(148,28,47,0.4)] mt-2 active:scale-[0.98] disabled:opacity-70"
+            className="flex items-center justify-center w-full bg-[#941C2F] text-white py-4 rounded-2xl text-[15px] font-bold transition-all shadow-[0_8px_25px_-4px_rgba(148,28,47,0.4)] mt-2 active:scale-[0.98] disabled:opacity-70"
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
@@ -200,7 +192,7 @@ export default function LoginForm() {
           </button>
 
           <p className="text-center text-[12px] text-[#8A9BAD] font-medium mt-7">
-            Belum punya akses? <span className="text-crimson font-bold cursor-pointer hover:underline">Hubungi Admin</span>
+            Belum punya akses? <span className="text-[#941C2F] font-bold cursor-pointer hover:underline">Hubungi Admin</span>
           </p>
         </div>
       </div>
@@ -215,7 +207,7 @@ export default function LoginForm() {
         <div className="text-left mb-6">
           <h1 className="text-[38px] font-extrabold tracking-[-1px] leading-[1.1] mb-3">
             <span className="text-[#0D1B2A]">Reset</span><br />
-            <span className="text-crimson">Password.</span>
+            <span className="text-[#941C2F]">Password.</span>
           </h1>
           <p className="text-[14px] text-[#4B5563] leading-[1.6] font-medium max-w-[280px]">
             Masukkan email terdaftar untuk pemulihan akun.
@@ -229,7 +221,7 @@ export default function LoginForm() {
           <input
             type="email"
             placeholder="Alamat Email"
-            className="w-full px-5 py-4 bg-white border border-[#E2E8F0] rounded-2xl text-[#0F172A] text-[14px] font-semibold outline-none transition-all duration-200 placeholder:text-[#94A3B8] placeholder:font-medium focus:border-crimson focus:ring-4 focus:ring-crimson/10 disabled:opacity-60 disabled:bg-[#F8FAFC] disabled:cursor-not-allowed"
+            className="w-full px-5 py-4 bg-white border border-[#E2E8F0] rounded-2xl text-[#0F172A] text-[14px] font-semibold outline-none transition-all duration-200 placeholder:text-[#94A3B8] placeholder:font-medium focus:border-[#941C2F] focus:ring-4 focus:ring-[#941C2F]/10 disabled:opacity-60 disabled:bg-[#F8FAFC] disabled:cursor-not-allowed"
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             required
@@ -239,7 +231,7 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="flex items-center justify-center w-full bg-crimson text-white py-4 rounded-2xl text-[15px] font-bold transition-all shadow-[0_8px_25px_-4px_rgba(148,28,47,0.4)] mt-2 active:scale-[0.98] disabled:opacity-70"
+            className="flex items-center justify-center w-full bg-[#941C2F] text-white py-4 rounded-2xl text-[15px] font-bold transition-all shadow-[0_8px_25px_-4px_rgba(148,28,47,0.4)] mt-2 active:scale-[0.98] disabled:opacity-70"
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
@@ -261,13 +253,15 @@ export default function LoginForm() {
             onClick={() => toggleView('login')}
             className="w-full mt-6 p-[14px] text-[14px] font-bold text-[#64748B] flex items-center justify-end gap-[6px] hover:text-[#0F172A] transition-colors"
           >
-            â† Kembali
+            ← Kembali
           </button>
         </div>
       </div>
 
     </div>
   );
+
+  const currentBg = isEntering || isExiting ? 'bg-canvas' : 'bg-[#EDF2F4]';
 
   return (
     <>
@@ -277,52 +271,55 @@ export default function LoginForm() {
             from { opacity: 0; transform: translateY(22px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes bgEntry {
-            from { opacity: 1; }
-            to { opacity: 0.5; }
-        }
       `}</style>
 
       {renderToasts()}
 
-      <div className="hidden lg:flex min-h-screen w-full items-center bg-canvas font-['Plus_Jakarta_Sans',sans-serif]">
+      <div className={`hidden lg:flex min-h-screen w-full items-center font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${currentBg}`}>
         <div className="relative w-[55%] self-stretch shrink-0">
           <div
-            className="absolute inset-0 bg-[url('/gedung-untar-fl.webp')] bg-cover bg-center bg-no-repeat z-0"
-            style={{ animation: 'bgEntry 0.5s ease-out forwards' }}
+            className={`absolute inset-0 bg-[url('/gedung-untar-fl.webp')] bg-cover bg-center bg-no-repeat z-0 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-100' : 'opacity-50'}`}
           />
-          <div className="absolute inset-y-0 right-0 w-[60%] z-10 bg-gradient-to-r from-canvas/0 via-canvas/80 to-canvas" />
+          {/* Layer 1: White Gradient */}
+          <div className="absolute inset-y-0 right-0 w-[60%] z-10 bg-gradient-to-r from-[#f4f4f5]/0 via-[#f4f4f5]/80 to-[#f4f4f5]" />
+          {/* Layer 2: Telor Asin Gradient (Fades out when entering or exiting) */}
+          <div className={`absolute inset-y-0 right-0 w-[60%] z-10 bg-gradient-to-r from-[#EDF2F4]/0 via-[#EDF2F4]/80 to-[#EDF2F4] transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-0' : 'opacity-100'}`} />
         </div>
 
-        <div className="flex flex-col flex-1 justify-center items-start pl-20 pr-16 relative z-20">
+        <div className={`flex flex-col flex-1 justify-center items-start pl-20 pr-16 relative z-20 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExiting ? 'opacity-0 translate-y-[22px]' : 'opacity-100 translate-y-0'}`}>
           <div className="w-full max-w-[400px]">
             {renderFormArea()}
           </div>
         </div>
       </div>
 
-      <div className="flex lg:hidden min-h-[100svh] w-full justify-center bg-canvas font-['Plus_Jakarta_Sans',sans-serif]">
-        <div className="relative w-full max-w-[450px] md:max-w-[650px] min-h-[100svh] bg-canvas flex flex-col mx-auto shadow-[0_0_40px_rgba(0,0,0,0.05)]">
-          <div className="absolute inset-0 z-0 pointer-events-none">
-            <div
-              className="absolute top-0 left-0 right-0 h-[68svh] bg-gray-300 bg-[url('/gedung-untar.png')] bg-cover bg-[center_top]"
-              style={{ animation: 'bgEntry 0.5s ease-out forwards' }}
-            />
-            <div className="absolute inset-0 z-10" style={{
-              background: 'linear-gradient(to top, #f4f4f5 0%, #f4f4f5 40%, rgba(244, 244, 245, 0.9) 52%, rgba(244, 244, 245, 0.55) 63%, rgba(244, 244, 245, 0.15) 74%, transparent 85%)'
-            }} />
+      <div className={`flex lg:hidden min-h-[100svh] w-full justify-center font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${currentBg}`}>
+        <div className={`relative w-full max-w-[450px] md:max-w-[650px] min-h-[100svh] flex flex-col mx-auto shadow-[0_0_40px_rgba(0,0,0,0.05)] transition-colors duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${currentBg}`}>
+          <div className="absolute inset-0 z-0 pointer-events-none flex flex-col">
+            <div className="relative w-full h-[50svh] min-h-[300px] shrink-0">
+              <div
+                className={`absolute inset-0 bg-gray-300 bg-[url('/gedung-untar.png')] bg-cover bg-[center_top] z-0 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-100' : 'opacity-50'}`}
+              />
+              {/* Layer 1: White Gradient */}
+              <div className="absolute inset-0 z-10" style={{
+                background: 'linear-gradient(to top, #f4f4f5 0%, #f4f4f5 12%, rgba(244, 244, 245, 0.85) 22%, rgba(244, 244, 245, 0.55) 35%, rgba(244, 244, 245, 0.2) 50%, transparent 65%)'
+              }} />
+              {/* Layer 2: Telor Asin Gradient (Fades out when entering or exiting) */}
+              <div className={`absolute inset-0 z-10 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-0' : 'opacity-100'}`} style={{
+                background: 'linear-gradient(to top, #EDF2F4 0%, #EDF2F4 12%, rgba(237, 242, 244, 0.85) 22%, rgba(237, 242, 244, 0.55) 35%, rgba(237, 242, 244, 0.2) 50%, transparent 65%)'
+              }} />
+            </div>
           </div>
 
-          <div className="relative z-10 flex min-h-[100svh] flex-col px-8 py-[max(1.5rem,4svh)]">
+          <div className={`relative z-10 flex flex-col flex-1 px-8 py-[5svh] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExiting ? 'opacity-0 translate-y-[22px]' : 'opacity-100 translate-y-0'}`}>
             <button
-              onClick={() => router.push('/')}
+              onClick={handleBackToHome}
               className="self-end shrink-0 w-9 h-9 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-2xl active:scale-95 transition-all hover:bg-slate-50 shadow-sm"
             >
               <ArrowLeft size={18} />
             </button>
-            <div className="flex flex-1 items-center pb-[6svh] pt-[4svh]">
-              {renderFormArea()}
-            </div>
+            <div className="grow" />
+            {renderFormArea()}
           </div>
         </div>
       </div>

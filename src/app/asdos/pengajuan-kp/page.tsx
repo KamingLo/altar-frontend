@@ -1,10 +1,10 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarPlus, Info, Check, Trash2, XCircle, ArrowLeft, Calendar } from 'lucide-react';
-import { getSubstitutionDetail, createSubstitution, deleteSubstitution, getMySubstitutions } from '@/lib/actions/pergantian-kelas';
+import { createSubstitution, deleteSubstitution, getMySubstitutions } from '@/lib/actions/pergantian-kelas';
 import { getRuanganList } from '@/lib/actions/data-master';
 import { getSessionsByDate } from '@/lib/actions/jadwal';
-import type { RuanganItem, SubstituteSessionDetail } from '@/types/api';
+import type { RuanganItem } from '@/types/api';
 import type { SessionFromAPI } from '@/lib/actions/jadwal';
 import { AsdosPageHeader, AsdosPageShell, AsdosPrimaryButton, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { usePengajuanKpStore } from '@/store/usePengajuanKpStore';
@@ -13,26 +13,6 @@ import { CustomSelect } from '@/components/ui/CustomSelect';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 
 const DROPDOWN_LIMIT = 500;
-
-const storageKey = (userId?: string | null) => userId ? `pengajuan-kp-ids:${userId}` : null;
-
-const loadStoredIds = (userId?: string | null): string[] => {
-  const key = storageKey(userId);
-  if (!key || typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(key);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveStoredIds = (userId: string | null | undefined, ids: string[]) => {
-  const key = storageKey(userId);
-  if (!key || typeof window === 'undefined') return;
-  window.localStorage.setItem(key, JSON.stringify(ids));
-};
 
 const SLOT_OPTIONS = [
   { value: 1, label: '07:30 — 09:10' },
@@ -66,7 +46,6 @@ function todayIso() {
 export default function PengajuanKpPage() {
   const { items: history, setPage, removeItem, reset } = usePengajuanKpStore();
   const { user } = useUserStore();
-  const userId = user?.id_asisten ?? user?.id ?? null;
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);

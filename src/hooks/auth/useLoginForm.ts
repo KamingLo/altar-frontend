@@ -1,11 +1,11 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginUser } from '@/lib/actions/auth/login';
 import { initiateGoogleAuth } from '@/lib/actions/auth/oauth';
 import { forgotPassword } from '@/lib/actions/auth/forgot-password';
-import { getSession } from '@/lib/actions/auth/session'; 
+import { getSession } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
 
 export const useAuthForm = () => {
@@ -14,7 +14,7 @@ export const useAuthForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  
+
   const router = useRouter();
   const setUser = useUserStore((state) => state.setUser);
   const setLoadingStore = useUserStore((state) => state.setLoading);
@@ -28,14 +28,15 @@ export const useAuthForm = () => {
   const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
-    
+
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
       const result = await loginUser(formData);
-      
+
       if (result.success) {
+        // Gunakan data user yang dikembalikan langsung dari action login
         if (result.data?.user) {
           setUser(result.data.user);
           setLoadingStore(false);
@@ -43,8 +44,9 @@ export const useAuthForm = () => {
           return;
         }
 
+        // Fallback jika data user tidak disertakan (jarang terjadi dengan logic baru)
         const session = await getSession();
-        
+
         if (session.success && session.data) {
           setUser(session.data);
           setLoadingStore(false);
@@ -56,6 +58,7 @@ export const useAuthForm = () => {
         setErrorMessage(result.message);
       }
     } catch {
+      // Catch tanpa variabel karena kita hanya butuh trigger notifikasi statis
       setErrorMessage('Terjadi kesalahan sistem. Silakan coba lagi.');
     } finally {
       setIsLoading(false);
@@ -84,7 +87,7 @@ export const useAuthForm = () => {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
-    
+
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);

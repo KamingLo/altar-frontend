@@ -27,6 +27,6 @@ export const useRoleGuard = (expectedRole: UserRole) => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [expectedRole, router]);
 };
 

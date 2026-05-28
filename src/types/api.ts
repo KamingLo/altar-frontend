@@ -1,4 +1,4 @@
-﻿export interface APIResponse<T = unknown> {
+export interface APIResponse<T = unknown> {
   success: boolean;
   message: string;
   data?: T;
@@ -58,6 +58,7 @@ export interface KelasItem {
 export interface MataKuliahItem {
   id: string;
   nama_mk: string;
+  kode_mk: string;
   sks: number;
   created_at: string;
   updated_at: string;

@@ -47,7 +47,6 @@ export default function PresensiKelasOnlinePage() {
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   const onlineSessions = useMemo(() => sessions.filter(s => !isSessionPast(s)), [sessions]);
   const selectedSession = onlineSessions.find(s => s.id_sesi === selectedSessionId);
-  const selectedTime = getSessionTime(selectedSession);
 
   useEffect(() => {
     async function fetchSessions() {

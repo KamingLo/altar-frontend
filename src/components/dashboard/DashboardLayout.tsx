@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown, GraduationCap, LayoutDashboard, ArrowLeftRight, Bell, Sun, Moon } from 'lucide-react';
+import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown, GraduationCap, LayoutDashboard, ArrowLeftRight, Bell } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { logoutUser } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
@@ -377,7 +377,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
 
         <aside
           id="dashboard-sidebar-desktop"
-          className={`relative z-20 hidden lg:flex flex-col h-[calc(100vh-2rem)] my-4 ml-4 rounded-[1.5rem] overflow-hidden shrink-0 backdrop-blur-2xl border bg-crimson/80 border-white/20 shadow-[0_8px_32px_rgba(148,28,47,0.25)] ${sidebarReady ? 'transition-[width,background-color] duration-300 ease-in-out' : ''} ${isSidebarCollapsed ? 'w-[84px]' : 'w-[280px]'}`}
+          className={`relative z-20 hidden lg:flex flex-col h-[calc(100vh-2rem)] my-4 ml-4 rounded-[1.5rem] overflow-hidden shrink-0 border bg-crimson border-[#7a1727] shadow-[0_8px_32px_rgba(148,28,47,0.25)] ${sidebarReady ? 'transition-[width,background-color] duration-300 ease-in-out' : ''} ${isSidebarCollapsed ? 'w-[84px]' : 'w-[280px]'}`}
         >
           <div className={`pt-8 pb-6 border-b border-white/10 flex items-center transition-all duration-300 shrink-0 ${isSidebarCollapsed ? 'justify-center px-2' : 'justify-between px-7'}`}>
             <div className={`overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'}`}>

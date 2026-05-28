@@ -51,7 +51,7 @@ const inputClass =
 
 const getItemDisplayName = (res: MasterResource, item: MasterItem | null | undefined): string => {
   if (!item) return '';
-  const i = item as any;
+  const i = item as Record<string, string | undefined>;
   switch (res) {
     case 'kelas': return i.nama_kelas || '';
     case 'mk': return i.nama_mk || '';
@@ -143,7 +143,8 @@ export function MasterEntityModal({ open, mode, resource, initialData, onClose, 
     if (!initialData) return;
     setError('');
     setIsSubmitting(true);
-    const id = (initialData as any).id || (initialData as any).id_asdos;
+    const data = initialData as Record<string, string | undefined>;
+    const id = data.id || data.id_asdos;
     const res = await deleteResource(resource, id);
     setIsSubmitting(false);
 
@@ -318,7 +319,7 @@ function initialFormFor(resource: MasterResource, item: MasterItem | null): Reco
   if (!item) {
     switch (resource) {
       case 'kelas': return { nama_kelas: '', jurusan: '', jumlah_siswa: '' };
-      case 'mk': return { nama_mk: '', sks: '' };
+      case 'mk': return { nama_mk: '', kode_mk: '', sks: '' };
       case 'ruangan': return { nama_ruangan: '', lantai: '', kapasitas: '' };
       case 'lecturer': return { nama: '', nip: '' };
       case 'asdos': return { username: '', nim: '' };
@@ -333,7 +334,7 @@ function initialFormFor(resource: MasterResource, item: MasterItem | null): Reco
     case 'kelas':
       return { nama_kelas: String(i.nama_kelas ?? ''), jurusan: String(i.jurusan ?? ''), jumlah_siswa: String(i.jumlah_siswa ?? '') };
     case 'mk':
-      return { nama_mk: String(i.nama_mk ?? ''), sks: String(i.sks ?? '') };
+      return { nama_mk: String(i.nama_mk ?? ''), kode_mk: String(i.kode_mk ?? ''), sks: String(i.sks ?? '') };
     case 'ruangan':
       return { nama_ruangan: String(i.nama_ruangan ?? ''), lantai: String(i.lantai ?? ''), kapasitas: String(i.kapasitas ?? '') };
     case 'lecturer':
@@ -374,6 +375,9 @@ function renderFields(
         <>
           <Field label="Nama Mata Kuliah">
             <input className={inputClass} placeholder="cth: Basis Data" value={form.nama_mk ?? ''} onChange={set('nama_mk')} disabled={disabled} />
+          </Field>
+          <Field label="Kode Mata Kuliah">
+            <input className={inputClass} placeholder="cth: IF120" value={form.kode_mk ?? ''} onChange={set('kode_mk')} disabled={disabled} />
           </Field>
           <Field label="SKS">
             <input className={inputClass} type="number" min={1} max={10} placeholder="cth: 3" value={form.sks ?? ''} onChange={set('sks')} disabled={disabled} />
@@ -483,10 +487,12 @@ function validateForm(resource: MasterResource, form: Record<string, string>): V
     }
     case 'mk': {
       const nama_mk = trim(form.nama_mk);
+      const kode_mk = trim(form.kode_mk);
       const sks = num(form.sks);
       if (!nama_mk) return { ok: false, message: 'Nama mata kuliah wajib diisi.' };
+      if (!kode_mk) return { ok: false, message: 'Kode mata kuliah wajib diisi.' };
       if (!isPositiveInt(sks)) return { ok: false, message: 'SKS harus bilangan positif.' };
-      return { ok: true, payload: { nama_mk, sks } };
+      return { ok: true, payload: { nama_mk, kode_mk, sks } };
     }
     case 'ruangan': {
       const nama_ruangan = trim(form.nama_ruangan);

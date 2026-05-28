@@ -1,5 +1,6 @@
 "use client";
 import React from 'react';
+import Link from 'next/link';
 
 const HeroDesktop = () => {
   return (
@@ -14,10 +15,7 @@ const HeroDesktop = () => {
         }
       `}</style>
 
-      <div
-        className="relative w-[55%] self-stretch shrink-0"
-        style={{ animation: 'fadeUp 0.8s cubic-bezier(0.16,1,0.3,1) 0.05s both' }}
-      >
+      <div className="relative w-[55%] self-stretch shrink-0">
         <div className="absolute inset-0 bg-[url('/gedung-untar-fl.webp')] bg-cover bg-center bg-no-repeat z-0" />
         <div
           className="absolute inset-y-0 right-0 w-[60%] z-10 bg-gradient-to-r from-canvas/0 via-canvas/80 to-canvas"
@@ -43,12 +41,13 @@ const HeroDesktop = () => {
           className="flex flex-col items-start gap-4"
           style={{ animation: 'fadeUp 0.8s cubic-bezier(0.16,1,0.3,1) 0.35s both' }}
         >
-          <a
+          <Link
             href="/auth/login"
+            prefetch={true}
             className="inline-flex items-center justify-center px-16 bg-crimson text-white py-[18px] rounded-full text-[16px] font-bold no-underline cursor-pointer transition-all duration-200 ease-out shadow-[0_8px_24px_rgba(148,28,47,0.3)] hover:shadow-[0_12px_32px_rgba(148,28,47,0.4)] hover:-translate-y-1 active:scale-[0.97] active:translate-y-0"
           >
             Masuk
-          </a>
+          </Link>
           <p className="text-left text-[13px] text-[#8A9BAD] font-medium mt-2">
             © Altar - Universitas Tarumanagara
           </p>
@@ -75,10 +74,7 @@ const HeroMobile = () => {
 
       <div className="relative w-full min-h-[100svh] bg-canvas flex flex-col">
 
-        <div
-          className="relative w-full h-[42svh] min-h-[300px] shrink-0"
-          style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.05s both' }}
-        >
+        <div className="relative w-full h-[50svh] min-h-[300px] shrink-0">
           <div className="absolute inset-0 bg-gray-300 bg-[url('/gedung-untar.png')] bg-cover bg-[center_top] z-0" />
           <div
             className="absolute inset-0 z-10"
@@ -107,12 +103,13 @@ const HeroMobile = () => {
             className="w-full flex flex-col items-center"
             style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.35s both' }}
           >
-            <a
+            <Link
               href="/auth/login"
+              prefetch={true}
               className="flex items-center justify-center w-full max-w-[400px] bg-crimson text-white py-[clamp(18px,4vw,22px)] rounded-full text-[clamp(16px,4vw,18px)] font-bold no-underline cursor-pointer mb-4 transition-all duration-150 ease-out shadow-[0_8px_24px_rgba(148,28,47,0.3)] tracking-[0.2px] active:scale-[0.97] active:shadow-[0_4px_12px_rgba(148,28,47,0.2)]"
             >
               Masuk
-            </a>
+            </Link>
             <p className="text-center w-full text-[clamp(12px,3vw,14px)] text-[#8A9BAD] font-medium">
               © Altar - Universitas Tarumanagara
             </p>

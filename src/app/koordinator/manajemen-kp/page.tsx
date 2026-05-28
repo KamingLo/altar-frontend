@@ -2,21 +2,14 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  CalendarDays,
-  Clock,
-  MapPin,
   User,
   CheckCircle2,
   X,
-  BookOpen,
-  MessageSquare,
-  ShieldAlert,
   Check,
   XCircle,
   Search,
   Inbox,
   Loader2,
-  FileText,
   Filter
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,6 +20,7 @@ import {
 import type { SubstituteSessionDetail } from '@/types/api';
 import { usePergantianKelasStore } from '@/store/usePergantianKelasStore';
 import { AsdosPageShell, AsdosPageHeader, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 type TabId = 'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED';
 
@@ -36,7 +30,6 @@ export default function ManajemenKpPage() {
 
   const [activeTab, setActiveTab] = useState<TabId>('PENDING');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<SubstituteSessionDetail | null>(null);
   const [modalType, setModalType] = useState<'APPROVE' | 'REJECT' | 'NONE'>('NONE');
   const [rejectionReason, setRejectionReason] = useState('');
@@ -81,7 +74,8 @@ export default function ManajemenKpPage() {
     setModalType(type);
     setRejectionReason('');
     setIsClosing(false);
-    setIsModalVisible(true);
+    setIsModalVisible(false);
+    setTimeout(() => setIsModalVisible(true), 10);
   };
 
   const closeModal = () => {
@@ -234,64 +228,22 @@ export default function ManajemenKpPage() {
               )}
             </div>
 
-            <div className="relative md:hidden shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
-                className={`
-                  p-3.5 rounded-2xl border border-slate-200/80 bg-white/95 text-slate-600 hover:text-slate-800 active:scale-95 transition-all flex items-center justify-center relative
-                  ${activeTab !== 'PENDING' ? 'border-crimson/30 bg-crimson/5 text-crimson' : ''}
-                `}
-              >
-                <Filter className="w-5 h-5" />
-
-                {activeTab !== 'PENDING' && (
-                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-crimson" />
-                )}
-              </button>
-
-              {isMobileFilterOpen && (
-                <>
-
-                  <div
-                    className="fixed inset-0 z-30"
-                    onClick={() => setIsMobileFilterOpen(false)}
-                  />
-
-                  <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200/85 rounded-2xl p-1.5 shadow-xl backdrop-blur-md z-40 animate-in fade-in slide-in-from-top-2 duration-200">
-                    {(
-                      [
-                        { id: 'PENDING', label: 'Pending' },
-                        { id: 'VERIFIED', label: 'Disetujui' },
-                        { id: 'REJECTED', label: 'Ditolak' },
-                        { id: 'ALL', label: 'Semua' }
-                      ] as const
-                    ).map(tab => {
-                      const isActive = activeTab === tab.id;
-                      return (
-                        <button
-                          key={tab.id}
-                          type="button"
-                          onClick={() => {
-                            setActiveTab(tab.id);
-                            setIsMobileFilterOpen(false);
-                          }}
-                          className={`
-                            w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold rounded-xl transition-all active:scale-[0.98] select-none
-                            ${isActive
-                              ? 'bg-crimson/10 text-crimson'
-                              : 'bg-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-800'
-                            }
-                          `}
-                        >
-                          <span>{tab.label}</span>
-                          {isActive && <Check className="w-4 h-4 text-crimson" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
+            <div className="md:hidden shrink-0">
+              <CustomSelect
+                variant="icon"
+                align="right"
+                value={activeTab}
+                onChange={v => setActiveTab(v as TabId)}
+                options={[
+                  { value: 'PENDING', label: 'Pending' },
+                  { value: 'VERIFIED', label: 'Disetujui' },
+                  { value: 'REJECTED', label: 'Ditolak' },
+                  { value: 'ALL', label: 'Semua' },
+                ]}
+                placeholder="Filter status"
+                icon={<Filter className="w-[18px] h-[18px]" />}
+                triggerClassName={activeTab !== 'PENDING' ? 'bg-red-50 border-crimson text-crimson' : ''}
+              />
             </div>
 
           </div>
@@ -346,134 +298,112 @@ export default function ManajemenKpPage() {
                   ? { bg: 'bg-fog', text: 'text-ink', label: 'MENUNGGU' }
                   : req.status === 'VERIFIED'
                     ? { bg: 'bg-obsidian', text: 'text-white', label: 'DISETUJUI' }
-                    : { bg: 'bg-obsidian', text: 'text-white', label: 'DITOLAK' };
+                    : { bg: 'bg-crimson', text: 'text-white', label: 'DITOLAK' };
 
               const penggantiName = (req.substitute_teacher || '').replace(/\s*\(pengganti\)\s*/gi, '').trim() || req.substitute_teacher || '—';
 
               return (
                 <section
                   key={req.id}
-                  className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 flex flex-col gap-5 w-full shadow-sm hover:shadow-md transition-all"
+                  className="bg-white rounded-[12px] p-5 border border-slate-100 flex flex-col w-full shadow-sm hover:shadow-md transition-all"
                 >
-                  <article className="flex flex-col gap-4">
-                    <div className="flex items-start justify-between gap-4">
+                  <article className="flex flex-col flex-1 gap-3">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h2 className="font-bold text-slate-900 leading-snug line-clamp-2 text-base md:text-lg">
+                        <h2 className="font-bold text-slate-900 leading-snug line-clamp-2 text-sm md:text-sm">
                           {req.session?.mata_kuliah ?? 'Kuliah Pengganti'}
                         </h2>
-                        <p className="text-slate-500 font-medium text-xs md:text-sm mt-1 truncate">
+                        <p className="text-slate-500 font-medium text-[11px] mt-0.5 truncate">
                           {req.session?.nama_kelas ?? 'Kelas tidak tersedia'}
                         </p>
                       </div>
-                      <span className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${statusCfg.bg} ${statusCfg.text}`}>
+                      <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap shrink-0 ${statusCfg.bg} ${statusCfg.text}`}>
                         {statusCfg.label}
                       </span>
                     </div>
 
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tgl Asli</span>
-                          <span className="text-sm font-bold text-slate-800">{formatDate(req.original_date)}</span>
+                    <div className="border-t border-slate-100 pt-3">
+                      <div className="grid grid-cols-2 gap-x-0 gap-y-2.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tgl Asli</span>
+                          <span className="text-[11px] font-bold text-slate-800">{formatDate(req.original_date)}</span>
                         </div>
-                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
-                          <span className="text-sm font-bold text-slate-800">{req.session?.waktu || '—'}</span>
+                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-1.5">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tgl Pengganti</span>
+                          <span className="text-[11px] font-bold text-slate-800">{formatDate(req.substitute_date)}</span>
                         </div>
-                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
-                          <span className="text-sm font-bold text-slate-800 truncate" title={req.session?.ruangan || ''}>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+                          <span className="text-[11px] font-bold text-slate-800">{req.session?.waktu || '—'}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-1.5">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Waktu Baru</span>
+                          <span className="text-[11px] font-bold text-slate-800">{req.time_slot}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+                          <span className="text-[11px] font-bold text-slate-800 truncate" title={req.session?.ruangan || ''}>
                             {req.session?.ruangan || '—'}
                           </span>
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tgl Pengganti</span>
-                          <span className="text-sm font-bold text-slate-800">{formatDate(req.substitute_date)}</span>
-                        </div>
-                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
-                          <span className="text-sm font-bold text-slate-800">{req.time_slot}</span>
-                        </div>
-                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-4">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
-                          <span className="text-sm font-bold text-slate-800 truncate" title={req.room}>
+                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-1.5">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ruangan Baru</span>
+                          <span className="text-[11px] font-bold text-slate-800 truncate" title={req.room}>
                             {req.room}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="pt-2">
-                      <div className="text-[11px] font-extrabold tracking-widest uppercase text-slate-400 mb-2">
+                    <div className="border-t border-slate-100 pt-3">
+                      <div className="text-[10px] font-extrabold tracking-widest uppercase text-slate-400 mb-1.5">
                         Mengajar
                       </div>
-                      <div className="space-y-1.5">
-                        <div className="flex items-start gap-2 text-sm font-semibold text-slate-700">
-                          <User className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                          <div className="min-w-0">
-                            <p className="truncate" title={req.substitute_teacher}>
-                              {penggantiName} <span className="text-slate-400 font-bold">(Pengganti)</span>
-                            </p>
-                            <p className="truncate text-slate-500 font-semibold" title={req.session?.pengajar || ''}>
-                              {req.session?.pengajar || '—'}
-                            </p>
-                          </div>
-                        </div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="text-xs font-semibold text-slate-700 truncate" title={req.substitute_teacher}>{penggantiName}</span>
                       </div>
                     </div>
 
-                    <div className="bg-fog rounded-[20px] p-4 md:p-5 border border-slate-200/40">
-                      <div className="flex items-start gap-2.5">
-                        <MessageSquare className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                        <div className="min-w-0 w-full">
-                          <span className="text-[10px] font-extrabold tracking-wider uppercase text-slate-400 block mb-1">
-                            Kotak Alasan Pengajuan
-                          </span>
-                          <p className="text-sm text-slate-600 font-medium leading-relaxed">
-                            &quot;{req.reason}&quot;
-                          </p>
+                    <div className={`bg-fog rounded-[16px] p-3${!isPendingStatus ? ' flex-1' : ''}`}>
+                      <span className="text-[9px] font-extrabold tracking-wider uppercase text-slate-400 block mb-1">
+                        Alasan Pengajuan
+                      </span>
+                      <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                        &quot;{req.reason}&quot;
+                      </p>
 
-                          {isRejectedStatus && req.coordinator_reason && (
-                            <div className="mt-4 pt-4 border-t border-slate-200/70">
-                              <div className="flex items-start gap-2.5">
-                                <ShieldAlert className="w-4 h-4 text-crimson shrink-0 mt-0.5" />
-                                <div className="min-w-0">
-                                  <span className="text-[10px] font-extrabold tracking-wider uppercase text-crimson/80 block mb-1">
-                                    Ditolak
-                                  </span>
-                                  <p className="text-sm text-slate-600 font-medium leading-relaxed">
-                                    {req.coordinator_reason}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                      {isRejectedStatus && req.coordinator_reason && (
+                        <div className="mt-3 pt-3 border-t border-slate-200/70">
+                          <span className="text-[9px] font-extrabold tracking-wider uppercase text-crimson/80 block mb-1">
+                            Alasan Ditolak
+                          </span>
+                          <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                            {req.coordinator_reason}
+                          </p>
                         </div>
-                      </div>
+                      )}
                     </div>
 
                     {isPendingStatus && (
-                      <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 mt-auto">
                         <button
                           type="button"
                           onClick={() => openModal(req, 'REJECT')}
-                          className="w-11 h-11 rounded-full border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95 transition-all flex items-center justify-center"
+                          className="w-10 h-10 rounded-full border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95 transition-all flex items-center justify-center"
                           aria-label="Tolak"
                           title="Tolak"
                         >
-                          <X className="w-5 h-5" />
+                          <X className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
                           onClick={() => openModal(req, 'APPROVE')}
-                          className="w-11 h-11 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-sm flex items-center justify-center"
+                          className="w-10 h-10 rounded-full border border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 transition-all flex items-center justify-center"
                           aria-label="Setujui"
                           title="Setujui"
                         >
-                          <Check className="w-5 h-5" />
+                          <Check className="w-4 h-4" />
                         </button>
                       </div>
                     )}
@@ -500,84 +430,64 @@ export default function ManajemenKpPage() {
             <div
               className={`
                 w-full max-w-md bg-white rounded-[2.2rem] shadow-2xl p-7 pointer-events-auto border border-slate-100 flex flex-col relative overflow-hidden transition-all duration-300
-                ${isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
+                ${isModalVisible && !isClosing ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
               `}
             >
 
-              <div className="flex items-center gap-4 mb-5">
-                <div
-                  className={`
-                    w-12 h-12 rounded-2xl flex items-center justify-center shrink-0
-                    ${modalType === 'APPROVE'
-                      ? 'bg-emerald-50 text-emerald-600'
-                      : 'bg-rose-50 text-crimson'
-                    }
-                  `}
-                >
-                  {modalType === 'APPROVE' ? (
-                    <CheckCircle2 className="w-6 h-6 animate-pulse" />
-                  ) : (
-                    <ShieldAlert className="w-6 h-6 animate-pulse" />
-                  )}
-                </div>
-                <div>
-                  <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase block">
-                    {modalType === 'APPROVE' ? 'Konfirmasi Verifikasi' : 'Penolakan Kelas'}
-                  </span>
-                  <h3 className="text-xl font-black text-slate-800 leading-tight">
-                    {modalType === 'APPROVE' ? 'Setujui Kuliah Pengganti?' : 'Tolak Kuliah Pengganti'}
-                  </h3>
-                </div>
-              </div>
+              {modalType === 'APPROVE' ? (
+                <>
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase block">Konfirmasi Verifikasi</span>
+                      <h3 className="text-xl font-black text-slate-800 leading-tight">Setujui Kuliah Pengganti?</h3>
+                    </div>
+                  </div>
 
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-2 mb-5">
-                <div className="flex justify-between items-center text-xs text-slate-400 font-bold border-b border-slate-200/50 pb-2">
-                  <span>Mata Kuliah:</span>
-                  <span className="text-slate-800 font-extrabold max-w-[200px] truncate">
-                    {selectedRequest.session?.mata_kuliah}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-xs text-slate-400 font-bold border-b border-slate-200/50 pb-2">
-                  <span>Kelas:</span>
-                  <span className="text-slate-800 font-extrabold">{selectedRequest.session?.nama_kelas}</span>
-                </div>
-                <div className="flex justify-between items-center text-xs text-crimson font-black border-b border-slate-200/50 pb-2">
-                  <span>Tanggal Baru:</span>
-                  <span>{formatDate(selectedRequest.substitute_date)}</span>
-                </div>
-                <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
-                  <span>Ruang & Jam:</span>
-                  <span className="text-slate-800 font-bold">
-                    R.{selectedRequest.room} ({selectedRequest.time_slot})
-                  </span>
-                </div>
-              </div>
+                  <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-2 mb-5">
+                    <div className="flex justify-between items-center text-xs text-slate-400 font-bold border-b border-slate-200/50 pb-2">
+                      <span>Mata Kuliah:</span>
+                      <span className="text-slate-800 font-extrabold max-w-[200px] truncate">{selectedRequest.session?.mata_kuliah}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-slate-400 font-bold border-b border-slate-200/50 pb-2">
+                      <span>Kelas:</span>
+                      <span className="text-slate-800 font-extrabold">{selectedRequest.session?.nama_kelas}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-crimson font-black border-b border-slate-200/50 pb-2">
+                      <span>Tanggal Baru:</span>
+                      <span>{formatDate(selectedRequest.substitute_date)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
+                      <span>Ruang & Jam:</span>
+                      <span className="text-slate-800 font-bold">R.{selectedRequest.room} ({selectedRequest.time_slot})</span>
+                    </div>
+                  </div>
 
-              {modalType === 'REJECT' ? (
-                <div className="space-y-2 mb-6">
-                  <label htmlFor="coordinator_reason" className="text-xs font-extrabold text-slate-500 tracking-wider uppercase flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5 text-slate-400" />
-                    Alasan Penolakan <span className="text-red-500">*</span>
+                  <p className="text-xs text-slate-500 font-bold leading-relaxed mb-6">
+                    Dengan menyetujui pengajuan ini, jadwal kuliah pengganti asisten dosen akan otomatis diaktifkan di dalam sistem dan mahasiswa dapat melakukan check-in pada tanggal tersebut.
+                  </p>
+                </>
+              ) : (
+                <div className="mb-5">
+                  <label htmlFor="coordinator_reason" className="block text-xs font-extrabold text-slate-500 tracking-wider uppercase mb-2">
+                    Alasan Penolakan
                   </label>
                   <textarea
                     id="coordinator_reason"
-                    rows={3}
-                    maxLength={150}
-                    placeholder="Masukkan alasan penolakan agar asisten dosen mengetahui perbaikan yang diperlukan..."
+                    rows={4}
+                    maxLength={100}
+                    placeholder="Masukkan alasan penolakan..."
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
                     disabled={isSubmitting}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-crimson/50 focus:border-crimson/50 transition-all resize-none leading-relaxed"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-crimson/50 focus:border-crimson/50 transition-all resize-none leading-relaxed"
                   />
-                  <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 px-1">
-                    <span>Minimal 5 karakter</span>
-                    <span>{rejectionReason.trim().length} / 150</span>
+                  <div className="text-right text-[10px] font-bold text-slate-400 mt-1 pr-1">
+                    {rejectionReason.length} / 100
                   </div>
                 </div>
-              ) : (
-                <p className="text-xs text-slate-500 font-bold leading-relaxed mb-6">
-                  Dengan menyetujui pengajuan ini, jadwal kuliah pengganti asisten dosen akan otomatis diaktifkan di dalam sistem dan mahasiswa dapat melakukan check-in pada tanggal tersebut.
-                </p>
               )}
 
               <div className="flex gap-3 mt-auto pt-2">
@@ -595,7 +505,7 @@ export default function ManajemenKpPage() {
                   onClick={handleVerifyStatus}
                   disabled={
                     isSubmitting ||
-                    (modalType === 'REJECT' && rejectionReason.trim().length < 5)
+                    (modalType === 'REJECT' && rejectionReason.trim().length < 1)
                   }
                   className={`
                     flex-1 py-3.5 rounded-2xl text-white font-extrabold text-xs transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer

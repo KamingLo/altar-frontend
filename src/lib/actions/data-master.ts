@@ -1,4 +1,4 @@
-﻿'use server';
+'use server';
 
 import { apiClient } from '@/lib/api/client';
 import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem } from '@/types/api';
@@ -34,12 +34,12 @@ export async function getMKList(page = 1, search = '', limit = 10) {
   );
 }
 
-export async function createMK(data: { nama_mk: string; sks: number }) {
+export async function createMK(data: { nama_mk: string; kode_mk: string; sks: number }) {
   const res = await apiClient.post<MataKuliahItem>('/courses', data, { auth: true });
   return { success: res.success, message: res.message, data: res.data };
 }
 
-export async function updateMK(id: string, data: { nama_mk: string; sks: number }) {
+export async function updateMK(id: string, data: { nama_mk: string; kode_mk: string; sks: number }) {
   const res = await apiClient.patch(`/courses/${id}`, data, { auth: true });
   return { success: res.success, message: res.message };
 }

@@ -4,16 +4,12 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, startTransiti
 import Image from 'next/image';
 import {
   CalendarDays,
-  Clock,
   Lock,
   Unlock,
   KeyRound,
   MonitorDot,
   RefreshCw,
   X,
-  BookOpen,
-  MapPin,
-  User,
   CheckCircle2,
   AlertCircle,
   ChevronRight,
@@ -28,10 +24,9 @@ import {
   deactivateKiosk,
   generateQRToken
 } from '@/lib/actions/koordinator';
-import { getScheduleTimeline } from '@/lib/actions/jadwal';
-import { fetchSemesters } from '@/lib/actions/manajemen-jadwal';
-import { semesterLabel, pengajarDisplayName } from '@/lib/jadwal-utils';
-import type { SemesterItem, UnifiedJadwalResponse } from '@/types/api';
+import { fetchSemesters, fetchSessions } from '@/lib/actions/manajemen-jadwal';
+import { semesterLabel, pengajarDisplayName, todayIso } from '@/lib/jadwal-utils';
+import type { SemesterItem, SessionTimeline } from '@/types/api';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { AsdosPageShell, AsdosPageHeader } from '@/components/dashboard/asdos/AsdosUI';
 
@@ -40,7 +35,7 @@ const REFRESH_INTERVAL_SEC = 240;
 export default function GenerateQrPage() {
   const [semesters, setSemesters] = useState<SemesterItem[]>([]);
   const [selectedSemesterId, setSelectedSemesterId] = useState<string>('');
-  const [todaySessions, setTodaySessions] = useState<UnifiedJadwalResponse[]>([]);
+  const [todaySessions, setTodaySessions] = useState<SessionTimeline[]>([]);
   const [isSessionsLoading, setIsSessionsLoading] = useState(true);
 
   const selectedSemester = useMemo(() => {
@@ -105,52 +100,60 @@ export default function GenerateQrPage() {
     }
   }, []);
 
-  const SessionCard = useCallback(({ s }: { s: UnifiedJadwalResponse }) => {
+  const SessionCard = useCallback(({ s }: { s: SessionTimeline }) => {
     const timePart = s.waktu.includes(', ') ? s.waktu.split(', ')[1] : s.waktu;
     const pengajar = pengajarDisplayName(s.pengajar) || '-';
     const isPengganti = s.tipe === 'PENGGANTI';
 
     return (
-      <section className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 flex flex-col gap-5 w-full shadow-sm hover:shadow-md transition-all">
-        <article className="flex flex-col gap-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex flex-col gap-1 w-full">
-              <h2 className="font-bold text-slate-900 leading-snug line-clamp-2 mb-1 text-sm md:text-base">
-                {s.mata_kuliah}
-              </h2>
-              <p className="text-slate-500 font-medium text-[11px] md:text-xs">{s.nama_kelas || 'Kelas tidak tersedia'}</p>
-              {isPengganti && (
-                <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">
-                  Pengganti
-                </span>
-              )}
+      <section className="bg-white rounded-[12px] p-5 md:p-6 border border-slate-100 flex flex-col w-full">
+        <article className="flex flex-col flex-1 gap-5">
+          <div className="flex flex-col gap-1 w-full">
+            <h2 className="font-bold text-slate-900 leading-snug line-clamp-2 mb-1 text-sm md:text-base">
+              {s.mata_kuliah}
+            </h2>
+            <p className="text-slate-500 font-medium text-[11px] md:text-xs">
+              {s.nama_kelas || 'Kelas tidak tersedia'}
+            </p>
+          </div>
+
+          <div className="grid w-full grid-cols-1 gap-3 pt-1 md:grid-cols-2 md:pt-0">
+            <div className="flex flex-col gap-2.5 border-l border-slate-100 pl-2.5">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
+                <span className="font-bold text-slate-800 text-xs md:text-xs">{formatDisplayDate(s.tanggal)}</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+                <span className="font-bold text-slate-800 text-xs md:text-xs break-words" title={s.ruangan}>{s.ruangan}</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2.5 border-l border-slate-100 pl-2.5">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+                <span className="font-bold text-slate-800 text-xs md:text-xs">{timePart}</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pengajar</span>
+                <span className="font-bold text-slate-800 text-xs md:text-xs break-words" title={pengajar}>{pengajar}</span>
+              </div>
             </div>
           </div>
 
-          <div className="grid w-full grid-cols-1 gap-y-2.5 border-t border-slate-100 pt-3 md:grid-cols-2 md:gap-x-6 md:gap-y-4 md:border-t-0 md:pt-0">
-            <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
-              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
-              <span className="font-bold text-slate-800 text-xs md:text-xs">{formatDisplayDate(s.tanggal)}</span>
+          {isPengganti && (
+            <div className="flex items-center justify-end pt-1 mt-auto">
+              <span className="text-[10px] font-bold bg-crimson/10 text-crimson border border-crimson/20 px-2.5 py-1 rounded-xl uppercase tracking-wider">
+                Pengganti
+              </span>
             </div>
-            <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
-              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
-              <span className="font-bold text-slate-800 text-xs md:text-xs">{timePart}</span>
-            </div>
-            <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
-              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
-              <span className="font-bold text-slate-800 text-xs md:text-xs truncate" title={s.ruangan}>{s.ruangan}</span>
-            </div>
-            <div className="flex flex-col gap-0.5 md:border-l-2 md:border-slate-100 md:pl-4">
-              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pengajar</span>
-              <span className="font-bold text-slate-800 text-xs md:text-xs truncate" title={pengajar}>{pengajar}</span>
-            </div>
-          </div>
+          )}
         </article>
       </section>
     );
   }, [formatDisplayDate]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    if (type === 'success') return;
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
   }, []);
@@ -173,14 +176,14 @@ export default function GenerateQrPage() {
   const loadSessionsData = useCallback(async (semesterId: string) => {
     if (!semesterId) return;
     setIsSessionsLoading(true);
-    const today = new Date().toISOString().split('T')[0];
-    const schedRes = await getScheduleTimeline({
+    const today = todayIso();
+    const schedRes = await fetchSessions({
+      id_semester: semesterId,
       start_date: today,
       end_date: today,
-      id_semester: semesterId
     });
-    if (schedRes.success && schedRes.data?.items) {
-      setTodaySessions(schedRes.data.items);
+    if (schedRes.success) {
+      setTodaySessions(schedRes.items);
     } else {
       setTodaySessions([]);
     }
@@ -255,67 +258,6 @@ export default function GenerateQrPage() {
     };
   }, [mode, refreshQRToken]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isPinModalOpen && !isExitModalOpen) return;
-
-      const target = e.target as HTMLElement;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-        return;
-      }
-
-      const type = isExitModalOpen ? 'EXIT' : 'PIN';
-
-      if (e.key >= '0' && e.key <= '9') {
-        e.preventDefault();
-        handleNumpadPress(e.key, type);
-      } else if (e.key === 'Backspace') {
-        e.preventDefault();
-        handleNumpadBackspace(type);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (type === 'EXIT') {
-          if (!isSubmitting && exitPin.length >= 4 && exitPin.length <= 6) {
-            handleExitKiosk();
-          }
-        } else {
-          const isButtonDisabled = 
-            isSubmitting || 
-            (pinMode === 'SET' 
-              ? (!isConfirmStep 
-                  ? (newPin.length < 4 || newPin.length > 6) 
-                  : (confirmPin.length < 4 || confirmPin.length > 6)) 
-              : (enteredPin.length < 4 || enteredPin.length > 6));
-          if (!isButtonDisabled) {
-            handlePINSubmit();
-          }
-        }
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        if (type === 'EXIT') {
-          if (!isSubmitting) closeExitModal();
-        } else {
-          if (!isSubmitting) closePinModal();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [
-    isPinModalOpen,
-    isExitModalOpen,
-    isSubmitting,
-    pinMode,
-    isConfirmStep,
-    newPin,
-    confirmPin,
-    enteredPin,
-    exitPin
-  ]);
-
   const downloadQRCode = async () => {
     if (!qrToken) return;
     try {
@@ -366,7 +308,7 @@ export default function GenerateQrPage() {
     setTimeout(() => setIsPinVisible(true), 10);
   };
 
-  const closePinModal = () => {
+  const closePinModal = useCallback(() => {
     setIsPinClosing(true);
     setIsPinVisible(false);
     setTimeout(() => {
@@ -375,9 +317,9 @@ export default function GenerateQrPage() {
       setPinMode('NONE');
       setIsConfirmStep(false);
     }, 300);
-  };
+  }, []);
 
-  const transitionPinMode = (targetMode: typeof pinMode) => {
+  const transitionPinMode = useCallback((targetMode: typeof pinMode) => {
     setIsPinVisible(false);
     setTimeout(() => {
       setPinMode(targetMode);
@@ -388,7 +330,7 @@ export default function GenerateQrPage() {
       setIsConfirmStep(false);
       setIsPinVisible(true);
     }, 150);
-  };
+  }, []);
 
   const openExitModal = () => {
     setExitPin('');
@@ -398,14 +340,14 @@ export default function GenerateQrPage() {
     setTimeout(() => setIsExitVisible(true), 10);
   };
 
-  const closeExitModal = () => {
+  const closeExitModal = useCallback(() => {
     setIsExitClosing(true);
     setIsExitVisible(false);
     setTimeout(() => {
       setIsExitModalOpen(false);
       setIsExitClosing(false);
     }, 300);
-  };
+  }, []);
 
   const handleActivateKioskClick = async () => {
     setIsKioskActionLoading(true);
@@ -445,7 +387,7 @@ export default function GenerateQrPage() {
     }
   };
 
-  const handlePINSubmit = async () => {
+  const handlePINSubmit = useCallback(async () => {
     setPinError('');
     setIsSubmitting(true);
 
@@ -521,9 +463,9 @@ export default function GenerateQrPage() {
       }
     }
     setIsSubmitting(false);
-  };
+  }, [pinMode, isConfirmStep, newPin, confirmPin, enteredPin, showToast, transitionPinMode, closePinModal]);
 
-  const handleExitKiosk = async () => {
+  const handleExitKiosk = useCallback(async () => {
     setExitError('');
     setIsSubmitting(true);
     if (exitPin.length < 4 || exitPin.length > 6) {
@@ -546,9 +488,9 @@ export default function GenerateQrPage() {
       setExitError('PIN Salah! Akses keluar ditolak.');
     }
     setIsSubmitting(false);
-  };
+  }, [exitPin, showToast, closeExitModal]);
 
-  const handleNumpadPress = (num: string, type: 'EXIT' | 'PIN') => {
+  const handleNumpadPress = useCallback((num: string, type: 'EXIT' | 'PIN') => {
     if (type === 'EXIT') {
       setExitError('');
       if (exitPin.length < 6) {
@@ -572,9 +514,9 @@ export default function GenerateQrPage() {
         }
       }
     }
-  };
+  }, [exitPin, isConfirmStep, newPin, confirmPin, enteredPin, pinMode]);
 
-  const handleNumpadBackspace = (type: 'EXIT' | 'PIN') => {
+  const handleNumpadBackspace = useCallback((type: 'EXIT' | 'PIN') => {
     if (type === 'EXIT') {
       setExitPin(prev => prev.slice(0, -1));
     } else {
@@ -592,7 +534,74 @@ export default function GenerateQrPage() {
         setEnteredPin(prev => prev.slice(0, -1));
       }
     }
-  };
+  }, [pinMode, isConfirmStep, confirmPin]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isPinModalOpen && !isExitModalOpen) return;
+
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      const type = isExitModalOpen ? 'EXIT' : 'PIN';
+
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        handleNumpadPress(e.key, type);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleNumpadBackspace(type);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (type === 'EXIT') {
+          if (!isSubmitting && exitPin.length >= 4 && exitPin.length <= 6) {
+            handleExitKiosk();
+          }
+        } else {
+          const isButtonDisabled =
+            isSubmitting ||
+            (pinMode === 'SET'
+              ? (!isConfirmStep
+                  ? (newPin.length < 4 || newPin.length > 6)
+                  : (confirmPin.length < 4 || confirmPin.length > 6))
+              : (enteredPin.length < 4 || enteredPin.length > 6));
+          if (!isButtonDisabled) {
+            handlePINSubmit();
+          }
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (type === 'EXIT') {
+          if (!isSubmitting) closeExitModal();
+        } else {
+          if (!isSubmitting) closePinModal();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    isPinModalOpen,
+    isExitModalOpen,
+    isSubmitting,
+    pinMode,
+    isConfirmStep,
+    newPin,
+    confirmPin,
+    enteredPin,
+    exitPin,
+    handleExitKiosk,
+    handleNumpadBackspace,
+    handleNumpadPress,
+    handlePINSubmit,
+    closeExitModal,
+    closePinModal,
+  ]);
 
   return (
     <div className="relative min-h-screen w-full bg-transparent text-slate-800 font-sans">
@@ -600,23 +609,28 @@ export default function GenerateQrPage() {
       {mode === 'NORMAL' && (
         <AsdosPageShell className="pb-24 md:pb-12">
 
-          <div className="mb-4 md:mb-8 relative z-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-            <div>
-              <AsdosPageHeader eyebrow="Presensi Asdos" title="Kiosk & QR Presensi" description="Konfigurasi kode QR asisten dosen atau jalankan layar Kiosk Mandiri di kelas Anda." />
-            </div>
-
-            <div className="relative shrink-0 w-full sm:w-48 md:w-56 z-30">
-              <CustomSelect
-                value={selectedSemesterId}
-                onChange={setSelectedSemesterId}
-                options={semesterOptions}
-                placeholder="Semester"
-                disabled={!semesters.length}
-                icon={<CalendarDays className="w-[18px] h-[18px]" />}
-                triggerClassName="rounded-2xl py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-              />
-            </div>
-          </div>
+          <AsdosPageHeader
+            eyebrow="Presensi Asdos"
+            title="Kiosk & QR Presensi"
+            description="Konfigurasi kode QR asisten dosen atau jalankan layar Kiosk Mandiri di kelas Anda."
+            className="relative z-10 !mb-4 md:!mb-8"
+            action={
+              <div className="relative shrink-0 w-full sm:w-48 md:w-56 z-30">
+                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                  Semester
+                </label>
+                <CustomSelect
+                  value={selectedSemesterId}
+                  onChange={setSelectedSemesterId}
+                  options={semesterOptions}
+                  placeholder="Semester"
+                  disabled={!semesters.length}
+                  icon={<CalendarDays className="w-[18px] h-[18px]" />}
+                  triggerClassName="rounded-2xl py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                />
+              </div>
+            }
+          />
 
           <div className="space-y-8 relative z-10">
 
@@ -661,20 +675,17 @@ export default function GenerateQrPage() {
             </div>
 
             <div className="w-full">
-              <div className="flex items-center justify-between mb-4 px-1">
+              <div className="flex items-center mb-4 px-1">
                 <h3 className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">
                   Sesi Mengajar Hari Ini ({todaySessions.length})
                 </h3>
-                <span className="text-xs font-bold text-slate-400 bg-slate-100 border border-slate-200/50 px-2.5 py-0.5 rounded-full">
-                  Hari Ini
-                </span>
               </div>
 
               {isSessionsLoading ? (
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[1, 2, 3].map(i => (
-                    <div key={i} className="bg-white rounded-[12px] md:rounded-[32px] p-4 md:p-6 border border-slate-100 animate-shimmer flex items-center gap-4">
+                    <div key={i} className="bg-white rounded-[12px] p-4 md:p-6 border border-slate-100 animate-shimmer flex items-center gap-4">
                       <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl bg-slate-100 shrink-0" />
                       <div className="flex-1 space-y-2 md:space-y-3">
                         <div className="h-4 bg-slate-100 rounded-lg w-2/5" />
@@ -689,7 +700,7 @@ export default function GenerateQrPage() {
                 </div>
               ) : todaySessions.length === 0 ? (
 
-                <div className="bg-white rounded-[12px] md:rounded-[32px] p-8 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
+                <div className="bg-white rounded-[12px] p-8 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
                   <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
                     <CalendarDays size={26} />
                   </div>
@@ -700,7 +711,7 @@ export default function GenerateQrPage() {
                 </div>
               ) : (
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:max-h-[calc(100dvh-22rem)] md:overflow-y-auto md:pr-1 md:[&::-webkit-scrollbar]:w-1.5 md:[&::-webkit-scrollbar-thumb]:rounded-full md:[&::-webkit-scrollbar-thumb]:bg-slate-300/80">
+                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:max-h-[calc(100dvh-22rem)] md:overflow-y-auto md:pr-1 md:[&::-webkit-scrollbar]:w-1.5 md:[&::-webkit-scrollbar-thumb]:rounded-full md:[&::-webkit-scrollbar-thumb]:bg-slate-300/80">
                   {todaySessions.map(s => {
                     return (
                       <SessionCard key={s.id_sesi} s={s} />
@@ -715,10 +726,12 @@ export default function GenerateQrPage() {
       )}
 
       {mode === 'KIOSK' && (
-        <div className="fixed inset-0 text-slate-800 z-[9999] overflow-y-auto lg:overflow-hidden flex flex-col p-6 pb-16 md:p-8 font-sans select-none animate-fade-in bg-canvas">
+        <div className="fixed inset-0 text-slate-800 z-[9999] overflow-y-auto lg:overflow-hidden flex flex-col p-6 pb-28 md:p-8 font-sans select-none animate-fade-in bg-canvas">
 
           <style>{`
             #dashboard-home-button-desktop,
+            #dashboard-top-left,
+            #dashboard-top-right,
             #dashboard-header-mobile,
             #dashboard-sidebar-desktop,
             #dashboard-clock-desktop,
@@ -753,22 +766,22 @@ export default function GenerateQrPage() {
 
           <div className="relative z-10 flex flex-col min-h-full w-full">
 
-            <div className="flex flex-row justify-between items-start pb-5 shrink-0">
-              <div>
-                <h1 className="text-lg md:text-xl font-black text-slate-800 tracking-wider">ALTAR PRESENSI KIOSK</h1>
-                <p className="text-xs text-slate-500 font-semibold mt-1">Sesi Presensi Asisten Aktif Kelas</p>
-                <div className="mt-2 lg:hidden">
+            <div className="flex flex-row justify-between items-start gap-4 pb-5 shrink-0">
+              <div className="min-w-0">
+                <h1 className="hidden lg:block text-lg md:text-xl font-black text-slate-800 tracking-wider leading-tight">ALTAR PRESENSI KIOSK</h1>
+                <p className="hidden lg:block text-xs text-slate-500 font-semibold mt-1">Sesi Presensi Asisten Aktif Kelas</p>
+                <div className="mt-2 lg:hidden max-w-full">
                   <p className="text-xl font-black font-mono tracking-tight text-crimson">
-                    {timeStr} <span className="text-[10px] font-extrabold text-slate-400 tracking-widest align-middle">WIB</span>
+                    {timeStr} <span className="text-[10px] font-extrabold text-slate-800 tracking-widest align-middle">WIB</span>
                   </p>
-                  <p className="text-[10px] font-bold text-slate-400 tracking-wide mt-0.5">{dateStr}</p>
+                  <p className="text-[10px] font-bold text-slate-800 tracking-wide mt-0.5 leading-snug break-words">{dateStr}</p>
                 </div>
               </div>
 
               <button
                 type="button"
                 onClick={openExitModal}
-                className="lg:hidden shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-xs shadow-sm active:scale-95 transition-all"
+                className="lg:hidden w-fit shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-xs shadow-sm active:scale-95 transition-all"
               >
                 <Unlock className="w-3.5 h-3.5 text-slate-400" />
                 Keluar
@@ -844,7 +857,7 @@ export default function GenerateQrPage() {
                     <p className="text-sm font-semibold text-slate-400">Belum ada sesi terdaftar</p>
                   </div>
                 ) : (
-                  <div className="flex-1 lg:overflow-y-auto overflow-visible grid grid-cols-1 sm:grid-cols-2 gap-3 content-start pr-1 lg:[&::-webkit-scrollbar]:w-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-slate-200">
+                  <div className="flex-1 lg:overflow-y-auto overflow-visible grid grid-cols-2 gap-3 content-start pr-1 lg:[&::-webkit-scrollbar]:w-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-slate-200">
                     {todaySessions.map(s => {
                       return (
                         <SessionCard key={s.id_sesi} s={s} />
@@ -866,6 +879,7 @@ export default function GenerateQrPage() {
                 Keluar Kiosk Mode
               </button>
             </div>
+            <div className="lg:hidden h-24 shrink-0" aria-hidden />
           </div>
         </div>
       )}
