@@ -2,16 +2,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import Link from 'next/link';
-import {
-  FileText, QrCode, Users, CalendarSync,
-  MapPin, LogOut, ChevronRight, Clock, CheckCircle2,
-  CalendarDays, Bell
-} from 'lucide-react';
+import { useUserStore } from '@/store/useUserStore';
+import { FileText, QrCode, Users, CalendarSync, CalendarDays } from 'lucide-react';
 import { getAllSubstitutions } from '@/lib/actions/pergantian-kelas';
 import { getAllPresensi } from '@/lib/actions/presensi';
 import type { SubstituteSessionDetail } from '@/types/api';
 import type { PresensiResponseDTO } from '@/lib/actions/presensi';
 
+// Used by dashboard layouts / not-found navigation.
 export const koordinatorMenuItems = [
   { id: 1, title: 'Data Presensi', icon: FileText, href: '/koordinator/data-presensi', desc: 'Lihat & kelola data presensi' },
   { id: 2, title: 'Generate QR', icon: QrCode, href: '/koordinator/generate-qr', desc: 'Buat kode QR untuk sesi' },
@@ -19,6 +17,23 @@ export const koordinatorMenuItems = [
   { id: 4, title: 'Manajemen KP', icon: CalendarSync, href: '/koordinator/manajemen-kp', desc: 'Jadwal & data kerja praktik' },
   { id: 5, title: 'Manajemen Jadwal', icon: CalendarDays, href: '/koordinator/manajemen-jadwal', desc: 'Kelola sesi jadwal mengajar' },
 ];
+
+function getDisplayName(email?: string | null) {
+  if (!email) return 'Koordinator';
+
+  const raw = email.split('@')[0] || '';
+  const cleaned = raw
+    .replace(/[._-]+/g, ' ')
+    .replace(/\d+/g, ' ')
+    .trim();
+
+  if (!cleaned) return 'Koordinator';
+
+  return cleaned
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
 
 function formatTime(value?: string) {
   if (!value || value === 'null' || String(value).startsWith('0001')) return '--:--';
@@ -46,9 +61,8 @@ function formatShortDate(dateStr: string) {
 
 export default function KoordinatorHome() {
   const { markSeen, setPendingCount } = useNotificationStore();
-  const [kpItem, setKpItem] = useState<SubstituteSessionDetail | null>(null);
+  const user = useUserStore((state) => state.user);
   const [kpItems, setKpItems] = useState<SubstituteSessionDetail[]>([]);
-  const [presensiItem, setPresensiItem] = useState<PresensiResponseDTO | null>(null);
   const [presensiItems, setPresensiItems] = useState<PresensiResponseDTO[]>([]);
   const [notifLoaded, setNotifLoaded] = useState(false);
 
@@ -61,27 +75,13 @@ export default function KoordinatorHome() {
       const kpData = kpRes.success && kpRes.data?.items ? kpRes.data.items : [];
       const presensiData = presensiRes.success && presensiRes.data ? presensiRes.data : [];
       setKpItems(kpData);
-      setKpItem(kpData[0] ?? null);
       setPresensiItems(presensiData);
-      setPresensiItem(presensiData[0] ?? null);
       setPendingCount(kpData.length + presensiData.length);
       markSeen();
       setNotifLoaded(true);
     }
     fetchNotifications();
   }, [markSeen, setPendingCount]);
-
-  const desktopStats = useMemo(() => {
-    const todayIso = new Date().toISOString().split('T')[0];
-    const todayCount = presensiItems.filter(p => String(p.tanggal_mengajar || '').split('T')[0] === todayIso).length;
-    const pendingPresensi = presensiItems.filter(p => !p.is_verified).length;
-    const uniqAsdos = new Set(presensiItems.map(p => (p.nama_asdos || '').trim()).filter(Boolean));
-    return [
-      { id: 1, label: 'Asdos Tercatat', value: String(uniqAsdos.size), sub: 'Berdasar data presensi', icon: Users, positive: true },
-      { id: 2, label: 'Presensi Hari Ini', value: String(todayCount), sub: `${pendingPresensi} belum diverifikasi`, icon: CheckCircle2, positive: pendingPresensi === 0 },
-      { id: 3, label: 'Menunggu ACC KP', value: String(kpItems.length), sub: kpItems.length ? 'Perlu persetujuan' : 'Tidak ada pending', icon: Clock, positive: kpItems.length === 0 },
-    ];
-  }, [kpItems.length, presensiItems]);
 
   const activities = useMemo(() => {
     const sorted = [...presensiItems].sort((a, b) => {
@@ -97,10 +97,11 @@ export default function KoordinatorHome() {
         action: hasCheckout ? 'Check-out' : 'Check-in',
         subject: `${p.nama_mata_kuliah} - ${p.nama_ruangan}`,
         time: `${formatTime(hasCheckout ? p.waktu_checkout : p.waktu_checkin)} WIB`,
-        isCheckIn: !hasCheckout,
       };
     });
   }, [presensiItems]);
+
+  const displayName = getDisplayName(user?.email);
 
   return (
     <div className="max-w-6xl mx-auto px-1.5 sm:px-2 md:px-0 pb-10 md:pb-12">
@@ -109,120 +110,12 @@ export default function KoordinatorHome() {
         <p className="text-[11px] font-bold text-crimson tracking-[0.15em] uppercase mb-1 md:text-xs">
           Dashboard Koordinator
         </p>
-        <h1 className="text-[22px] md:text-[26px] font-extrabold text-slate-900 leading-snug">
-          Ringkasan aktivitas asdos & pengajuan
+        <h1 className="text-[24px] md:text-[30px] font-extrabold text-slate-900 leading-tight">
+          Halo, {displayName}
         </h1>
-        <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-xl">
-          Pantau pengajuan kuliah pengganti, verifikasi presensi, dan aktivitas asisten secara real-time dalam satu tampilan.
+        <p className="text-xs md:text-sm text-slate-500 mt-2 max-w-2xl">
+          Pantau pengajuan kelas pengganti dan aktivitas presensi asisten dosen dalam satu ringkasan.
         </p>
-      </div>
-
-      {notifLoaded && (kpItem || presensiItem) && (
-        <div className="mb-8 animate-fade-up" style={{ animationDelay: '0.05s' }}>
-          <div className="flex items-center gap-2 mb-4 px-1">
-            <div className="relative">
-              <Bell size={16} className="text-crimson" />
-              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-crimson" />
-            </div>
-            <h3 className="font-bold text-lg text-slate-800">Notifikasi</h3>
-          </div>
-          <div className="space-y-3">
-            {kpItem && (
-              <div className="bg-white p-4 rounded-2xl shadow-md lg:shadow-sm flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 shrink-0">
-                  <CalendarSync size={20} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate">Pengajuan KP Baru</p>
-                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
-                    {kpItem.substitute_teacher} mengajukan kelas pengganti{kpItem.session?.mata_kuliah ? ` ${kpItem.session.mata_kuliah}` : ''}{kpItem.session?.nama_kelas ? ` ${kpItem.session.nama_kelas}` : ''}
-                  </p>
-                </div>
-                <Link href="/koordinator/manajemen-kp" className="flex items-center gap-1 text-xs font-bold text-crimson shrink-0 hover:underline">
-                  Selengkapnya <ChevronRight size={13} />
-                </Link>
-              </div>
-            )}
-            {presensiItem && (
-              <div className="bg-white p-4 rounded-2xl shadow-md lg:shadow-sm flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
-                  <CheckCircle2 size={20} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate">Presensi Menunggu Verifikasi</p>
-                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
-                    {presensiItem.nama_asdos} check-in {presensiItem.nama_mata_kuliah} {presensiItem.nama_kelas} dan menunggu verifikasi
-                  </p>
-                </div>
-                <Link href="/koordinator/data-presensi" className="flex items-center gap-1 text-xs font-bold text-crimson shrink-0 hover:underline">
-                  Selengkapnya <ChevronRight size={13} />
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="hidden lg:grid lg:grid-cols-3 lg:gap-5 lg:mb-10">
-        {desktopStats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div
-              key={stat.id}
-              className="bg-white rounded-2xl p-6 shadow-sm border border-slate-50 hover:shadow-md transition-shadow duration-300"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-11 h-11 rounded-xl bg-crimson/5 flex items-center justify-center text-crimson">
-                  <Icon size={20} />
-                </div>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full ${stat.positive ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'}`}>
-                  {stat.sub}
-                </span>
-              </div>
-              <p className="text-4xl font-extrabold text-slate-800 mb-1">{stat.value}</p>
-              <p className="text-sm font-semibold text-slate-400">{stat.label}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-4 lg:hidden gap-y-6 gap-x-3 mb-6 w-full">
-        {koordinatorMenuItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link key={item.id} href={item.href} className="flex flex-col items-center group">
-              <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] text-crimson group-hover:scale-105 group-active:scale-95 transition-all mb-3">
-                <Icon size={24} strokeWidth={2} />
-              </div>
-              <span className="text-[10px] font-semibold text-slate-600 text-center w-16 leading-tight">
-                {item.title}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8 lg:hidden">
-        {desktopStats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div
-              key={stat.id}
-              className="bg-white rounded-2xl px-4 py-3 shadow-sm border border-slate-100 flex items-center gap-3"
-            >
-              <div className="w-9 h-9 rounded-xl bg-crimson/5 flex items-center justify-center text-crimson shrink-0">
-                <Icon size={18} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium text-slate-500 truncate">{stat.label}</p>
-                <p className="text-lg font-extrabold text-slate-900 leading-tight">{stat.value}</p>
-                <p className={`text-[10px] font-semibold mt-0.5 truncate ${stat.positive ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  {stat.sub}
-                </p>
-              </div>
-            </div>
-          );
-        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-8">
@@ -247,31 +140,27 @@ export default function KoordinatorHome() {
                 </div>
               ))
             ) : kpItems.length === 0 ? (
-              <div className="bg-white p-6 rounded-2xl lg:rounded-3xl shadow-md lg:shadow-sm text-center text-slate-400">
-                <CalendarSync size={28} className="mx-auto mb-2 text-slate-300" />
+              <div className="bg-white p-6 rounded-2xl lg:rounded-3xl shadow-sm border border-slate-100 text-center text-slate-500">
                 <p className="text-sm font-semibold">Tidak ada pengajuan kelas pengganti pending</p>
               </div>
             ) : (
               kpItems.map((kp) => (
                 <div
                   key={kp.id}
-                  className="bg-white p-4 lg:p-5 rounded-2xl lg:rounded-3xl shadow-md lg:shadow-sm active:scale-[0.97] transition-all duration-200 flex gap-4 lg:gap-5 items-start"
+                  className="bg-white p-4 lg:p-5 rounded-2xl lg:rounded-3xl shadow-sm border border-slate-100 active:scale-[0.97] transition-all duration-200 flex gap-4 lg:gap-5 items-start"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-crimson/5 flex items-center justify-center text-crimson shrink-0">
-                    <CalendarSync size={22} />
-                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start mb-1">
                       <h4 className="text-sm font-bold text-slate-800 truncate pr-2">{kp.substitute_teacher}</h4>
                       <span className="text-[10px] lg:text-xs text-slate-400 font-medium whitespace-nowrap">{timeAgo(kp.created_at)}</span>
                     </div>
-                    <p className="text-[12px] lg:text-xs font-semibold text-crimson mb-1 truncate">
+                    <p className="text-[12px] lg:text-xs font-semibold text-slate-700 mb-1 truncate">
                       {kp.session?.mata_kuliah}{kp.session?.nama_kelas ? ` — ${kp.session.nama_kelas}` : ''}
                     </p>
                     <p className="text-[12px] lg:text-xs text-slate-500 mb-3 line-clamp-2">
                       {formatShortDate(kp.original_date)} → {formatShortDate(kp.substitute_date)}
                     </p>
-                    <span className="inline-block text-[10px] lg:text-xs font-bold text-amber-600 bg-amber-50 px-4 py-1.5 rounded-full">
+                    <span className="inline-block text-[10px] lg:text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full">
                       Menunggu ACC
                     </span>
                   </div>
@@ -284,35 +173,45 @@ export default function KoordinatorHome() {
         <div className="animate-fade-up" style={{ animationDelay: '0.15s' }}>
           <div className="flex justify-between items-center mb-4 lg:mb-6 px-1">
             <h3 className="font-bold text-lg lg:text-xl text-slate-800">Aktivitas Asdos</h3>
-            <button className="text-xs lg:text-sm font-semibold text-crimson active:scale-95 transition">
+            <Link href="/koordinator/data-presensi" className="text-xs lg:text-sm font-semibold text-crimson active:scale-95 transition">
               Lihat Semua
-            </button>
+            </Link>
           </div>
-          <div className="bg-white rounded-2xl lg:rounded-[2rem] shadow-md lg:shadow-sm p-4 lg:p-6 space-y-4 lg:space-y-5">
-            {activities.map((activity) => (
-              <div
-                key={activity.id}
-                className="flex gap-4 items-start group active:scale-[0.98] transition-all duration-200"
-              >
-                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-sm shrink-0 transition-colors ${activity.isCheckIn ? 'bg-emerald-50 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-200 group-hover:text-slate-600'}`}>
-                  {activity.isCheckIn ? <MapPin size={20} /> : <LogOut size={20} />}
-                </div>
-                <div className="flex-1 pb-4 border-b border-slate-100 last:border-none group-last:pb-0">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-800 leading-tight mb-1">{activity.name}</h4>
-                      <p className="text-[12px] lg:text-xs text-slate-500 font-medium">{activity.subject}</p>
+          <div className="bg-white rounded-2xl lg:rounded-[2rem] shadow-sm border border-slate-100 p-4 lg:p-6">
+            {!notifLoaded ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="animate-pulse flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-slate-100 rounded w-1/2" />
+                      <div className="h-3 bg-slate-100 rounded w-2/3" />
                     </div>
-                    <div className="text-right">
-                      <div className="text-[11px] lg:text-xs font-bold text-slate-400 mb-1">{activity.time}</div>
-                      <div className={`text-[11px] lg:text-xs font-extrabold uppercase tracking-wider ${activity.isCheckIn ? 'text-emerald-500' : 'text-slate-400'}`}>
+                    <div className="h-4 bg-slate-100 rounded w-20 shrink-0" />
+                  </div>
+                ))}
+              </div>
+            ) : activities.length === 0 ? (
+              <div className="py-10 text-center text-slate-500">
+                <p className="text-sm font-semibold">Tidak ada aktivitas presensi terbaru</p>
+              </div>
+            ) : (
+              <div className="space-y-4 lg:space-y-5">
+                {activities.map((activity) => (
+                  <div key={activity.id} className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100 last:border-none last:pb-0">
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-slate-800 leading-tight truncate">{activity.name}</h4>
+                      <p className="text-[12px] lg:text-xs text-slate-500 font-medium truncate">{activity.subject}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="text-[11px] lg:text-xs font-bold text-slate-400">{activity.time}</div>
+                      <span className="inline-block mt-1 text-[10px] lg:text-xs font-extrabold uppercase tracking-wider text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-full">
                         {activity.action}
-                      </div>
+                      </span>
                     </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
 

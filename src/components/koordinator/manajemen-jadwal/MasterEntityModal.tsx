@@ -145,6 +145,12 @@ export function MasterEntityModal({ open, mode, resource, initialData, onClose, 
     setIsSubmitting(true);
     const data = initialData as Record<string, string | undefined>;
     const id = data.id || data.id_asdos;
+    if (!id) {
+      setIsSubmitting(false);
+      setError(`Gagal menghapus ${RESOURCE_LABEL[resource]}: ID tidak ditemukan.`);
+      setConfirmDelete(false);
+      return;
+    }
     const res = await deleteResource(resource, id);
     setIsSubmitting(false);
 
