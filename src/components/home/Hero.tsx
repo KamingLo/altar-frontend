@@ -60,7 +60,13 @@ const HeroDesktop = () => {
 };
 
 const HeroMobile = () => {
+  const [isIOS, setIsIOS] = React.useState(false);
+  React.useEffect(() => {
+    setIsIOS(/iPhone|iPod/.test(navigator.userAgent));
+  }, []);
+
   return (
+
     <div className="min-h-[100svh] w-full flex bg-canvas font-['Plus_Jakarta_Sans',sans-serif]">
 
       <style>{`
@@ -84,7 +90,10 @@ const HeroMobile = () => {
           />
         </div>
 
-        <div className="bg-canvas px-[clamp(2rem,6vw,4rem)] pb-[clamp(2rem,7vw,3.5rem)] pt-[clamp(1rem,4vw,2rem)] flex flex-col flex-1 justify-center gap-7 relative z-20">
+        <div className={isIOS
+          ? "absolute inset-0 z-20 flex flex-col items-start justify-center px-[clamp(2rem,6vw,4rem)] gap-7"
+          : "bg-canvas px-[clamp(2rem,6vw,4rem)] pb-[clamp(2rem,7vw,3.5rem)] pt-[clamp(1rem,4vw,2rem)] flex flex-col flex-1 justify-center gap-7 relative z-20"
+        }>
 
           <div
             className="flex flex-col items-start md:items-center text-left md:text-center"

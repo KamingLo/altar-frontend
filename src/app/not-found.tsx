@@ -612,7 +612,7 @@ function NotFoundGuest() {
       <div className="absolute inset-0 pointer-events-none" style={gridStyle} />
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6" style={{ zIndex: 3 }}>
-        <div className="h-[clamp(180px,34vh,320px)] w-full" />
+        <div className="h-[clamp(180px,34vh,320px)] lg:h-[clamp(240px,52vh,420px)] w-full" />
 
         <h1 className="text-[clamp(22px,3vw,40px)] font-extrabold text-slate-800 text-center leading-tight max-w-[18ch] mt-4">
           Halaman ini <span className="text-crimson">tidak tersedia</span>
@@ -870,7 +870,7 @@ function NotFoundAuth() {
 
 
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6" style={{ zIndex: 3 }}>
-            <div className="h-[clamp(180px,34vh,320px)] w-full" />
+            <div className="h-[clamp(180px,34vh,320px)] lg:h-[clamp(240px,52vh,420px)] w-full" />
 
             <h1 className={`text-[clamp(22px,3vw,40px)] font-extrabold text-center leading-tight max-w-[18ch] mt-4 ${headingCls}`}>
               Halaman ini <span className="text-crimson">tidak tersedia</span>

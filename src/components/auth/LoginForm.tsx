@@ -26,6 +26,7 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [isExiting, setIsExiting] = React.useState(false);
   const [isEntering, setIsEntering] = React.useState(true);
+  const [isIOS, setIsIOS] = React.useState(false);
 
   const handleBackToHome = () => {
     setIsExiting(true);
@@ -39,6 +40,10 @@ export default function LoginForm() {
       setIsEntering(false);
     }, 50);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    setIsIOS(/iPhone|iPod/.test(navigator.userAgent));
   }, []);
 
   const renderToasts = () => (
@@ -311,14 +316,14 @@ export default function LoginForm() {
             </div>
           </div>
 
-          <div className={`relative z-10 flex flex-col flex-1 px-8 py-[5svh] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExiting ? 'opacity-0 translate-y-[22px]' : 'opacity-100 translate-y-0'}`}>
+          <div className={`relative z-10 flex flex-col flex-1 px-8 py-[5svh] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExiting ? 'opacity-0 translate-y-[22px]' : 'opacity-100 translate-y-0'} ${isIOS ? 'justify-center' : ''}`}>
             <button
               onClick={handleBackToHome}
-              className="self-end shrink-0 w-9 h-9 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-2xl active:scale-95 transition-all hover:bg-slate-50 shadow-sm"
+              className={`shrink-0 w-9 h-9 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-2xl active:scale-95 transition-all hover:bg-slate-50 shadow-sm ${isIOS ? 'absolute top-[5svh] right-8' : 'self-end'}`}
             >
               <ArrowLeft size={18} />
             </button>
-            <div className="grow" />
+            {!isIOS && <div className="grow" />}
             {renderFormArea()}
           </div>
         </div>

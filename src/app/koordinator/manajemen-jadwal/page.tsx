@@ -538,7 +538,10 @@ export default function ManajemenJadwalPage() {
   }, [showToast, loadDropdownData]);
 
   useEffect(() => {
-    if (!selectedSemesterId) return;
+    if (!selectedSemesterId) {
+      setSessions([]);
+      return;
+    }
     const t = setTimeout(() => refreshSessions(), 0);
     return () => clearTimeout(t);
   }, [selectedSemesterId, refreshSessions]);
@@ -584,11 +587,13 @@ export default function ManajemenJadwalPage() {
       setIsDeleteSemesterSubmitting(false);
       if (res.success) {
         showToast("Semester berhasil dihapus.", "success");
-        if (selectedSemesterId === deleteSemesterTargetId) {
-          setSelectedSemesterId("");
-        }
+        const wasSelected = selectedSemesterId === deleteSemesterTargetId;
         handleCloseDeleteSemester();
-        await refreshSemesters();
+        const refreshed = await refreshSemesters();
+        if (wasSelected) {
+          const next = refreshed?.find(s => s.id !== deleteSemesterTargetId);
+          setSelectedSemesterId(next?.id ?? "");
+        }
       } else {
         showToast(res.message || "Gagal menghapus semester.");
       }
@@ -675,11 +680,14 @@ export default function ManajemenJadwalPage() {
     showToast(`${labelMap[resource]} berhasil ${actionLabel}.`, 'success');
 
     if (resource === 'semester') {
-      await refreshSemesters();
+      const refreshed = await refreshSemesters();
       if (action === 'created' && item) setSelectedSemesterId((item as { id: string }).id);
       if (action === 'deleted' && item) {
         const deletedId = (item as { id: string }).id;
-        if (selectedSemesterId === deletedId) setSelectedSemesterId('');
+        if (selectedSemesterId === deletedId) {
+          const next = refreshed?.find(s => s.id !== deletedId);
+          setSelectedSemesterId(next?.id ?? '');
+        }
       }
       return;
     }
