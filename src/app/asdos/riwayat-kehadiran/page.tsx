@@ -11,11 +11,7 @@ type HistoryItem = {
   id: string; subject: string; date: string;
   checkIn: string; checkOut: string; room: string;
   status: 'BERJALAN' | 'SELESAI'; materi: string;
-};
-
-const statusCfg = {
-  BERJALAN: { bg: 'bg-crimson/10', text: 'text-crimson', label: 'BERJALAN' },
-  SELESAI: { bg: 'bg-crimson', text: 'text-white', label: 'SELESAI' },
+  isVerified: boolean; isPaid: boolean;
 };
 
 function isActivePresensi(item: PresensiResponseDTO) {
@@ -55,6 +51,8 @@ function mapPresensiToHistory(item: PresensiResponseDTO): HistoryItem {
     room: item.nama_ruangan,
     status: active ? 'BERJALAN' : 'SELESAI',
     materi: item.deskripsi_materi || (active ? 'Sesi sedang berlangsung. Materi belum diisi.' : '-'),
+    isVerified: item.is_verified,
+    isPaid: item.is_paid,
   };
 }
 
@@ -174,7 +172,6 @@ export default function RiwayatKehadiranPage() {
         ) : error ? (
           <AsdosState variant="error" message={error} />
         ) : displayed.length > 0 ? displayed.map(item => {
-          const cfg = statusCfg[item.status];
           return (
             <section
               key={item.id}
@@ -198,11 +195,16 @@ export default function RiwayatKehadiranPage() {
                   </div>
                 </div>
 
-                <span className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap mt-2 md:mt-0 ${cfg.bg} ${cfg.text}`}>
-                  {cfg.label}
-                </span>
-
               </article>
+
+              <div className="flex flex-wrap gap-2 -mt-2">
+                <span className={`px-3.5 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest ${item.isVerified ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                  {item.isVerified ? 'Sudah Diverifikasi' : 'Belum Diverifikasi'}
+                </span>
+                <span className={`px-3.5 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest ${item.isPaid ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                  {item.isPaid ? 'Sudah Dibayar' : 'Belum Dibayar'}
+                </span>
+              </div>
 
               <div className="bg-fog rounded-[20px] p-5 flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-slate-800">
@@ -252,13 +254,6 @@ export default function RiwayatKehadiranPage() {
         onClose={() => setSelectedItem(null)}
         title={selectedItem?.subject}
         subtitle={selectedItem?.date}
-        headerAction={
-          selectedItem && (
-            <span className={`text-[10px] font-bold px-3 py-2 rounded-xl tracking-widest ${statusCfg[selectedItem.status].bg} ${statusCfg[selectedItem.status].text}`}>
-              {statusCfg[selectedItem.status].label}
-            </span>
-          )
-        }
       >
         {selectedItem && (
           <div className="pt-2">
@@ -272,6 +267,15 @@ export default function RiwayatKehadiranPage() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-5">
+              <span className={`px-3.5 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest ${selectedItem.isVerified ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                {selectedItem.isVerified ? 'Sudah Diverifikasi' : 'Belum Diverifikasi'}
+              </span>
+              <span className={`px-3.5 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest ${selectedItem.isPaid ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                {selectedItem.isPaid ? 'Sudah Dibayar' : 'Belum Dibayar'}
+              </span>
             </div>
 
             <div className="mb-4">

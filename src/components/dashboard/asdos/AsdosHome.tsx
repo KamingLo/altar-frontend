@@ -9,13 +9,10 @@ import {
   History,
   CalendarDays,
   CalendarSync,
-  CalendarClock,
   CheckCircle2,
   Bell,
   ChevronRight,
-  MapPin,
 } from 'lucide-react';
-import { DashboardLoading } from '@/components/dashboard/DashboardLoading';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 import { getMySubstitutions } from '@/lib/actions/pergantian-kelas';
 import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
@@ -84,13 +81,16 @@ function formatShortDate(dateStr: string) {
   }
 }
 
-function timeAgo(dateStr: string) {
-  const ms = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.max(0, Math.floor(ms / 60000));
-  if (mins < 60) return `${mins} mnt lalu`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs} jam lalu`;
-  return `${Math.floor(hrs / 24)} hr lalu`;
+function getScheduleTypeLabel(schedule: SessionFromAPI) {
+  const type = schedule.tipe_jadwal === 'PENGGANTI' ? 'PENGGANTI' : 'REGULER';
+  if (type !== 'REGULER') return type;
+
+  const match = schedule.waktu.match(/(\d{1,2})[:.]/);
+  if (!match) return 'REGULER';
+
+  const hour = Number(match[1]);
+  if (Number.isNaN(hour)) return 'REGULER';
+  return hour < 12 ? 'REGULER PAGI' : 'REGULER SORE';
 }
 
 function getDisplayName(email?: string | null) {
@@ -115,33 +115,88 @@ function hasMeaningfulText(value?: string | null) {
   return text !== '' && text !== '-';
 }
 
-type ActivityPreviewItem = {
+type ActivityItem = {
+  id: string;
+  title: string;
+  detail: string;
+  date: string;
+  badge: string;
+  tone: 'emerald' | 'blue';
+};
+
+type PresensiActivityItem = {
   id: string;
   nama_mata_kuliah: string;
   nama_kelas: string;
   nama_ruangan: string;
   tanggal_mengajar: string;
-  is_verified: boolean;
+  isVerified: boolean;
+  isPaid: boolean;
 };
 
-const previewActivities: ActivityPreviewItem[] = [
-  {
-    id: 'preview-activity-1',
-    nama_mata_kuliah: 'Rekayasa Perangkat Lunak',
-    nama_kelas: 'SI-42-04',
-    nama_ruangan: 'Ruang 904',
-    tanggal_mengajar: todayISO(),
-    is_verified: true,
-  },
-  {
-    id: 'preview-activity-2',
-    nama_mata_kuliah: 'Basis Data',
-    nama_kelas: 'SI-42-02',
-    nama_ruangan: 'Lab 705',
-    tanggal_mengajar: todayISO(),
-    is_verified: false,
-  },
-];
+function AsdosHomeSkeleton() {
+  return (
+    <div className="max-w-6xl mx-auto px-1.5 sm:px-2 md:px-0 pb-10 md:pb-12">
+      <div className="mb-6 md:mb-8 space-y-2.5">
+        <div className="h-3 w-32 rounded-lg animate-shimmer" />
+        <div className="h-8 w-48 rounded-xl animate-shimmer" />
+        <div className="h-4 w-full max-w-xl rounded-lg animate-shimmer" />
+      </div>
+
+      <div className="grid grid-cols-4 lg:hidden gap-y-6 gap-x-3 mb-8">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-full animate-shimmer" />
+            <div className="h-3 w-14 rounded-lg animate-shimmer" />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-8">
+        <section className="lg:row-span-2">
+          <div className="flex items-center justify-between mb-4 lg:mb-6 px-1">
+            <div className="h-6 w-36 rounded-xl animate-shimmer" />
+            <div className="h-4 w-20 rounded-lg animate-shimmer" />
+          </div>
+          <div className="bg-white rounded-2xl p-4 lg:p-5 space-y-4 border border-slate-100 lg:min-h-[430px]">
+            {Array.from({ length: 3 }, (_, i) => (
+              <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 space-y-4">
+                <div className="flex justify-between gap-4">
+                  <div className="space-y-2 flex-1">
+                    <div className="h-5 w-44 rounded-lg animate-shimmer" />
+                    <div className="h-3.5 w-28 rounded-lg animate-shimmer" />
+                  </div>
+                  <div className="h-6 w-20 rounded-full animate-shimmer" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="h-4 w-24 rounded-lg animate-shimmer" />
+                  <div className="h-4 w-24 rounded-lg animate-shimmer" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {Array.from({ length: 2 }, (_, section) => (
+          <section key={section}>
+            <div className="flex items-center justify-between mb-4 lg:mb-6 px-1">
+              <div className="h-6 w-44 rounded-xl animate-shimmer" />
+              <div className="h-4 w-20 rounded-lg animate-shimmer" />
+            </div>
+            <div className="bg-white rounded-2xl p-4 lg:p-5 space-y-3 border border-slate-100">
+              {Array.from({ length: 3 }, (_, i) => (
+                <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 space-y-2">
+                  <div className="h-4 w-2/3 rounded-lg animate-shimmer" />
+                  <div className="h-3.5 w-1/2 rounded-lg animate-shimmer" />
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function AsdosHome() {
   const { markSeen, setPendingCount } = useNotificationStore();
@@ -202,12 +257,55 @@ export default function AsdosHome() {
 
   const displayName = getDisplayName(user?.email);
 
-  const recentActivities = useMemo(() => {
+  const presensiActivities = useMemo<PresensiActivityItem[]>(() => {
     return [...presensiItems]
       .filter((item) => hasMeaningfulText(item.nama_mata_kuliah) || hasMeaningfulText(item.nama_kelas))
       .sort((a, b) => new Date(b.waktu_checkin || b.tanggal_mengajar).getTime() - new Date(a.waktu_checkin || a.tanggal_mengajar).getTime())
-      .slice(0, 3);
+      .map((item) => ({
+        id: item.id_presensi,
+        nama_mata_kuliah: item.nama_mata_kuliah,
+        nama_kelas: item.nama_kelas,
+        nama_ruangan: item.nama_ruangan,
+        tanggal_mengajar: item.tanggal_mengajar,
+        isVerified: item.is_verified,
+        isPaid: item.is_paid,
+      }));
   }, [presensiItems]);
+
+  const activityItems = useMemo<ActivityItem[]>(() => {
+    const items: ActivityItem[] = [];
+
+    for (const item of presensiActivities) {
+      const subject = item.nama_mata_kuliah;
+      const context = `${item.nama_kelas} - ${item.nama_ruangan}`;
+
+      if (item.isVerified) {
+        items.push({
+          id: `${item.id}-verified`,
+          title: 'Kehadiran telah diverifikasi',
+          detail: `${subject} • ${context}`,
+          date: item.tanggal_mengajar,
+          badge: 'Terverifikasi',
+          tone: 'emerald',
+        });
+      }
+
+      if (item.isPaid) {
+        items.push({
+          id: `${item.id}-paid`,
+          title: 'Pembayaran sudah masuk',
+          detail: `${subject} • ${context}`,
+          date: item.tanggal_mengajar,
+          badge: 'Dibayar',
+          tone: 'blue',
+        });
+      }
+    }
+
+    return items.slice(0, 3);
+  }, [presensiActivities]);
+
+  const activityRows = activityItems.slice(0, 3);
 
   const recentKpItems = useMemo(() => {
     return [...kpItems]
@@ -215,10 +313,8 @@ export default function AsdosHome() {
       .slice(0, 3);
   }, [kpItems]);
 
-  const activityItems = recentActivities.length > 0 ? recentActivities : previewActivities;
-
   if (isLoading) {
-    return <DashboardLoading />;
+    return <AsdosHomeSkeleton />;
   }
 
   return (
@@ -310,48 +406,40 @@ export default function AsdosHome() {
           <div className="bg-white rounded-2xl shadow-md lg:shadow-sm p-4 lg:p-5 space-y-4 border border-slate-100 lg:min-h-[430px]">
             {sessionsToday.length === 0 ? (
               <div className="py-16 text-center">
-                <CalendarDays size={30} className="mx-auto mb-3 text-slate-300" />
                 <p className="text-sm font-semibold text-slate-400">Tidak ada jadwal hari ini</p>
                 <p className="text-xs font-medium text-slate-400 mt-1">Gunakan waktu ini untuk cek riwayat atau pengajuan KP.</p>
               </div>
             ) : (
               sessionsToday.map((schedule) => (
                 <div key={`${schedule.id_sesi}-${schedule.waktu}`} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-all duration-200 hover:bg-white hover:shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-sm shrink-0 bg-white text-crimson border border-slate-100">
-                      <CalendarClock size={19} />
+                  <div className="flex justify-between gap-3 items-start">
+                    <div className="min-w-0">
+                      <h4 className="text-sm lg:text-base font-extrabold text-slate-800 leading-tight truncate">{schedule.mata_kuliah}</h4>
+                      <p className="text-xs text-slate-500 leading-tight mt-1 truncate">
+                        {schedule.nama_kelas}
+                      </p>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex justify-between gap-3 items-start">
-                        <div className="min-w-0">
-                          <h4 className="text-sm lg:text-base font-extrabold text-slate-800 leading-tight truncate">{schedule.mata_kuliah}</h4>
-                          <p className="text-xs text-slate-500 leading-tight mt-1 truncate">
-                            {schedule.nama_kelas}
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-crimson/5 px-3 py-1 text-[10px] font-extrabold text-crimson shrink-0">
-                          {schedule.tipe_jadwal}
-                        </span>
-                      </div>
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        <div className="flex items-center gap-2 text-slate-500">
-                          <CalendarClock size={14} className="text-slate-400" />
-                          <span className="font-semibold">{schedule.waktu}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-slate-500">
-                          <MapPin size={14} className="text-slate-400" />
-                          <span className="font-semibold truncate">{schedule.ruangan}</span>
-                        </div>
-                      </div>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <Link href="/asdos/check-in" className="inline-flex items-center justify-center rounded-xl bg-crimson px-4 py-2 text-xs font-bold text-white shadow-sm shadow-crimson/20 active:scale-[0.98]">
-                          Check-in
-                        </Link>
-                        <Link href="/asdos/check-out" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 active:scale-[0.98]">
-                          Check-out
-                        </Link>
-                      </div>
-                    </div>
+                    <span className="rounded-full bg-crimson/5 px-3 py-1 text-[10px] font-extrabold text-crimson shrink-0">
+                      {getScheduleTypeLabel(schedule)}
+                    </span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-500">
+                    <p>
+                      <span className="font-bold text-slate-400">Waktu: </span>
+                      <span className="font-semibold">{schedule.waktu}</span>
+                    </p>
+                    <p className="truncate">
+                      <span className="font-bold text-slate-400">Ruangan: </span>
+                      <span className="font-semibold">{schedule.ruangan}</span>
+                    </p>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Link href="/asdos/check-in" className="inline-flex items-center justify-center rounded-xl bg-crimson px-4 py-2 text-xs font-bold text-white shadow-sm shadow-crimson/20 active:scale-[0.98]">
+                      Check-in
+                    </Link>
+                    <Link href="/asdos/check-out" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 active:scale-[0.98]">
+                      Check-out
+                    </Link>
                   </div>
                 </div>
               ))
@@ -366,28 +454,30 @@ export default function AsdosHome() {
               Lihat Semua
             </Link>
           </div>
-          <div className="space-y-4">
-            {activityItems.map((item) => (
-              <div key={'id_presensi' in item ? item.id_presensi : item.id} className="bg-white p-4 lg:p-5 rounded-2xl lg:rounded-3xl shadow-md lg:shadow-sm active:scale-[0.97] transition-all duration-200 flex gap-4 lg:gap-5 items-start border border-slate-100">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm shrink-0 ${item.is_verified ? 'bg-emerald-50 text-emerald-500' : 'bg-amber-50 text-amber-500'}`}>
-                  <CheckCircle2 size={22} />
-                </div>
-                <div className="flex-1 min-w-0">
+          <div className="bg-white rounded-2xl shadow-md lg:shadow-sm border border-slate-100 p-4 lg:p-5 space-y-3">
+            {activityRows.length === 0 ? (
+              <div className="py-6 text-center text-slate-400">
+                <p className="text-sm font-semibold">Belum ada aktivitas terbaru</p>
+                <p className="text-xs font-medium mt-1">Verifikasi kehadiran atau pembayaran akan muncul di sini.</p>
+              </div>
+            ) : (
+              activityRows.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-all duration-200 hover:bg-white hover:shadow-sm">
                   <div className="flex justify-between items-start mb-1 gap-3">
-                    <h4 className="text-sm font-bold text-slate-800 truncate">{item.nama_mata_kuliah}</h4>
+                    <h4 className="text-sm font-bold text-slate-800 truncate">{item.title}</h4>
                     <span className="text-[10px] lg:text-xs text-slate-400 whitespace-nowrap">
-                      {formatShortDate(item.tanggal_mengajar)}
+                      {formatShortDate(item.date)}
                     </span>
                   </div>
                   <p className="text-[11px] font-bold text-slate-400 mb-2 truncate uppercase tracking-wider">
-                    {item.nama_kelas} - {item.nama_ruangan}
+                    {item.detail}
                   </p>
-                  <span className={`inline-block text-[10px] lg:text-xs font-bold px-3 py-1.5 rounded-full ${item.is_verified ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'}`}>
-                    {item.is_verified ? 'Terverifikasi' : 'Menunggu verifikasi'}
+                  <span className={`inline-block text-[10px] lg:text-xs font-bold px-3 py-1.5 rounded-full ${item.tone === 'emerald' ? 'text-emerald-600 bg-emerald-50' : 'text-blue-600 bg-blue-50'}`}>
+                    {item.badge}
                   </span>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -398,10 +488,9 @@ export default function AsdosHome() {
               Lihat Semua
             </Link>
           </div>
-          <div className="space-y-4">
+          <div className="bg-white rounded-2xl shadow-md lg:shadow-sm border border-slate-100 p-4 lg:p-5 space-y-3">
             {recentKpItems.length === 0 ? (
-              <div className="bg-white p-6 rounded-2xl lg:rounded-3xl shadow-md lg:shadow-sm text-center text-slate-400 border border-slate-100">
-                <CalendarSync size={28} className="mx-auto mb-2 text-slate-300" />
+              <div className="py-6 text-center text-slate-400">
                 <p className="text-sm font-semibold">Belum ada pengajuan kelas pengganti</p>
               </div>
             ) : (
@@ -415,26 +504,38 @@ export default function AsdosHome() {
                     : 'text-amber-600 bg-amber-50';
 
                 return (
-                  <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-start gap-4">
-                    <div className="w-11 h-11 rounded-xl bg-crimson/5 flex items-center justify-center text-crimson shrink-0">
-                      <CalendarSync size={20} />
+                  <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-all duration-200 hover:bg-white hover:shadow-sm">
+                    <div className="flex items-start justify-between gap-3 mb-1">
+                      <h4 className="text-sm font-bold text-slate-800 truncate">
+                        {item.session?.mata_kuliah ?? 'Kelas Pengganti'}
+                      </h4>
+                      <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full shrink-0 ${badgeClass}`}>
+                        {item.status}
+                      </span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3 mb-1">
-                        <h4 className="text-sm font-bold text-slate-800 truncate">
-                          {item.session?.mata_kuliah ?? 'Kelas Pengganti'}
-                        </h4>
-                        <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full shrink-0 ${badgeClass}`}>
-                          {item.status}
-                        </span>
+                    <p className="text-xs text-slate-500 truncate">
+                      {item.session?.nama_kelas ?? item.substitute_teacher}
+                    </p>
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-500">
+                      <p>
+                        <span className="font-bold text-slate-400">Pengganti: </span>
+                        <span>{formatShortDate(item.substitute_date)}</span>
+                      </p>
+                      <p>
+                        <span className="font-bold text-slate-400">Waktu: </span>
+                        <span>{item.time_slot || item.session?.waktu || '-'}</span>
+                      </p>
+                      <p className="truncate">
+                        <span className="font-bold text-slate-400">Ruang: </span>
+                        <span>{item.room || item.session?.ruangan || '-'}</span>
+                      </p>
+                    </div>
+                    {isRejected && item.coordinator_reason && (
+                      <div className="mt-3 rounded-xl bg-red-50 border border-red-100 px-3 py-2">
+                        <p className="text-[11px] font-bold text-red-600 mb-0.5">Alasan ditolak</p>
+                        <p className="text-xs text-red-500 line-clamp-2">{item.coordinator_reason}</p>
                       </div>
-                      <p className="text-xs text-slate-500 truncate">
-                        {item.session?.nama_kelas ?? item.substitute_teacher}
-                      </p>
-                      <p className="text-[11px] text-slate-400 mt-2">
-                        Update {timeAgo(item.updated_at)}
-                      </p>
-                    </div>
+                    )}
                   </div>
                 );
               })
