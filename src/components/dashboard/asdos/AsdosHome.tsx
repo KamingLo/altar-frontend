@@ -93,6 +93,26 @@ function getScheduleTypeLabel(schedule: SessionFromAPI) {
   return hour < 12 ? 'REGULER PAGI' : 'REGULER SORE';
 }
 
+function getScheduleEndMinutes(schedule: SessionFromAPI) {
+  const matches = [...schedule.waktu.matchAll(/(\d{1,2})[:.](\d{2})/g)];
+  const end = matches[matches.length - 1];
+  if (!end) return Number.POSITIVE_INFINITY;
+  const hour = Number(end[1]);
+  const minute = Number(end[2]);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return Number.POSITIVE_INFINITY;
+  return hour * 60 + minute;
+}
+
+function getCurrentMinutes() {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+function getKpStatusClass(status: SubstituteSessionDetail['status']) {
+  if (status === 'PENDING') return 'bg-fog text-ink';
+  return 'bg-obsidian text-white';
+}
+
 function getDisplayName(email?: string | null) {
   if (!email) return 'Asisten Dosen';
 
@@ -307,6 +327,14 @@ export default function AsdosHome() {
 
   const activityRows = activityItems.slice(0, 3);
 
+  const { currentSchedules, pastSchedules } = useMemo(() => {
+    const nowMinutes = getCurrentMinutes();
+    return {
+      currentSchedules: sessionsToday.filter((schedule) => getScheduleEndMinutes(schedule) >= nowMinutes),
+      pastSchedules: sessionsToday.filter((schedule) => getScheduleEndMinutes(schedule) < nowMinutes),
+    };
+  }, [sessionsToday]);
+
   const recentKpItems = useMemo(() => {
     return [...kpItems]
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
@@ -316,6 +344,42 @@ export default function AsdosHome() {
   if (isLoading) {
     return <AsdosHomeSkeleton />;
   }
+
+  const renderScheduleCard = (schedule: SessionFromAPI, showActions: boolean) => (
+    <div key={`${schedule.id_sesi}-${schedule.waktu}`} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-all duration-200 hover:bg-white hover:shadow-sm">
+      <div className="flex justify-between gap-3 items-start">
+        <div className="min-w-0">
+          <h4 className="text-sm lg:text-base font-extrabold text-slate-800 leading-tight truncate">{schedule.mata_kuliah}</h4>
+          <p className="text-xs text-slate-500 leading-tight mt-1 truncate">
+            {schedule.nama_kelas}
+          </p>
+        </div>
+        <span className="rounded-full bg-crimson/5 px-3 py-1 text-[10px] font-extrabold text-crimson shrink-0">
+          {getScheduleTypeLabel(schedule)}
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-500">
+        <p>
+          <span className="font-bold text-slate-400">Waktu: </span>
+          <span className="font-semibold">{schedule.waktu}</span>
+        </p>
+        <p className="truncate">
+          <span className="font-bold text-slate-400">Ruangan: </span>
+          <span className="font-semibold">{schedule.ruangan}</span>
+        </p>
+      </div>
+      {showActions && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href="/asdos/check-in" className="inline-flex items-center justify-center rounded-xl bg-crimson px-4 py-2 text-xs font-bold text-white shadow-sm shadow-crimson/20 active:scale-[0.98]">
+            Check-in
+          </Link>
+          <Link href="/asdos/check-out" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 active:scale-[0.98]">
+            Check-out
+          </Link>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="max-w-6xl mx-auto px-1.5 sm:px-2 md:px-0 pb-10 md:pb-12">
@@ -410,39 +474,33 @@ export default function AsdosHome() {
                 <p className="text-xs font-medium text-slate-400 mt-1">Gunakan waktu ini untuk cek riwayat atau pengajuan KP.</p>
               </div>
             ) : (
-              sessionsToday.map((schedule) => (
-                <div key={`${schedule.id_sesi}-${schedule.waktu}`} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-all duration-200 hover:bg-white hover:shadow-sm">
-                  <div className="flex justify-between gap-3 items-start">
-                    <div className="min-w-0">
-                      <h4 className="text-sm lg:text-base font-extrabold text-slate-800 leading-tight truncate">{schedule.mata_kuliah}</h4>
-                      <p className="text-xs text-slate-500 leading-tight mt-1 truncate">
-                        {schedule.nama_kelas}
-                      </p>
+              <>
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-3 px-1">
+                    Sedang / Akan Datang
+                  </p>
+                  {currentSchedules.length > 0 ? (
+                    <div className="space-y-3">
+                      {currentSchedules.map((schedule) => renderScheduleCard(schedule, true))}
                     </div>
-                    <span className="rounded-full bg-crimson/5 px-3 py-1 text-[10px] font-extrabold text-crimson shrink-0">
-                      {getScheduleTypeLabel(schedule)}
-                    </span>
-                  </div>
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-500">
-                    <p>
-                      <span className="font-bold text-slate-400">Waktu: </span>
-                      <span className="font-semibold">{schedule.waktu}</span>
-                    </p>
-                    <p className="truncate">
-                      <span className="font-bold text-slate-400">Ruangan: </span>
-                      <span className="font-semibold">{schedule.ruangan}</span>
-                    </p>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Link href="/asdos/check-in" className="inline-flex items-center justify-center rounded-xl bg-crimson px-4 py-2 text-xs font-bold text-white shadow-sm shadow-crimson/20 active:scale-[0.98]">
-                      Check-in
-                    </Link>
-                    <Link href="/asdos/check-out" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 active:scale-[0.98]">
-                      Check-out
-                    </Link>
-                  </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-center text-slate-400">
+                      <p className="text-sm font-semibold">Tidak ada jadwal aktif atau mendatang</p>
+                    </div>
+                  )}
                 </div>
-              ))
+
+                {pastSchedules.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-3 px-1">
+                      Sudah Lewat
+                    </p>
+                    <div className="space-y-3">
+                      {pastSchedules.map((schedule) => renderScheduleCard(schedule, false))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -495,13 +553,7 @@ export default function AsdosHome() {
               </div>
             ) : (
               recentKpItems.map((item) => {
-                const isVerified = item.status === 'VERIFIED';
                 const isRejected = item.status === 'REJECTED';
-                const badgeClass = isVerified
-                  ? 'text-emerald-600 bg-emerald-50'
-                  : isRejected
-                    ? 'text-red-600 bg-red-50'
-                    : 'text-amber-600 bg-amber-50';
 
                 return (
                   <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-all duration-200 hover:bg-white hover:shadow-sm">
@@ -509,7 +561,7 @@ export default function AsdosHome() {
                       <h4 className="text-sm font-bold text-slate-800 truncate">
                         {item.session?.mata_kuliah ?? 'Kelas Pengganti'}
                       </h4>
-                      <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full shrink-0 ${badgeClass}`}>
+                      <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full shrink-0 ${getKpStatusClass(item.status)}`}>
                         {item.status}
                       </span>
                     </div>
@@ -531,9 +583,9 @@ export default function AsdosHome() {
                       </p>
                     </div>
                     {isRejected && item.coordinator_reason && (
-                      <div className="mt-3 rounded-xl bg-red-50 border border-red-100 px-3 py-2">
-                        <p className="text-[11px] font-bold text-red-600 mb-0.5">Alasan ditolak</p>
-                        <p className="text-xs text-red-500 line-clamp-2">{item.coordinator_reason}</p>
+                      <div className="mt-3 rounded-xl bg-fog border border-slate-200 px-3 py-2">
+                        <p className="text-[11px] font-bold text-slate-600 mb-0.5">Alasan ditolak</p>
+                        <p className="text-xs text-slate-500 line-clamp-2">{item.coordinator_reason}</p>
                       </div>
                     )}
                   </div>

@@ -300,7 +300,6 @@ export default function RiwayatKehadiranPage() {
                 <p className="text-xs font-semibold text-red-500 mt-2 ml-1">Kamu tidak melakukan checkout pada sesi ini.</p>
               )}
             </div>
-
             <button onClick={() => setSelectedItem(null)}
               className="w-full md:hidden bg-slate-100 text-slate-600 font-bold py-3.5 rounded-xl active:scale-[0.98] hover:bg-slate-200 transition-all text-[15px]">
               Tutup
