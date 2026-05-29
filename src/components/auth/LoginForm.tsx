@@ -26,7 +26,7 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [isExiting, setIsExiting] = React.useState(false);
   const [isEntering, setIsEntering] = React.useState(true);
-  const [isIOS, setIsIOS] = React.useState(false);
+  const [isIOS] = React.useState(() => /iPhone|iPod/.test(navigator.userAgent));
 
   const handleBackToHome = () => {
     setIsExiting(true);
@@ -42,9 +42,6 @@ export default function LoginForm() {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    setIsIOS(/iPhone|iPod/.test(navigator.userAgent));
-  }, []);
 
   const renderToasts = () => (
     <>
@@ -285,9 +282,9 @@ export default function LoginForm() {
           <div
             className={`absolute inset-0 bg-[url('/gedung-untar-fl.webp')] bg-cover bg-center bg-no-repeat z-0 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-100' : 'opacity-50'}`}
           />
-          {/* Layer 1: White Gradient */}
+          
           <div className="absolute inset-y-0 right-0 w-[60%] z-10 bg-gradient-to-r from-[#f4f4f5]/0 via-[#f4f4f5]/80 to-[#f4f4f5]" />
-          {/* Layer 2: Telor Asin Gradient (Fades out when entering or exiting) */}
+          
           <div className={`absolute inset-y-0 right-0 w-[60%] z-10 bg-gradient-to-r from-[#EDF2F4]/0 via-[#EDF2F4]/80 to-[#EDF2F4] transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-0' : 'opacity-100'}`} />
         </div>
 
@@ -305,11 +302,11 @@ export default function LoginForm() {
               <div
                 className={`absolute inset-0 bg-gray-300 bg-[url('/gedung-untar.png')] bg-cover bg-[center_top] z-0 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-100' : 'opacity-50'}`}
               />
-              {/* Layer 1: White Gradient */}
+              
               <div className="absolute inset-0 z-10" style={{
                 background: 'linear-gradient(to top, #f4f4f5 0%, #f4f4f5 12%, rgba(244, 244, 245, 0.85) 22%, rgba(244, 244, 245, 0.55) 35%, rgba(244, 244, 245, 0.2) 50%, transparent 65%)'
               }} />
-              {/* Layer 2: Telor Asin Gradient (Fades out when entering or exiting) */}
+              
               <div className={`absolute inset-0 z-10 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-0' : 'opacity-100'}`} style={{
                 background: 'linear-gradient(to top, #EDF2F4 0%, #EDF2F4 12%, rgba(237, 242, 244, 0.85) 22%, rgba(237, 242, 244, 0.55) 35%, rgba(237, 242, 244, 0.2) 50%, transparent 65%)'
               }} />

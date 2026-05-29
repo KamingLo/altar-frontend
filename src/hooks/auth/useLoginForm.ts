@@ -36,7 +36,7 @@ export const useAuthForm = () => {
       const result = await loginUser(formData);
 
       if (result.success) {
-        // Gunakan data user yang dikembalikan langsung dari action login
+        
         if (result.data?.user) {
           setUser(result.data.user);
           setLoadingStore(false);
@@ -44,8 +44,7 @@ export const useAuthForm = () => {
           return;
         }
 
-        // Fallback jika data user tidak disertakan (jarang terjadi dengan logic baru)
-        const session = await getSession();
+const session = await getSession();
 
         if (session.success && session.data) {
           setUser(session.data);
@@ -58,7 +57,7 @@ export const useAuthForm = () => {
         setErrorMessage(result.message);
       }
     } catch {
-      // Catch tanpa variabel karena kita hanya butuh trigger notifikasi statis
+      
       setErrorMessage('Terjadi kesalahan sistem. Silakan coba lagi.');
     } finally {
       setIsLoading(false);

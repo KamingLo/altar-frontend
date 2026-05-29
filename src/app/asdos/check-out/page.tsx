@@ -4,8 +4,7 @@ import { Check, Scan, ArrowLeft, BookOpen, AlertCircle, Loader2, Camera, Image a
 import { getMyPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/actions/presensi';
 
 import Link from 'next/link';
-import { AsdosQrScanSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
-import { PageHeader } from '@/components/ui/PageHeader';
+import { AsdosQrScanSkeleton, AsdosPageShell, AsdosPageHeader } from '@/components/dashboard/asdos/AsdosUI';
 
 export default function CheckOutPage() {
   const MAX_HURUF = 100;
@@ -251,9 +250,7 @@ export default function CheckOutPage() {
 
       {step === 1 && (
         <>
-          <div className="mb-6 md:mb-8">
-            <PageHeader label="Check-out Kehadiran" title="Pindai Kode QR" description="Arahkan kamera ke kode QR untuk menyelesaikan sesi mengajar." />
-          </div>
+          <AsdosPageHeader eyebrow="Check-out Kehadiran" title="Pindai Kode QR" description="Arahkan kamera ke kode QR untuk menyelesaikan sesi mengajar." />
 
           <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-12 lg:p-16 md:flex md:items-start md:gap-16">
             <div className="hidden md:flex md:flex-1 flex-col justify-center pt-8">
@@ -446,29 +443,30 @@ export default function CheckOutPage() {
           </div>
 
           <div className="flex flex-col gap-6">
-            <section className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col gap-6 w-full">
-              <article className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="flex flex-col gap-1 w-full md:w-1/3">
-                  <h3 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 leading-snug">{activePresensi.nama_mata_kuliah}</h3>
-                  <p className="text-sm text-slate-500 font-medium">{activePresensi.nama_kelas}</p>
+            <section className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-5 shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col gap-5 w-full">
+              <article className="flex flex-col md:flex-row md:items-center gap-6 md:gap-4">
+                <div className="flex flex-col gap-1 w-full md:min-w-0">
+                  <h2 className="text-xl md:text-base font-bold text-slate-900 leading-snug line-clamp-2 mb-1 md:mb-0.5">
+                    {activePresensi.nama_mata_kuliah}
+                  </h2>
+                  <p className="text-sm md:text-xs text-slate-500 font-medium">{activePresensi.nama_kelas}</p>
                 </div>
-
-                <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full md:w-[480px]">
-                  <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
-                    <span className="text-sm md:text-base font-bold text-slate-800">
-                      {new Date(activePresensi.tanggal_mengajar).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4 md:gap-y-3 w-full md:w-auto shrink-0 md:ml-auto">
+                  <div className="flex flex-col gap-1 md:gap-0.5 border-l-2 border-slate-100 pl-4">
+                    <span className="text-[10px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
+                    <span className="text-sm md:text-xs font-bold text-slate-800">
+                      {new Date(activePresensi.tanggal_mengajar).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </span>
                   </div>
-                  <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Check-in</span>
-                    <span className="text-sm md:text-base font-bold text-slate-800">
+                  <div className="flex flex-col gap-1 md:gap-0.5 border-l-2 border-slate-100 pl-4">
+                    <span className="text-[10px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-in</span>
+                    <span className="text-sm md:text-xs font-bold text-slate-800">
                       {new Date(activePresensi.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
                     </span>
                   </div>
-                  <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
-                    <span className="text-sm md:text-base font-bold text-slate-800">{activePresensi.nama_ruangan}</span>
+                  <div className="flex flex-col gap-1 md:gap-0.5 border-l-2 border-slate-100 pl-4">
+                    <span className="text-[10px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+                    <span className="text-sm md:text-xs font-bold text-slate-800">{activePresensi.nama_ruangan}</span>
                   </div>
                 </div>
               </article>

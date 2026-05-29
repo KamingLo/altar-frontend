@@ -22,7 +22,7 @@ export async function setSession(token: string) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7, // 7 hari
+    maxAge: 60 * 60 * 24 * 7, 
   });
   return { success: true };
 }

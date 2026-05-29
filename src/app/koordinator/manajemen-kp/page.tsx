@@ -317,9 +317,11 @@ export default function ManajemenKpPage() {
                           {req.session?.nama_kelas ?? 'Kelas tidak tersedia'}
                         </p>
                       </div>
-                      <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap shrink-0 ${statusCfg.bg} ${statusCfg.text}`}>
-                        {statusCfg.label}
-                      </span>
+                      {req.status !== 'VERIFIED' && (
+                        <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap shrink-0 ${statusCfg.bg} ${statusCfg.text}`}>
+                          {statusCfg.label}
+                        </span>
+                      )}
                     </div>
 
                     <div className="border-t border-slate-100 pt-3">

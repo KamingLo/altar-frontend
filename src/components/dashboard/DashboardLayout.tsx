@@ -63,7 +63,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const resetJadwal = useJadwalStore(s => s.reset);
   const resetPengajuanKp = usePengajuanKpStore(s => s.reset);
   const resetPresensi = usePresensiStore(s => s.reset);
-  const { hasSeen, pendingCount, setPendingCount } = useNotificationStore();
+  const { hasSeen, pendingCount, setPendingCount, markSeen } = useNotificationStore();
 
   const hasDualRole = !!(user?.id_asisten && user?.id_koordinator);
   const otherDashboardHref = homeHref === '/koordinator' ? '/asdos' : '/koordinator';
@@ -90,6 +90,10 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (pathname === homeHref) markSeen();
+  }, [pathname, homeHref, markSeen]);
 
   const pollingRef = useRef(false);
 
@@ -461,7 +465,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             <div className="flex items-center gap-4">
               {pathname !== homeHref && !hasSeen && pendingCount > 0 && (
                 <button
-                  onClick={() => router.push(homeHref)}
+                  onClick={() => { markSeen(); router.push(homeHref); }}
                   className="relative p-2 text-crimson active:scale-95 transition-all duration-200 cursor-pointer"
                 >
                   <Bell size={22} strokeWidth={2.5} />
@@ -482,22 +486,21 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
           </div>
 
           <header id="dashboard-header-mobile" className={`lg:hidden absolute top-0 left-0 right-0 flex items-center justify-between gap-3 px-6 py-3.5 z-20 transition-all duration-300 ${isScrolled ? 'bg-white/60 backdrop-blur-md shadow-sm border-b border-white/30' : 'bg-transparent'}`}>
-            <Link
-              href={homeHref}
-              className="shrink-0 hover:scale-105 active:scale-90 rounded-full transition-all duration-200 p-2.5 flex items-center justify-center text-crimson"
+            <button
+              onClick={() => {
+                if (pathname !== homeHref && !hasSeen && pendingCount > 0) markSeen();
+                router.push(homeHref);
+              }}
+              className="shrink-0 hover:scale-105 active:scale-90 rounded-full transition-all duration-200 p-2.5 flex items-center justify-center text-crimson relative"
             >
               <Home size={26} strokeWidth={2.5} />
-            </Link>
-
-            <div className="flex flex-col items-center">
-              <div id="dashboard-clock-mobile" className={`flex flex-col items-center rounded-xl px-3 py-1.5 transition-all duration-300 ${isScrolled ? 'bg-transparent border border-transparent shadow-none' : 'bg-white/40 backdrop-blur-md shadow-sm border border-white/20'}`}>
-                <p className="text-[8px] font-bold tracking-widest uppercase leading-none text-slate-500">{dateStr}</p>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <p className="text-base font-black font-mono tracking-tight leading-none text-crimson">{timeStr}</p>
-                  <p className="text-[9px] font-extrabold tracking-widest leading-none text-slate-500">WIB</p>
-                </div>
-              </div>
-            </div>
+              {pathname !== homeHref && !hasSeen && pendingCount > 0 && (
+                <>
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-crimson" />
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-crimson animate-border-pulse" />
+                </>
+              )}
+            </button>
 
             <button
               onClick={() => setIsSidebarOpen(true)}

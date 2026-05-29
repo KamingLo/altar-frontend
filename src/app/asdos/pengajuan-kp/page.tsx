@@ -98,9 +98,7 @@ export default function PengajuanKpPage() {
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
   useEffect(() => { setClientToday(todayIso()); }, []);
 
-
-
-  useEffect(() => {
+useEffect(() => {
     let cancelled = false;
     setDropdownLoading(true);
     setDropdownError(null);

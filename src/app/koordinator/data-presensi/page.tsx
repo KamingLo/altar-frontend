@@ -32,9 +32,8 @@ type TipeFilter = 'ALL' | 'QR' | 'LINK';
 type PageTab = 'VERIFY' | 'PAY';
 
 function toMonthKey(dateStr: string) {
-  // Accepts ISO-ish strings; safest for backend formats used here.
-  // Example: 2026-05-27T00:00:00.000Z -> 2026-05
-  const part = (dateStr || '').split('T')[0] || '';
+
+const part = (dateStr || '').split('T')[0] || '';
   const [y, m] = part.split('-');
   if (!y || !m) return '';
   return `${y}-${m}`;
@@ -213,9 +212,8 @@ export default function DataPresensiPage() {
     );
   });
 
-  // For Progress & Pembayaran, we should not depend on the VERIFY tab filters (activeTab).
-  // We still respect semesterFilter because the fetch already scopes data by semester.
-  const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
+
+const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
     return presensiList.filter((item) => {
       if (!item.is_verified) return false;
       if (tipeFilter === 'QR' && item.tipe_absensi !== 'qr') return false;
@@ -229,7 +227,7 @@ export default function DataPresensiPage() {
   const currentMonthKey = useMemo(() => toMonthKey(new Date().toISOString()), []);
 
   const paymentSections = useMemo(() => {
-    // Group verified items into month -> asdos rekap
+    
     const monthMap = new Map<string, PresensiResponseDTO[]>();
     for (const item of payVerifiedList) {
       const key = toMonthKey(item.tanggal_mengajar);
@@ -266,7 +264,7 @@ export default function DataPresensiPage() {
         }
 
         const unpaidIdsAll = asdosRows.flatMap(r => r.unpaidIds);
-        const canPay = monthKey < currentMonthKey; // only months strictly before current month
+        const canPay = monthKey < currentMonthKey; 
 
         return {
           monthKey,
@@ -381,7 +379,7 @@ export default function DataPresensiPage() {
         </div>
       </div>
 
-      {/* Shared Filter Bar above the sliding container */}
+      
       <div className="space-y-6 relative z-20 mb-3 px-1">
         <div className="w-full z-20 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex w-full md:w-auto">
@@ -414,7 +412,7 @@ export default function DataPresensiPage() {
                 })}
               </div>
             ) : (
-              // Empty space to maintain layout alignment when PAY tab is active
+              
               <div className="hidden md:block h-12" />
             )}
           </div>
@@ -422,7 +420,7 @@ export default function DataPresensiPage() {
           <div className="flex gap-3 flex-1 md:max-w-max md:ml-auto w-full items-end">
             {semesters.length > 0 && (
               <>
-                {/* Desktop Semester Select */}
+                
                 <div className="hidden md:flex flex-col gap-1 w-[180px] shrink-0">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Semester</span>
                   <CustomSelect
@@ -442,7 +440,7 @@ export default function DataPresensiPage() {
                   />
                 </div>
 
-                {/* Mobile Semester Floating Select Button (styled exactly like manajemen jadwal) */}
+                
                 <div className="md:hidden fixed bottom-7 right-4 z-50">
                   <CustomSelect
                     variant="icon"

@@ -17,7 +17,6 @@ const isSessionExpired = (waktu: string): boolean => {
   return endHour * 60 + endMin < now.getHours() * 60 + now.getMinutes();
 };
 
-
 const normalizeScannedQrToken = (rawToken: string): string => {
   const token = rawToken.trim();
   if (!token) return '';
@@ -340,9 +339,8 @@ export default function CheckInPage() {
       id_sesi_pengganti: selectedSession?.tipe_jadwal === 'PENGGANTI' ? selectedSession.id_sesi : undefined,
     });
     if (res.success) {
-      // Auto-hapus pengajuan KP yang masih PENDING untuk sesi yang sama,
-      // karena asdos terbukti hadir (check-in berhasil)
-      try {
+
+try {
         const subRes = await getMySubstitutions();
         if (subRes.success && subRes.data) {
           const pendingUntukSesiIni = subRes.data.items.filter(
@@ -355,7 +353,7 @@ export default function CheckInPage() {
           }
         }
       } catch {
-        // Silent fail — check-in sudah berhasil, cleanup KP tidak boleh blokir flow
+        
       }
 
       handleCloseSheet();

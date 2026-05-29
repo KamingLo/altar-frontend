@@ -10,6 +10,7 @@ export function ResetPasswordForm() {
   const [showSuccessToast, setShowSuccessToast] = React.useState(false);
   const [showNew, setShowNew] = React.useState(false);
   const [showConfirm, setShowConfirm] = React.useState(false);
+  const [isIOS] = React.useState(() => /iPhone|iPod/.test(navigator.userAgent));
 
   useEffect(() => {
     const t = setTimeout(() => setShowErrorToast(message?.type === 'error'), 0);
@@ -206,8 +207,8 @@ export function ResetPasswordForm() {
             }} />
           </div>
 
-          <div className="relative z-10 flex flex-col flex-1 px-8 py-[5svh]">
-            <div className="grow" />
+          <div className={`relative z-10 flex flex-col flex-1 px-8 py-[5svh] ${isIOS ? 'justify-center' : ''}`}>
+            {!isIOS && <div className="grow" />}
             {renderFormArea()}
           </div>
         </div>

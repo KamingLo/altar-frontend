@@ -478,20 +478,20 @@ export default function ManajemenJadwalPage() {
 
   const sortSemestersByNewest = (items: SemesterItem[]) => {
     return [...items].sort((a, b) => {
-      // 1. Coba urutkan berdasarkan created_at terlebih dahulu (jika ada dan berbeda)
+      
       const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
       if (timeA !== timeB && timeA > 0 && timeB > 0) {
         return timeB - timeA;
       }
 
-      // 2. Fallback 1: Urutkan berdasarkan tahun ajaran secara descending (cth: "2026/2027" > "2025/2026")
+      
       const yearCompare = (b.tahun_ajaran || '').localeCompare(a.tahun_ajaran || '');
       if (yearCompare !== 0) {
         return yearCompare;
       }
 
-      // 3. Fallback 2: Urutkan berdasarkan tipe semester secara descending (Pendek > Genap > Ganjil)
+      
       const weight = { 'Pendek': 3, 'Genap': 2, 'Ganjil': 1 };
       const getWeight = (t: string) => weight[t as keyof typeof weight] || 0;
       return getWeight(b.tipe_semester || '') - getWeight(a.tipe_semester || '');
@@ -539,8 +539,8 @@ export default function ManajemenJadwalPage() {
 
   useEffect(() => {
     if (!selectedSemesterId) {
-      setSessions([]);
-      return;
+      const t = setTimeout(() => setSessions([]), 0);
+      return () => clearTimeout(t);
     }
     const t = setTimeout(() => refreshSessions(), 0);
     return () => clearTimeout(t);
@@ -1062,7 +1062,7 @@ export default function ManajemenJadwalPage() {
           className="!mb-2 md:!mb-5"
           action={
             <div className="relative shrink-0 flex flex-col sm:flex-row sm:items-end gap-3 z-30 w-full md:w-auto">
-              {/* Desktop: semester select */}
+              
               <div className="hidden md:flex relative w-full sm:w-[200px] md:w-[220px] flex-col gap-[10px]">
                 <div className="flex items-center justify-between w-full px-1">
                   <label className="block text-[11px] font-bold text-slate-400/90 tracking-widest uppercase">
@@ -1089,7 +1089,7 @@ export default function ManajemenJadwalPage() {
                 />
               </div>
 
-              {/* Buat Sesi Baru Button (desktop only) */}
+              
               <AsdosPrimaryButton
                 type="button"
                 onClick={() => handleOpenModal('add')}
@@ -1154,7 +1154,7 @@ export default function ManajemenJadwalPage() {
               </div>
             </div>
           </div>
-          {/* Hint khusus desktop — di luar baris filter agar tidak ganggu alignment */}
+          
           <p className="hidden md:block text-xs font-medium text-slate-400">
             Pilih rentang tanggal maksimal 7 hari.
           </p>
@@ -1238,7 +1238,7 @@ export default function ManajemenJadwalPage() {
                           </div>
                         </div>
 
-                        {/* Mobile: tombol kanan, badge di atas tombol */}
+                        
                         <div className="md:hidden flex flex-col items-end pt-4 pb-1 border-t border-slate-100 gap-2 mt-auto">
                           <div className="h-[22px] flex items-center">
                             {isPengganti && (
@@ -1270,7 +1270,7 @@ export default function ManajemenJadwalPage() {
                           </div>
                         </div>
 
-                        {/* Desktop: tombol kiri, badge kanan */}
+                        
                         <div className="hidden md:flex items-center justify-between pt-3 border-t border-slate-100 mt-auto">
                           <div className="flex items-center gap-2">
                             <button

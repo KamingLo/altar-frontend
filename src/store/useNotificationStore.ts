@@ -31,6 +31,7 @@ export const useNotificationStore = create<NotificationState>()(
       name: 'altar-notification',
       partialize: (state) => ({
         pendingCount: state.pendingCount,
+        hasSeen: state.hasSeen,
         lastSeenKpId: state.lastSeenKpId,
         lastSeenPresensiId: state.lastSeenPresensiId,
       }),

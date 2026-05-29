@@ -17,7 +17,7 @@ export async function verifyKioskPIN(pin: string) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 2, // 2 hours for kiosk mode
+      maxAge: 60 * 60 * 2, 
     });
   }
   
@@ -34,7 +34,7 @@ export async function deactivateKiosk() {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 7 days back to normal
+      maxAge: 60 * 60 * 24 * 7, 
     });
   }
   

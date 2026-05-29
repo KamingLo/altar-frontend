@@ -7,6 +7,7 @@ import {
 } from '@/lib/actions/manajemen';
 import type { UserListItem } from '@/lib/actions/manajemen';
 import { useManajemenStore } from '@/store/useManajemenStore';
+import Image from 'next/image';
 import { Plus, Search } from 'lucide-react';
 import { AsdosPageShell, AsdosPageHeader, AsdosState, AsdosListSkeleton, AsdosPrimaryButton } from '@/components/dashboard/asdos/AsdosUI';
 
@@ -379,8 +380,8 @@ export default function ManajemenAsdosPage() {
             className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex items-center justify-between border border-slate-100 active:scale-[0.99] md:hover:shadow-md md:hover:border-slate-200 transition-all"
           >
             <div className="flex items-center space-x-3 md:space-x-4 min-w-0 md:w-1/3">
-              <div className={`w-11 h-11 md:w-12 md:h-12 rounded-xl flex items-center justify-center font-bold text-base md:text-lg shrink-0 ${tabTheme[activeTab].iconBg} ${tabTheme[activeTab].iconText}`}>
-                {item.username[0]?.toUpperCase()}
+              <div className={`w-11 h-11 md:w-12 md:h-12 rounded-xl shrink-0 overflow-hidden shadow-md ${tabTheme[activeTab].iconBg}`}>
+                <Image src="/icon-512x512.png" alt="" width={48} height={48} className="w-full h-full object-cover" />
               </div>
               <div className="min-w-0">
                 <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{item.username}</h3>
@@ -603,8 +604,8 @@ export default function ManajemenAsdosPage() {
                             onClick={() => handleSelectUser(user)}
                             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] transition-all text-left"
                           >
-                            <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-bold text-sm text-crimson shrink-0">
-                              {user.username[0]?.toUpperCase()}
+                            <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 shrink-0 overflow-hidden shadow-md">
+                              <Image src="/icon-512x512.png" alt="" width={36} height={36} className="w-full h-full object-cover" />
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-semibold text-slate-800 truncate">{user.username}</p>
@@ -723,8 +724,8 @@ export default function ManajemenAsdosPage() {
 
                     {selectedUser && (
                       <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 mb-4">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base shrink-0 ${addRole === 'asdos' ? 'bg-rose-100 text-crimson' : 'bg-indigo-100 text-indigo-700'}`}>
-                          {selectedUser.username[0]?.toUpperCase()}
+                        <div className={`w-10 h-10 rounded-xl shrink-0 overflow-hidden shadow-md ${addRole === 'asdos' ? 'bg-rose-100' : 'bg-indigo-100'}`}>
+                          <Image src="/icon-512x512.png" alt="" width={40} height={40} className="w-full h-full object-cover" />
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-slate-800 truncate">{selectedUser.username}</p>

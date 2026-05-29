@@ -5,7 +5,7 @@ export const DashboardLoading = () => (
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
       `}</style>
 
-    {/* Mobile */}
+    
     <div className="lg:hidden relative w-full max-w-[450px] min-h-[100svh] bg-canvas flex flex-col items-center justify-center overflow-hidden mx-auto shadow-2xl">
       <div className="flex flex-col items-center gap-5">
         <div className="relative flex h-10 w-10 items-center justify-center">
@@ -18,7 +18,7 @@ export const DashboardLoading = () => (
       </div>
     </div>
 
-    {/* Desktop */}
+    
     <div className="hidden lg:flex w-full h-screen overflow-hidden bg-canvas relative">
       <main className="relative z-10 flex-1 h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-5">

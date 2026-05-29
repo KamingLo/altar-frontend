@@ -93,6 +93,15 @@ function getScheduleTypeLabel(schedule: SessionFromAPI) {
   return hour < 12 ? 'REGULER PAGI' : 'REGULER SORE';
 }
 
+function getScheduleStartMinutes(schedule: SessionFromAPI) {
+  const match = schedule.waktu.match(/(\d{1,2})[:.](\d{2})/);
+  if (!match) return 0;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return 0;
+  return hour * 60 + minute;
+}
+
 function getScheduleEndMinutes(schedule: SessionFromAPI) {
   const matches = [...schedule.waktu.matchAll(/(\d{1,2})[:.](\d{2})/g)];
   const end = matches[matches.length - 1];
@@ -227,6 +236,12 @@ export default function AsdosHome() {
   const [kpItem, setKpItem] = useState<SubstituteSessionDetail | null>(null);
   const [presensiItem, setPresensiItem] = useState<PresensiResponseDTO | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentMinutes, setCurrentMinutes] = useState(getCurrentMinutes);
+
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentMinutes(getCurrentMinutes()), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     async function fetchDashboard() {
@@ -345,41 +360,62 @@ export default function AsdosHome() {
     return <AsdosHomeSkeleton />;
   }
 
-  const renderScheduleCard = (schedule: SessionFromAPI, showActions: boolean) => (
-    <div key={`${schedule.id_sesi}-${schedule.waktu}`} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-all duration-200 hover:bg-white hover:shadow-sm">
-      <div className="flex justify-between gap-3 items-start">
-        <div className="min-w-0">
-          <h4 className="text-sm lg:text-base font-extrabold text-slate-800 leading-tight truncate">{schedule.mata_kuliah}</h4>
-          <p className="text-xs text-slate-500 leading-tight mt-1 truncate">
-            {schedule.nama_kelas}
+  const renderScheduleCard = (schedule: SessionFromAPI, showActions: boolean) => {
+    const today = todayISO();
+    const startMinutes = getScheduleStartMinutes(schedule);
+    const canCheckIn = currentMinutes >= startMinutes - 10;
+
+    const sessionPresensi = presensiItems.find(p => {
+      const matchDate = String(p.tanggal_mengajar).split('T')[0] === today;
+      return matchDate && (p.id_sesi === schedule.id_sesi || p.id_sesi_pengganti === schedule.id_sesi);
+    });
+    const hasCheckedIn = !!sessionPresensi;
+    const hasCheckedOut = hasCheckedIn && !!sessionPresensi!.waktu_checkout && !String(sessionPresensi!.waktu_checkout).startsWith('0001');
+
+    return (
+      <div key={`${schedule.id_sesi}-${schedule.waktu}`} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-all duration-200 hover:bg-white hover:shadow-sm">
+        <div className="flex justify-between gap-3 items-start">
+          <div className="min-w-0">
+            <h4 className="text-sm lg:text-base font-extrabold text-slate-800 leading-tight truncate">{schedule.mata_kuliah}</h4>
+            <p className="text-xs text-slate-500 leading-tight mt-1 truncate">
+              {schedule.nama_kelas}
+            </p>
+          </div>
+          <span className="rounded-full bg-crimson/5 px-3 py-1 text-[10px] font-extrabold text-crimson shrink-0">
+            {getScheduleTypeLabel(schedule)}
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
+          <p>
+            <span className="font-bold text-slate-500">Waktu: </span>
+            <span className="font-semibold">{schedule.waktu}</span>
+          </p>
+          <p className="truncate">
+            <span className="font-bold text-slate-500">Ruangan: </span>
+            <span className="font-semibold">{schedule.ruangan}</span>
           </p>
         </div>
-        <span className="rounded-full bg-crimson/5 px-3 py-1 text-[10px] font-extrabold text-crimson shrink-0">
-          {getScheduleTypeLabel(schedule)}
-        </span>
+        {showActions && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {canCheckIn ? (
+              <Link href="/asdos/check-in" className="inline-flex items-center justify-center rounded-xl bg-crimson px-4 py-2 text-xs font-bold text-white shadow-sm shadow-crimson/20 active:scale-[0.98]">
+                Check-in
+              </Link>
+            ) : (
+              <span className="inline-flex items-center justify-center rounded-xl bg-crimson/40 px-4 py-2 text-xs font-bold text-white cursor-not-allowed select-none">
+                Check-in
+              </span>
+            )}
+            {hasCheckedIn && !hasCheckedOut && (
+              <Link href="/asdos/check-out" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 active:scale-[0.98]">
+                Check-out
+              </Link>
+            )}
+          </div>
+        )}
       </div>
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-500">
-        <p>
-          <span className="font-bold text-slate-400">Waktu: </span>
-          <span className="font-semibold">{schedule.waktu}</span>
-        </p>
-        <p className="truncate">
-          <span className="font-bold text-slate-400">Ruangan: </span>
-          <span className="font-semibold">{schedule.ruangan}</span>
-        </p>
-      </div>
-      {showActions && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/asdos/check-in" className="inline-flex items-center justify-center rounded-xl bg-crimson px-4 py-2 text-xs font-bold text-white shadow-sm shadow-crimson/20 active:scale-[0.98]">
-            Check-in
-          </Link>
-          <Link href="/asdos/check-out" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 active:scale-[0.98]">
-            Check-out
-          </Link>
-        </div>
-      )}
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-1.5 sm:px-2 md:px-0 pb-10 md:pb-12">
@@ -390,7 +426,7 @@ export default function AsdosHome() {
         <h1 className="text-[24px] md:text-[30px] font-extrabold text-slate-900 leading-tight">
           Halo, {displayName}
         </h1>
-        <p className="text-xs md:text-sm text-slate-500 mt-2 max-w-2xl">
+        <p className="text-xs md:text-sm text-slate-700 mt-2 max-w-2xl">
           Pantau jadwal mengajar, status presensi, dan pengajuan kelas pengganti dalam satu ringkasan.
         </p>
       </div>
@@ -414,7 +450,7 @@ export default function AsdosHome() {
                   <p className="text-sm font-bold text-slate-800 truncate">
                     {kpItem.status === 'VERIFIED' ? 'Pengajuan KP Disetujui' : 'Pengajuan KP Ditolak'}
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                  <p className="text-xs text-slate-700 mt-0.5 line-clamp-1">
                     {kpItem.session?.mata_kuliah ?? 'Kelas pengganti'} {kpItem.session?.nama_kelas ?? ''} telah {kpItem.status === 'VERIFIED' ? 'disetujui' : 'ditolak'} koordinator
                   </p>
                 </div>
@@ -430,7 +466,7 @@ export default function AsdosHome() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-800 truncate">Presensi Telah Diverifikasi</p>
-                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                  <p className="text-xs text-slate-700 mt-0.5 line-clamp-1">
                     Kehadiran {presensiItem.nama_mata_kuliah} {presensiItem.nama_kelas} telah diverifikasi koordinator
                   </p>
                 </div>
@@ -451,7 +487,7 @@ export default function AsdosHome() {
               <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] text-crimson group-hover:scale-105 group-active:scale-95 transition-all mb-3">
                 <Icon size={24} strokeWidth={2} />
               </div>
-              <span className="text-[10px] font-semibold text-slate-600 text-center w-16 leading-tight">
+              <span className="text-[10px] font-semibold text-slate-800 text-center w-16 leading-tight">
                 {item.title}
               </span>
             </Link>
@@ -460,14 +496,14 @@ export default function AsdosHome() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-8 lg:gap-8">
-        <div className="animate-fade-up lg:row-span-2" style={{ animationDelay: '0.1s' }}>
+        <div className="animate-fade-up lg:row-span-2 flex flex-col" style={{ animationDelay: '0.1s' }}>
           <div className="flex justify-between items-center mb-4 lg:mb-6 px-1">
             <h3 className="font-bold text-lg lg:text-xl text-slate-800">Jadwal Hari Ini</h3>
             <Link href="/asdos/jadwal-ajar" className="text-xs lg:text-sm font-semibold text-crimson active:scale-95 transition">
               Lihat Semua
             </Link>
           </div>
-          <div className="bg-white rounded-2xl shadow-md lg:shadow-sm p-4 lg:p-5 space-y-4 border border-slate-100 lg:min-h-[430px]">
+          <div className="bg-white rounded-2xl shadow-md lg:shadow-sm p-4 lg:p-5 space-y-4 border border-slate-100 flex-1">
             {sessionsToday.length === 0 ? (
               <div className="py-16 text-center">
                 <p className="text-sm font-semibold text-slate-400">Tidak ada jadwal hari ini</p>
@@ -476,9 +512,6 @@ export default function AsdosHome() {
             ) : (
               <>
                 <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-3 px-1">
-                    Sedang / Akan Datang
-                  </p>
                   {currentSchedules.length > 0 ? (
                     <div className="space-y-3">
                       {currentSchedules.map((schedule) => renderScheduleCard(schedule, true))}
@@ -516,18 +549,18 @@ export default function AsdosHome() {
             {activityRows.length === 0 ? (
               <div className="py-6 text-center text-slate-400">
                 <p className="text-sm font-semibold">Belum ada aktivitas terbaru</p>
-                <p className="text-xs font-medium mt-1">Verifikasi kehadiran atau pembayaran akan muncul di sini.</p>
+                <p className="text-[10px] font-medium mt-1">Verifikasi kehadiran atau pembayaran akan muncul di sini.</p>
               </div>
             ) : (
               activityRows.map((item) => (
                 <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-all duration-200 hover:bg-white hover:shadow-sm">
                   <div className="flex justify-between items-start mb-1 gap-3">
                     <h4 className="text-sm font-bold text-slate-800 truncate">{item.title}</h4>
-                    <span className="text-[10px] lg:text-xs text-slate-400 whitespace-nowrap">
+                    <span className="text-[10px] lg:text-xs text-slate-700 whitespace-nowrap">
                       {formatShortDate(item.date)}
                     </span>
                   </div>
-                  <p className="text-[11px] font-bold text-slate-400 mb-2 truncate uppercase tracking-wider">
+                  <p className="text-[11px] font-bold text-slate-700 mb-2 truncate uppercase tracking-wider">
                     {item.detail}
                   </p>
                   <span className={`inline-block text-[10px] lg:text-xs font-bold px-3 py-1.5 rounded-full ${item.tone === 'emerald' ? 'text-emerald-600 bg-emerald-50' : 'text-blue-600 bg-blue-50'}`}>
@@ -565,27 +598,27 @@ export default function AsdosHome() {
                         {item.status}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 truncate">
+                    <p className="text-xs text-slate-700 truncate">
                       {item.session?.nama_kelas ?? item.substitute_teacher}
                     </p>
-                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-500">
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-700">
                       <p>
-                        <span className="font-bold text-slate-400">Pengganti: </span>
+                        <span className="font-bold text-slate-500">Pengganti: </span>
                         <span>{formatShortDate(item.substitute_date)}</span>
                       </p>
                       <p>
-                        <span className="font-bold text-slate-400">Waktu: </span>
+                        <span className="font-bold text-slate-500">Waktu: </span>
                         <span>{item.time_slot || item.session?.waktu || '-'}</span>
                       </p>
                       <p className="truncate">
-                        <span className="font-bold text-slate-400">Ruang: </span>
+                        <span className="font-bold text-slate-500">Ruang: </span>
                         <span>{item.room || item.session?.ruangan || '-'}</span>
                       </p>
                     </div>
                     {isRejected && item.coordinator_reason && (
                       <div className="mt-3 rounded-xl bg-fog border border-slate-200 px-3 py-2">
-                        <p className="text-[11px] font-bold text-slate-600 mb-0.5">Alasan ditolak</p>
-                        <p className="text-xs text-slate-500 line-clamp-2">{item.coordinator_reason}</p>
+                        <p className="text-[11px] font-bold text-slate-800 mb-0.5">Alasan ditolak</p>
+                        <p className="text-xs text-slate-700 line-clamp-2">{item.coordinator_reason}</p>
                       </div>
                     )}
                   </div>

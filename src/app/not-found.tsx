@@ -462,18 +462,18 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       let userHasInteracted = true;
       let lastInteract = performance.now() - 2000;
 
-      // Gyroscope states
+      
       const gyro = { x: 0, y: 0 };
       let initialBeta: number | null = null;
       let initialGamma: number | null = null;
 
       function onDeviceOrientation(e: DeviceOrientationEvent) {
         if (dragging) return;
-        const beta = e.beta;  // tilt front/back [-180, 180]
-        const gamma = e.gamma; // tilt left/right [-90, 90]
+        const beta = e.beta;  
+        const gamma = e.gamma; 
         if (beta === null || gamma === null) return;
 
-        // Calibrate based on initial holding angle
+        
         if (initialBeta === null || initialGamma === null) {
           initialBeta = beta;
           initialGamma = gamma;
@@ -483,15 +483,15 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         const deltaBeta = beta - initialBeta;
         const deltaGamma = gamma - initialGamma;
 
-        // Subtle parallax displacement
+        
         gyro.x = Math.max(-0.6, Math.min(0.6, deltaBeta * 0.012));
         gyro.y = Math.max(-0.6, Math.min(0.6, deltaGamma * 0.012));
       }
 
-      // Bind gyroscope immediately on Android/standard browsers
+      
       if (
         typeof window !== 'undefined' &&
-        // @ts-expect-error vendor-specific API not in types
+        
         !(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function')
       ) {
         window.addEventListener('deviceorientation', onDeviceOrientation);
@@ -504,13 +504,13 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         lastY = e.clientY;
         try { canvas!.setPointerCapture(e.pointerId); } catch {}
 
-        // Request iOS gyroscope permission on first touch interaction
+        
         if (
           typeof DeviceOrientationEvent !== 'undefined' &&
-          // @ts-expect-error vendor-specific API not in types
+          
           typeof DeviceOrientationEvent.requestPermission === 'function'
         ) {
-          // @ts-expect-error vendor-specific API not in types
+          
           DeviceOrientationEvent.requestPermission()
             .then((state: string) => {
               if (state === 'granted') {
@@ -546,7 +546,7 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         const autoFactor = Math.min(1, Math.max(0, (sinceMove - 0.3) / 1.5));
         if (!dragging && userHasInteracted) target.y += 0.0035 * autoFactor;
         
-        // Combine auto-rotation target + gyroscope parallax offset smoothly
+        
         rot.x += (target.x + gyro.x - rot.x) * 0.08;
         rot.y += (target.y + gyro.y - rot.y) * 0.08;
         cube.rotation.x = rot.x;
@@ -907,7 +907,7 @@ function NotFoundAuth() {
             </button>
           </header>
 
-          {/* Clock pill on the top right */}
+          
           <div className="hidden lg:flex absolute top-7 right-7 z-20 flex-col items-end gap-3">
             <div className="flex items-center gap-4 text-right">
               <div>
@@ -922,7 +922,7 @@ function NotFoundAuth() {
             </div>
           </div>
 
-          {/* Dashboard button(s) on the top left, next to the sidebar */}
+          
           <div className="hidden lg:flex absolute top-7 left-7 z-20 gap-2">
             {user?.id_koordinator && user?.id_asisten ? (
               <>

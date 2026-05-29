@@ -44,7 +44,7 @@ const TIPE_SEMESTER_OPTIONS = [
   { value: 'Pendek', label: 'Pendek' },
 ];
 
-// Direct side-by-side inputs are now used in renderFields for semester academic year
+
 
 const inputClass =
   'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-white focus:border-crimson focus:ring-1 focus:ring-crimson outline-none disabled:opacity-60';

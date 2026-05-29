@@ -20,7 +20,7 @@ type CustomSelectProps = {
   triggerClassName?: string;
   align?: 'left' | 'right';
   icon?: React.ReactNode;
-  /** field = full-width trigger; icon = compact square button (e.g. filter) */
+  
   variant?: 'field' | 'icon';
   onDeleteOption?: (value: string) => void;
   searchable?: boolean;
@@ -168,7 +168,7 @@ export function CustomSelect({
           style={menuStyle}
           className="z-[9999] bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden flex flex-col"
         >
-          {/* Mobile: search inside portal */}
+          
           {searchable && isMobile && (
             <div className="px-3 pt-3 pb-1 shrink-0">
               <input
@@ -191,7 +191,7 @@ export function CustomSelect({
 
   return (
     <div ref={triggerRef} className={`relative ${isIcon ? 'shrink-0' : ''} ${className}`}>
-      {/* Desktop searchable: replace trigger with input */}
+      
       {!isIcon && open && searchable && !isMobile ? (
         <div className="relative w-full">
           {icon && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-crimson shrink-0 z-10">{icon}</span>}

@@ -44,7 +44,7 @@ async function request<T = unknown>(
       data?: unknown;
       error?: unknown;
     } = {};
-    try { json = await res.json(); } catch { /* non-JSON response */ }
+    try { json = await res.json(); } catch {  }
     const isSuccess = json?.success === true || (res.ok && json?.success !== false);
 
     if (!isSuccess) {
