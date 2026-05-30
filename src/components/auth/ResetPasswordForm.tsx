@@ -85,7 +85,7 @@ export function ResetPasswordForm() {
     <div className="relative w-full">
       <div className="text-left mb-6" style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.05s both' }}>
         <h1 className="text-[38px] font-extrabold tracking-[-1px] leading-[1.1] mb-3">
-          <span className="text-[#0D1B2A]">Update</span><br />
+          <span className="text-[#0D1B2A]">Buat</span><br />
           <span className="text-crimson">Password.</span>
         </h1>
         <p className="text-[14px] text-[#4B5563] leading-[1.6] font-medium max-w-[280px]">
@@ -161,7 +161,7 @@ export function ResetPasswordForm() {
           href="/auth/login"
           className="w-full mt-6 p-[14px] text-[14px] font-bold text-[#64748B] flex items-center justify-end gap-[6px] hover:text-[#0F172A] transition-colors"
         >
-          â† Kembali
+          ← Kembali
         </a>
       </div>
     </div>
@@ -172,8 +172,8 @@ export function ResetPasswordForm() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @keyframes fadeUp {
-            from { transform: translateY(22px); }
-            to { transform: translateY(0); }
+            from { opacity: 0; transform: translateY(22px); }
+            to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
 

@@ -6,12 +6,14 @@ export type AsdosListItem = {
   id_asdos: string;
   username: string;
   nim: string;
+  deactivated_at?: string | null;
 };
 
 export type KoorListItem = {
   id_koor: string;
   username: string;
   nip: string;
+  deactivated_at?: string | null;
 };
 
 export type UserListItem = {
@@ -28,18 +30,14 @@ export type AsdosDetail = {
   user: { username: string; email: string };
 };
 
-export async function getAsdosList(page = 1, search = '', limit = 10) {
-  return apiClient.get<AsdosListItem[]>(
-    `/asdos?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
-    { auth: true, cache: 'no-store' },
-  );
+export async function getAsdosList(page = 1, search = '', limit = 10, includeInactive = false) {
+  const q = `/asdos?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}${includeInactive ? '&include_inactive=true' : ''}`;
+  return apiClient.get<AsdosListItem[]>(q, { auth: true, cache: 'no-store' });
 }
 
-export async function getKoorList(page = 1, search = '') {
-  return apiClient.get<KoorListItem[]>(
-    `/koor?page=${page}&search=${encodeURIComponent(search)}`,
-    { auth: true, cache: 'no-store' },
-  );
+export async function getKoorList(page = 1, search = '', includeInactive = false) {
+  const q = `/koor?page=${page}&search=${encodeURIComponent(search)}${includeInactive ? '&include_inactive=true' : ''}`;
+  return apiClient.get<KoorListItem[]>(q, { auth: true, cache: 'no-store' });
 }
 
 export async function getUserList(page = 1, search = '') {
@@ -134,13 +132,23 @@ export async function updateKoor(id: string, data: { nip: string }) {
   return { success: res.success, message: res.message };
 }
 
-export async function deleteAsdos(id: string) {
-  const res = await apiClient.delete(`/asdos/${id}`, { auth: true });
+export async function activateAsdos(id: string) {
+  const res = await apiClient.patch(`/asdos/${id}/activate`, undefined, { auth: true });
   return { success: res.success, message: res.message };
 }
 
-export async function deleteKoor(id: string) {
-  const res = await apiClient.delete(`/koor/${id}`, { auth: true });
+export async function deactivateAsdos(id: string) {
+  const res = await apiClient.patch(`/asdos/${id}/deactivate`, undefined, { auth: true });
+  return { success: res.success, message: res.message };
+}
+
+export async function activateKoor(id: string) {
+  const res = await apiClient.patch(`/koor/${id}/activate`, undefined, { auth: true });
+  return { success: res.success, message: res.message };
+}
+
+export async function deactivateKoor(id: string) {
+  const res = await apiClient.patch(`/koor/${id}/deactivate`, undefined, { auth: true });
   return { success: res.success, message: res.message };
 }
 

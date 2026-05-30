@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   User,
-  CheckCircle2,
   X,
   Check,
   XCircle,
@@ -31,11 +30,13 @@ export default function ManajemenKpPage() {
   const [activeTab, setActiveTab] = useState<TabId>('PENDING');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRequest, setSelectedRequest] = useState<SubstituteSessionDetail | null>(null);
-  const [modalType, setModalType] = useState<'APPROVE' | 'REJECT' | 'NONE'>('NONE');
+  const [modalType, setModalType] = useState<'REJECT' | 'NONE'>('NONE');
   const [rejectionReason, setRejectionReason] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmingApproveId, setConfirmingApproveId] = useState<string | null>(null);
+  const [approvePending, setApprovePending] = useState<Set<string>>(new Set());
 
   const hasLoadedRef = useRef(false);
 
@@ -69,13 +70,33 @@ export default function ManajemenKpPage() {
     fetchRequests(false);
   }, [fetchRequests]);
 
-  const openModal = (req: SubstituteSessionDetail, type: 'APPROVE' | 'REJECT') => {
+  const openModal = (req: SubstituteSessionDetail) => {
     setSelectedRequest(req);
-    setModalType(type);
+    setModalType('REJECT');
     setRejectionReason('');
     setIsClosing(false);
     setIsModalVisible(false);
     setTimeout(() => setIsModalVisible(true), 10);
+  };
+
+  const handleDirectApprove = async (req: SubstituteSessionDetail) => {
+    setConfirmingApproveId(null);
+    setApprovePending(prev => new Set(prev).add(req.id));
+    updateStatusLocal(req.id, 'VERIFIED', null);
+    try {
+      const res = await updateSubstitutionStatus(req.id, { status: 'VERIFIED', coordinator_reason: null });
+      if (res.success) {
+        toast.success('Pengajuan kuliah pengganti berhasil disetujui!');
+      } else {
+        toast.error(res.message || 'Gagal memperbarui status pengajuan.');
+        fetchRequests(true);
+      }
+    } catch {
+      toast.error('Gagal memperbarui status pengajuan.');
+      fetchRequests(true);
+    } finally {
+      setApprovePending(prev => { const s = new Set(prev); s.delete(req.id); return s; });
+    }
   };
 
   const closeModal = () => {
@@ -93,8 +114,8 @@ export default function ManajemenKpPage() {
     if (!selectedRequest) return;
     setIsSubmitting(true);
 
-    const action = modalType === 'APPROVE' ? 'VERIFIED' : 'REJECTED';
-    const reasonPayload = modalType === 'REJECT' ? rejectionReason.trim() : null;
+    const action = 'REJECTED';
+    const reasonPayload = rejectionReason.trim();
 
     try {
 
@@ -388,25 +409,54 @@ export default function ManajemenKpPage() {
                     </div>
 
                     {isPendingStatus && (
-                      <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 mt-auto">
-                        <button
-                          type="button"
-                          onClick={() => openModal(req, 'REJECT')}
-                          className="w-10 h-10 rounded-full border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95 transition-all flex items-center justify-center"
-                          aria-label="Tolak"
-                          title="Tolak"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openModal(req, 'APPROVE')}
-                          className="w-10 h-10 rounded-full border border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 transition-all flex items-center justify-center"
-                          aria-label="Setujui"
-                          title="Setujui"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
+                      <div className="pt-3 border-t border-slate-100 mt-auto">
+                        {confirmingApproveId === req.id ? (
+                          <div className="w-full h-10 flex items-center justify-between gap-3 bg-slate-50/50 rounded-xl px-3 border border-slate-100">
+                            <span className="text-xs font-extrabold text-slate-700 animate-pulse">Anda Yakin?</span>
+                            <div className="flex gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setConfirmingApproveId(null)}
+                                className="w-7 h-7 rounded-full border border-rose-200 bg-white text-crimson hover:bg-rose-50 active:scale-95 transition-all flex items-center justify-center shadow-sm"
+                                title="Batal"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDirectApprove(req)}
+                                disabled={approvePending.has(req.id)}
+                                className="w-7 h-7 rounded-full border border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 active:scale-95 transition-all flex items-center justify-center disabled:opacity-50 shadow-sm"
+                                title="Ya, Setujui"
+                              >
+                                {approvePending.has(req.id)
+                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  : <Check className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openModal(req)}
+                              className="w-10 h-10 rounded-full border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95 transition-all flex items-center justify-center"
+                              aria-label="Tolak"
+                              title="Tolak"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmingApproveId(req.id)}
+                              className="w-10 h-10 rounded-full border border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 transition-all flex items-center justify-center"
+                              aria-label="Setujui"
+                              title="Setujui"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </article>
@@ -418,7 +468,7 @@ export default function ManajemenKpPage() {
 
       </div>
 
-      {modalType !== 'NONE' && selectedRequest && (
+      {modalType === 'REJECT' && selectedRequest && (
         <>
 
           <div
@@ -436,61 +486,28 @@ export default function ManajemenKpPage() {
               `}
             >
 
-              {modalType === 'APPROVE' ? (
-                <>
-                  <div className="flex items-center gap-4 mb-5">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                      <CheckCircle2 className="w-6 h-6 animate-pulse" />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase block">Konfirmasi Verifikasi</span>
-                      <h3 className="text-xl font-black text-slate-800 leading-tight">Setujui Kuliah Pengganti?</h3>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-2 mb-5">
-                    <div className="flex justify-between items-center text-xs text-slate-400 font-bold border-b border-slate-200/50 pb-2">
-                      <span>Mata Kuliah:</span>
-                      <span className="text-slate-800 font-extrabold max-w-[200px] truncate">{selectedRequest.session?.mata_kuliah}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs text-slate-400 font-bold border-b border-slate-200/50 pb-2">
-                      <span>Kelas:</span>
-                      <span className="text-slate-800 font-extrabold">{selectedRequest.session?.nama_kelas}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs text-crimson font-black border-b border-slate-200/50 pb-2">
-                      <span>Tanggal Baru:</span>
-                      <span>{formatDate(selectedRequest.substitute_date)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
-                      <span>Ruang & Jam:</span>
-                      <span className="text-slate-800 font-bold">R.{selectedRequest.room} ({selectedRequest.time_slot})</span>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-slate-500 font-bold leading-relaxed mb-6">
-                    Dengan menyetujui pengajuan ini, jadwal kuliah pengganti asisten dosen akan otomatis diaktifkan di dalam sistem dan mahasiswa dapat melakukan check-in pada tanggal tersebut.
-                  </p>
-                </>
-              ) : (
-                <div className="mb-5">
-                  <label htmlFor="coordinator_reason" className="block text-xs font-extrabold text-slate-500 tracking-wider uppercase mb-2">
-                    Alasan Penolakan
-                  </label>
-                  <textarea
-                    id="coordinator_reason"
-                    rows={4}
-                    maxLength={100}
-                    placeholder="Masukkan alasan penolakan..."
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    disabled={isSubmitting}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-crimson/50 focus:border-crimson/50 transition-all resize-none leading-relaxed"
-                  />
-                  <div className="text-right text-[10px] font-bold text-slate-400 mt-1 pr-1">
-                    {rejectionReason.length} / 100
-                  </div>
+              <div className="mb-5">
+                <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase block mb-1">Konfirmasi Penolakan</span>
+                <h3 className="text-xl font-black text-slate-800 leading-tight">Tolak Kuliah Pengganti?</h3>
+              </div>
+              <div className="mb-5">
+                <label htmlFor="coordinator_reason" className="block text-xs font-extrabold text-slate-500 tracking-wider uppercase mb-2">
+                  Alasan Penolakan
+                </label>
+                <textarea
+                  id="coordinator_reason"
+                  rows={4}
+                  maxLength={100}
+                  placeholder="Masukkan alasan penolakan..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  disabled={isSubmitting}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-crimson/50 focus:border-crimson/50 transition-all resize-none leading-relaxed"
+                />
+                <div className="text-right text-[10px] font-bold text-slate-400 mt-1 pr-1">
+                  {rejectionReason.length} / 100
                 </div>
-              )}
+              </div>
 
               <div className="flex gap-3 mt-auto pt-2">
                 <button
@@ -505,25 +522,12 @@ export default function ManajemenKpPage() {
                 <button
                   type="button"
                   onClick={handleVerifyStatus}
-                  disabled={
-                    isSubmitting ||
-                    (modalType === 'REJECT' && rejectionReason.trim().length < 1)
-                  }
-                  className={`
-                    flex-1 py-3.5 rounded-2xl text-white font-extrabold text-xs transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer
-                    ${modalType === 'APPROVE'
-                      ? 'bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/10'
-                      : 'bg-crimson hover:bg-[#7a1728] shadow-md shadow-crimson/10'
-                    }
-                  `}
+                  disabled={isSubmitting || rejectionReason.trim().length < 1}
+                  className="flex-1 py-3.5 rounded-2xl text-white font-extrabold text-xs transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer bg-crimson hover:bg-[#7a1728] shadow-md shadow-crimson/10"
                 >
-                  {isSubmitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : modalType === 'APPROVE' ? (
-                    <>Setujui <Check className="w-4 h-4" /></>
-                  ) : (
-                    <>Tolak Pengajuan <XCircle className="w-4 h-4" /></>
-                  )}
+                  {isSubmitting
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <><XCircle className="w-4 h-4" /> Tolak Pengajuan</>}
                 </button>
               </div>
 

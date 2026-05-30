@@ -4,7 +4,9 @@ import {
   getAsdosList, getKoorList, getUserList, getAsdosDetail,
   createUser, assignKoor, assignAsdos,
   updateAsdos, updateKoor,
+  activateAsdos, deactivateAsdos, activateKoor, deactivateKoor,
 } from '@/lib/actions/manajemen';
+import { toast } from 'sonner';
 import type { UserListItem } from '@/lib/actions/manajemen';
 import { useManajemenStore } from '@/store/useManajemenStore';
 import Image from 'next/image';
@@ -14,7 +16,7 @@ import { AsdosPageShell, AsdosPageHeader, AsdosState, AsdosListSkeleton, AsdosPr
 type TabId = 'asdos' | 'koordinator' | 'user';
 type AddStep = 'role_search' | 'create_user' | 'role_data';
 type AddRole = 'asdos' | 'koordinator';
-type DisplayItem = { id: string; username: string; identifier: string };
+type DisplayItem = { id: string; username: string; identifier: string; deactivated_at?: string | null };
 type ModalForm = {
   username: string;
   email: string;
@@ -61,6 +63,9 @@ export default function ManajemenAsdosPage() {
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : false
   );
 
+  const [togglePending, setTogglePending] = useState<Set<string>>(new Set());
+  const [showInactive, setShowInactive] = useState(false);
+
   const isFirstTabChange = useRef(true);
   const loadedTabsRef = useRef<Set<TabId>>(new Set());
 
@@ -87,26 +92,26 @@ export default function ManajemenAsdosPage() {
   };
 
   const activeItems: DisplayItem[] = (() => {
-    if (activeTab === 'asdos') return asdosList.map(a => ({ id: a.id_asdos, username: a.username, identifier: a.nim }));
-    if (activeTab === 'koordinator') return koorList.map(k => ({ id: k.id_koor, username: k.username, identifier: k.nip }));
+    if (activeTab === 'asdos') return asdosList.map(a => ({ id: a.id_asdos, username: a.username, identifier: a.nim, deactivated_at: a.deactivated_at }));
+    if (activeTab === 'koordinator') return koorList.map(k => ({ id: k.id_koor, username: k.username, identifier: k.nip, deactivated_at: k.deactivated_at }));
     return userList.map(u => ({ id: u.id, username: u.username, identifier: u.email }));
   })();
 
-  const loadTabData = useCallback(async (tab: TabId, search: string, page: number, append = false) => {
+  const loadTabData = useCallback(async (tab: TabId, search: string, page: number, append = false, inactive = false) => {
     setIsLoading(true);
     if (tab === 'asdos') {
       if (!append) setAsdos([], false, 1);
-      const res = await getAsdosList(page, search);
+      const res = await getAsdosList(page, search, 10, inactive);
       if (res.success && res.data) {
         setAsdos(res.data, res.data.length === 10, page, append);
-        if (!search) loadedTabsRef.current.add(tab); else loadedTabsRef.current.delete(tab);
+        if (!search && !inactive) loadedTabsRef.current.add(tab); else loadedTabsRef.current.delete(tab);
       }
     } else if (tab === 'koordinator') {
       if (!append) setKoor([], false, 1);
-      const res = await getKoorList(page, search);
+      const res = await getKoorList(page, search, inactive);
       if (res.success && res.data) {
         setKoor(res.data, res.data.length === 10, page, append);
-        if (!search) loadedTabsRef.current.add(tab); else loadedTabsRef.current.delete(tab);
+        if (!search && !inactive) loadedTabsRef.current.add(tab); else loadedTabsRef.current.delete(tab);
       }
     } else {
       if (!append) setUsers([], false, 1);
@@ -151,14 +156,34 @@ export default function ManajemenAsdosPage() {
       return;
     }
 
-    if (!searchQuery && loadedTabsRef.current.has(activeTab)) return;
+    if (!searchQuery && !showInactive && loadedTabsRef.current.has(activeTab)) return;
     const timer = setTimeout(() => {
-      loadTabData(activeTab, searchQuery, 1);
+      loadTabData(activeTab, searchQuery, 1, false, showInactive);
     }, searchQuery ? 400 : 0);
     return () => clearTimeout(timer);
-  }, [activeTab, searchQuery, loadTabData]);
+  }, [activeTab, searchQuery, showInactive, loadTabData]);
 
-  const handleLoadMore = () => loadTabData(activeTab, searchQuery, currentPage + 1, true);
+  const handleLoadMore = () => loadTabData(activeTab, searchQuery, currentPage + 1, true, showInactive);
+
+  const handleToggleActive = async (item: DisplayItem) => {
+    const isActive = !item.deactivated_at;
+    setTogglePending(prev => new Set(prev).add(item.id));
+    try {
+      const res = activeTab === 'asdos'
+        ? isActive ? await deactivateAsdos(item.id) : await activateAsdos(item.id)
+        : isActive ? await deactivateKoor(item.id) : await activateKoor(item.id);
+      if (res.success) {
+        toast.success(isActive ? `${item.username} berhasil dinonaktifkan.` : `${item.username} berhasil diaktifkan.`);
+        loadTabData(activeTab, searchQuery, 1, false, showInactive);
+      } else {
+        toast.error(res.message || 'Gagal mengubah status.');
+      }
+    } catch {
+      toast.error('Terjadi kesalahan.');
+    } finally {
+      setTogglePending(prev => { const s = new Set(prev); s.delete(item.id); return s; });
+    }
+  };
 
   const handleOpenModal = async (type: 'add' | 'edit' = 'add', item?: DisplayItem) => {
     setModalType(type);
@@ -286,7 +311,7 @@ export default function ManajemenAsdosPage() {
       if (!res.success) { setFormError(res.message || 'Gagal menyimpan data.'); return; }
     }
     handleCloseModal();
-    loadTabData(activeTab, '', 1);
+    loadTabData(activeTab, '', 1, false, showInactive);
   };
 
   const handleSave = async () => {
@@ -306,7 +331,7 @@ export default function ManajemenAsdosPage() {
 
     if (!res.success) { setFormError(res.message || 'Gagal memperbarui data.'); return; }
     handleCloseModal();
-    loadTabData(activeTab, searchQuery, 1);
+    loadTabData(activeTab, searchQuery, 1, false, showInactive);
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => setSheetStartY(e.touches[0].clientY);
@@ -355,8 +380,8 @@ export default function ManajemenAsdosPage() {
           </div>
         </div>
 
-        <div className="w-full md:w-80 shrink-0">
-          <div className="relative md:mt-0">
+        <div className="flex gap-2 flex-1 md:w-auto md:max-w-sm shrink-0 items-center">
+          <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
               <Search className="w-5 h-5" />
             </div>
@@ -368,49 +393,104 @@ export default function ManajemenAsdosPage() {
               placeholder="Ketik nama asdos, koor, user"
             />
           </div>
+          {activeTab !== 'user' && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowInactive(v => !v);
+                loadedTabsRef.current.delete(activeTab);
+              }}
+              className={`shrink-0 h-[50px] px-3.5 rounded-[14px] md:rounded-2xl border text-xs font-bold transition-all active:scale-95 whitespace-nowrap ${
+                showInactive
+                  ? 'bg-slate-800 text-white border-slate-800'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              {showInactive ? 'Sembunyikan' : 'Nonaktif'}
+            </button>
+          )}
         </div>
       </div>
 
       <div className="space-y-3 relative z-10 pb-24 md:pb-12">
         {isLoading && activeItems.length === 0 && <AsdosListSkeleton count={4} />}
 
-        {activeItems.map((item) => (
-          <div
-            key={item.id}
-            className="bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex items-center justify-between border border-slate-100 active:scale-[0.99] md:hover:shadow-md md:hover:border-slate-200 transition-all"
-          >
-            <div className="flex items-center space-x-3 md:space-x-4 min-w-0 md:w-1/3">
-              <div className={`w-11 h-11 md:w-12 md:h-12 rounded-xl shrink-0 overflow-hidden shadow-md ${tabTheme[activeTab].iconBg}`}>
-                <Image src="/icon-512x512.png" alt="" width={48} height={48} className="w-full h-full object-cover" />
+        {activeItems.map((item) => {
+          const isActive = !item.deactivated_at;
+          const isPendingToggle = togglePending.has(item.id);
+          return (
+            <div
+              key={item.id}
+              className={`bg-white rounded-2xl md:rounded-xl p-3.5 md:px-5 md:py-4 shadow-sm flex items-center justify-between border transition-all ${
+                isActive ? 'border-slate-100 active:scale-[0.99] md:hover:shadow-md md:hover:border-slate-200' : 'border-slate-100 opacity-60'
+              }`}
+            >
+              <div className="flex items-center space-x-3 md:space-x-4 min-w-0 md:w-1/3">
+                <div className={`w-11 h-11 md:w-12 md:h-12 rounded-xl shrink-0 overflow-hidden shadow-md ${tabTheme[activeTab].iconBg}`}>
+                  <Image src="/icon-512x512.png" alt="" width={48} height={48} className="w-full h-full object-cover" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{item.username}</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs text-slate-400 font-medium flex md:hidden items-center gap-1">
+                      <span className="text-[10px]">#</span> {item.identifier}
+                    </p>
+                    {activeTab !== 'user' && !isActive && (
+                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full text-crimson bg-rose-50">
+                        Nonaktif
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{item.username}</h3>
-                <p className="text-xs text-slate-400 font-medium mt-0.5 flex md:hidden items-center gap-1">
-                  <span className="text-[10px]">#</span> {item.identifier}
-                </p>
-              </div>
-            </div>
 
-            <div className="hidden md:flex flex-1 items-center px-4">
-              <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{identifierLabel}</span>
-                <span className="text-[13px] font-semibold text-slate-700">{item.identifier}</span>
+              <div className="hidden md:flex flex-1 items-center px-4">
+                <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{identifierLabel}</span>
+                  <span className="text-[13px] font-semibold text-slate-700">{item.identifier}</span>
+                </div>
               </div>
-            </div>
 
-            {activeTab !== 'user' && (
-              <div className="text-slate-300 md:text-slate-400 shrink-0">
-                <button
-                  onClick={() => handleOpenModal('edit', item)}
-                  className="p-2.5 hover:text-crimson active:bg-slate-50 md:hover:bg-slate-50 rounded-xl transition-colors"
-                  aria-label="Edit data"
-                >
-                  <EditIcon />
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
+              {activeTab !== 'user' && (
+                <div className="flex items-center gap-0.5 shrink-0 text-slate-300 md:text-slate-400">
+                  <button
+                    onClick={() => handleToggleActive(item)}
+                    disabled={isPendingToggle}
+                    className={`p-2.5 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                      isActive
+                        ? 'hover:text-slate-500 active:bg-slate-50 md:hover:bg-slate-50'
+                        : 'hover:text-emerald-600 active:bg-emerald-50 md:hover:bg-emerald-50'
+                    }`}
+                    aria-label={isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                    title={isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                  >
+                    {isPendingToggle ? (
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    ) : isActive ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v9m4.243-7.757A9 9 0 1112 21" />
+                      </svg>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleOpenModal('edit', item)}
+                    className="p-2.5 hover:text-crimson active:bg-slate-50 md:hover:bg-slate-50 rounded-xl transition-colors"
+                    aria-label="Edit data"
+                  >
+                    <EditIcon />
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {isEmptyResult && (
           <AsdosState

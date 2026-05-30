@@ -10,7 +10,7 @@ import {
   createSemester, updateSemester, deleteSemester,
 } from '@/lib/actions/data-master';
 import { createLecturer, updateLecturer, deleteLecturer, type LecturerItem } from '@/lib/actions/lecturer';
-import { deleteAsdos, type AsdosListItem } from '@/lib/actions/manajemen';
+import { deactivateAsdos, type AsdosListItem } from '@/lib/actions/manajemen';
 import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem } from '@/types/api';
 
 export type MasterResource = 'kelas' | 'mk' | 'ruangan' | 'lecturer' | 'semester' | 'asdos';
@@ -581,7 +581,7 @@ async function deleteResource(resource: MasterResource, id: string): Promise<{ s
     case 'ruangan': return deleteRuangan(id);
     case 'lecturer': return deleteLecturer(id);
     case 'semester': return deleteSemester(id);
-    case 'asdos': return deleteAsdos(id);
+    case 'asdos': return deactivateAsdos(id);
   }
 }
 

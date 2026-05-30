@@ -1,12 +1,14 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Filter, Search, User, Users, X } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Filter, Search, Table2, User, Users, X } from 'lucide-react';
 import { getMyScheduleTimeline, getScheduleTimeline, type SessionFromAPI } from '@/lib/actions/jadwal';
 import { getSemesterList } from '@/lib/actions/data-master';
 import type { UnifiedJadwalResponse } from '@/types/api';
 import { AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { sessionDateKey, toIsoDateFromDate } from '@/lib/jadwal-utils';
+import { JAM_OPTIONS, opsiJamFromWaktu } from '@/lib/constants/jadwal-slots';
+import { useJadwalStore } from '@/store/useJadwalStore';
 
 type ViewMode = 'PERSONAL' | 'ALL';
 type ScheduleStatus = 'Mendatang' | 'Berjalan' | 'Selesai';
@@ -208,16 +210,22 @@ function DatePickerField({
 }
 
 export default function JadwalAjarPage() {
+  type ViewType = 'CARD' | 'TABLE';
+
   const today = useMemo(() => new Date(), []);
   const [viewMode, setViewMode] = useState<ViewMode>('PERSONAL');
+  const [viewType, setViewType] = useState<ViewType>('CARD');
   const [selectedSemesterId, setSelectedSemesterId] = useState('');
   const [startDate, setStartDate] = useState(() => toIsoDateFromDate(today));
   const [endDate, setEndDate] = useState(() => toIsoDateFromDate(addDays(today, 6)));
+  const [tableDate, setTableDate] = useState(() => toIsoDateFromDate(today));
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('ALL');
   const [sessions, setSessions] = useState<SessionFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { jadwalAjarCache, setJadwalAjarCache } = useJadwalStore();
 
   const maxEndDate = toIsoDateFromDate(addDays(parseLocalDate(startDate), 6));
 
@@ -244,6 +252,14 @@ export default function JadwalAjarPage() {
     if (!selectedSemesterId) return;
     let cancelled = false;
 
+    const cacheKey = `${viewMode}-${selectedSemesterId}-${startDate}-${endDate}`;
+    const cached = jadwalAjarCache[cacheKey];
+    if (cached) {
+      setSessions(cached);
+      setIsLoading(false);
+      return;
+    }
+
     async function fetchSchedule() {
       setIsLoading(true);
       setError(null);
@@ -255,7 +271,9 @@ export default function JadwalAjarPage() {
 
         if (cancelled) return;
         if (res.success) {
-          setSessions(mapTimelineItems(res.data?.items || []));
+          const mapped = mapTimelineItems(res.data?.items || []);
+          setSessions(mapped);
+          setJadwalAjarCache(cacheKey, mapped);
         } else {
           setSessions([]);
         }
@@ -271,7 +289,24 @@ export default function JadwalAjarPage() {
 
     fetchSchedule();
     return () => { cancelled = true; };
-  }, [startDate, endDate, selectedSemesterId, viewMode]);
+  }, [startDate, endDate, selectedSemesterId, viewMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleTableDateChange = (value: string) => {
+    setTableDate(value);
+    setStartDate(value);
+    setEndDate(value);
+  };
+
+  const handleViewTypeChange = (type: ViewType) => {
+    setViewType(type);
+    if (type === 'TABLE') {
+      setStartDate(tableDate);
+      setEndDate(tableDate);
+    } else {
+      setStartDate(tableDate);
+      setEndDate(toIsoDateFromDate(addDays(parseLocalDate(tableDate), 6)));
+    }
+  };
 
   const handleStartDateChange = (value: string) => {
     if (!value) return;
@@ -314,6 +349,22 @@ export default function JadwalAjarPage() {
   }, {});
 
   const sortedDateKeys = Object.keys(grouped).sort();
+
+  const timetableData = useMemo(() => {
+    if (viewType !== 'TABLE') return null;
+    const daySessions = sessions.filter(s => getSessionIso(s.waktu) === tableDate);
+    const roomSet = new Set<string>();
+    const lookup: Record<number, Record<string, SessionFromAPI>> = {};
+    daySessions.forEach(s => {
+      if (s.ruangan) roomSet.add(s.ruangan);
+      const t = s.waktu.split(', ')[1] ?? '';
+      const slot = opsiJamFromWaktu(t);
+      if (!lookup[slot]) lookup[slot] = {};
+      lookup[slot][s.ruangan] = s;
+    });
+    const rooms = Array.from(roomSet).sort();
+    return { jams: JAM_OPTIONS, rooms, lookup, daySessions };
+  }, [sessions, viewType, tableDate]);
 
   const ScheduleCard = ({ s, gridMode = false }: { s: SessionFromAPI; gridMode?: boolean }) => {
     const status = deriveStatus(s.waktu);
@@ -433,40 +484,161 @@ export default function JadwalAjarPage() {
         }
       />
 
-      <div className="mb-6 flex flex-col md:flex-row md:items-end gap-3 md:gap-4">
-        <div className="grid grid-cols-2 gap-3 flex-1">
-          <div>
-            <DatePickerField label="Dari Tanggal" value={startDate} onChange={handleStartDateChange} />
-          </div>
-          <div>
-            <DatePickerField label="Sampai Tanggal" value={endDate} min={startDate} max={maxEndDate} onChange={handleEndDateChange} />
+      <div className="mb-6 flex flex-col gap-3 md:gap-4">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 md:gap-4">
+          {/* Date picker */}
+          {viewType === 'TABLE' ? (
+            <div className="w-full md:w-52">
+              <DatePickerField label="Tanggal" value={tableDate} onChange={handleTableDateChange} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 md:flex md:gap-3">
+              <div className="md:w-44">
+                <DatePickerField label="Dari Tanggal" value={startDate} onChange={handleStartDateChange} />
+              </div>
+              <div className="md:w-44">
+                <DatePickerField label="Sampai Tanggal" value={endDate} min={startDate} max={maxEndDate} onChange={handleEndDateChange} />
+              </div>
+            </div>
+          )}
+
+          {/* Tab toggle */}
+          <div className="flex bg-slate-100 p-0.5 rounded-xl md:w-[260px] shrink-0">
+            {(['PERSONAL', 'ALL'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => {
+                  setViewMode(mode);
+                  handleViewTypeChange(mode === 'ALL' ? 'TABLE' : 'CARD');
+                }}
+                className={`flex-1 h-[46px] flex items-center justify-center gap-1.5 px-3 rounded-[10px] text-xs font-semibold transition-all ${
+                  viewMode === mode ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {mode === 'PERSONAL' ? <User size={14} /> : <Users size={14} />}
+                {mode === 'PERSONAL' ? 'Jadwal Saya' : 'Semua Jadwal'}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="flex bg-slate-100 p-0.5 rounded-xl w-full md:w-auto md:min-w-[280px]">
-          {(['PERSONAL', 'ALL'] as const).map(mode => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className={`flex-1 h-[52px] flex items-center justify-center gap-1.5 px-3 rounded-[10px] text-xs font-semibold transition-all ${
-                viewMode === mode ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
-              }`}
-            >
-              {mode === 'PERSONAL' ? <User size={14} /> : <Users size={14} />}
-              {mode === 'PERSONAL' ? 'Jadwal Saya' : 'Semua Jadwal'}
-            </button>
-          ))}
-        </div>
+        {viewType === 'CARD' && (
+          <p className="text-xs font-medium text-slate-400 ml-1 -mt-1">
+            Pilih rentang tanggal maksimal 7 hari.
+          </p>
+        )}
       </div>
-      <p className="text-xs font-medium text-slate-400 ml-1 -mt-3 mb-6">
-        Pilih rentang tanggal maksimal 7 hari.
-      </p>
 
       <div className="flex flex-col gap-6 w-full pb-8">
         {error ? (
           <AsdosState variant="error" message={error} />
         ) : isLoading ? (
-          <LoadingState />
+          viewType === 'TABLE' ? (
+            /* Skeleton tabel */
+            <div className="bg-white rounded-xl border border-slate-100 overflow-hidden animate-shimmer">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[500px]">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-100">
+                      {['Jam', 'Ruangan 1', 'Ruangan 2', 'Ruangan 3'].map(h => (
+                        <th key={h} className="px-4 py-3"><div className="h-3 bg-slate-100 rounded w-16 mx-auto" /></th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...Array(5)].map((_, i) => (
+                      <tr key={i} className="border-b border-slate-50">
+                        <td className="px-4 py-4"><div className="h-3 bg-slate-100 rounded w-20" /></td>
+                        {[...Array(3)].map((_, j) => (
+                          <td key={j} className="px-3 py-4">
+                            <div className={`h-14 bg-slate-100 rounded-lg ${j === 1 ? 'opacity-100' : 'opacity-40'}`} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <LoadingState />
+          )
+        ) : viewType === 'TABLE' ? (
+          /* ── TABEL JADWAL HARIAN ── */
+          timetableData && timetableData.rooms.length > 0 ? (
+            <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+
+              <div className="h-3 border-b border-slate-100" />
+              <div className="overflow-auto max-h-[70vh]">
+                <table className="w-full">
+                  <thead className="sticky top-0 z-20">
+                    <tr className="bg-slate-50/70 border-b border-slate-100">
+                      <th className="px-3 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap min-w-[110px] border-r border-slate-100">
+                        Jam
+                      </th>
+                      {timetableData.rooms.map(room => (
+                        <th key={room} className="px-3 py-3 text-center text-[10px] font-black text-slate-500 uppercase tracking-wider whitespace-nowrap min-w-[140px]">
+                          {room}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {timetableData.jams.map(jam => (
+                      <tr key={jam.value} className="hover:bg-slate-50/30 transition-colors">
+                        <td className="px-3 py-3 border-r border-slate-100">
+                          <span className="text-[11px] font-bold text-slate-600 whitespace-nowrap font-mono">{jam.range}</span>
+                        </td>
+                        {timetableData.rooms.map(room => {
+                          const s = timetableData.lookup[jam.value]?.[room];
+                          if (!s) {
+                            return (
+                              <td key={room} className="px-3 py-3 text-center">
+                                <span className="text-slate-200 text-sm">—</span>
+                              </td>
+                            );
+                          }
+                          const isRunning = deriveStatus(s.waktu) === 'Berjalan';
+                          const isPengganti = s.tipe_jadwal === 'PENGGANTI';
+                          return (
+                            <td key={room} className="px-2 py-2">
+                              <div className={`rounded-lg px-3 py-2.5 text-left transition-all ${
+                                isRunning ? 'bg-crimson/10 border border-crimson/20' : 'bg-slate-50 border border-slate-100'
+                              }`}>
+                                <p className={`text-xs font-bold leading-snug line-clamp-2 ${isRunning ? 'text-crimson' : 'text-slate-700'}`}>
+                                  {s.mata_kuliah}
+                                </p>
+                                {s.nama_kelas && (
+                                  <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">{s.nama_kelas}</p>
+                                )}
+                                <div className="flex items-center gap-1 mt-1.5">
+                                  <User className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                                  <p className="text-[10px] text-slate-400 truncate">{s.pengajar || '-'}</p>
+                                </div>
+                                {isPengganti && (
+                                  <span className="mt-1.5 inline-block text-[9px] font-bold uppercase tracking-wider text-ink bg-fog px-1.5 py-0.5 rounded">
+                                    Pengganti
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-100 rounded-xl p-8 text-center">
+              <div className="mx-auto mb-4 w-12 h-12 rounded-[14px] bg-fog flex items-center justify-center text-slate-400">
+                <Table2 size={20} />
+              </div>
+              <p className="text-base font-bold text-slate-700">Tidak ada jadwal hari ini.</p>
+              <p className="text-sm text-slate-400 mt-1">Pilih tanggal lain untuk melihat jadwal.</p>
+            </div>
+          )
         ) : filtered.length > 0 ? (
           <>
             {sortedDateKeys.map(dateKey => (

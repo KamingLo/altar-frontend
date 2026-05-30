@@ -7,9 +7,11 @@ import {
   CalendarDays,
   CheckCircle2,
   Filter,
+  LayoutList,
   Pencil,
   Plus,
   Search,
+  Table2,
   Trash2,
   User,
   Users,
@@ -329,6 +331,8 @@ export default function ManajemenJadwalPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipe, setFilterTipe] = useState<TipeFilter>('ALL');
+  const [viewType, setViewType] = useState<'CARD' | 'TABLE'>('CARD');
+  const [tableDate, setTableDate] = useState(() => toIsoDateFromDate(today));
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -396,6 +400,54 @@ export default function ManajemenJadwalPage() {
   }, []);
 
   const maxEndDate = useMemo(() => toIsoDateFromDate(addDays(parseLocalDate(startDate), 6)), [startDate]);
+
+  const handleViewTypeChange = (type: 'CARD' | 'TABLE') => {
+    setViewType(type);
+    if (type === 'TABLE') {
+      setTableDate(startDate);
+      setEndDate(startDate);
+    } else {
+      setEndDate(toIsoDateFromDate(addDays(parseLocalDate(startDate), 6)));
+    }
+  };
+
+  const handleTableDateChange = (value: string) => {
+    setTableDate(value);
+    setStartDate(value);
+    setEndDate(value);
+  };
+
+  const hasActiveSearch = Boolean(searchTerm.trim()) || filterTipe !== 'ALL';
+
+  const filtered = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return sessions.filter(s => {
+      const matchSearch =
+        !q ||
+        s.mata_kuliah.toLowerCase().includes(q) ||
+        s.nama_kelas.toLowerCase().includes(q) ||
+        s.ruangan.toLowerCase().includes(q) ||
+        s.pengajar.toLowerCase().includes(q) ||
+        sessionDateKey(s.tanggal).includes(q);
+      const matchTipe = filterTipe === 'ALL' || normalizeSessionTipe(s.tipe) === filterTipe;
+      return matchSearch && matchTipe;
+    });
+  }, [sessions, searchTerm, filterTipe]);
+
+  const timetableData = useMemo(() => {
+    if (viewType !== 'TABLE') return null;
+    const daySessions = filtered.filter(s => sessionDateKey(s.tanggal) === tableDate);
+    const roomSet = new Set<string>();
+    const lookup: Record<number, Record<string, SessionTimeline>> = {};
+    daySessions.forEach(s => {
+      if (s.ruangan) roomSet.add(s.ruangan);
+      const slot = opsiJamFromWaktu(s.waktu);
+      if (!lookup[slot]) lookup[slot] = {};
+      lookup[slot][s.ruangan] = s;
+    });
+    const rooms = Array.from(roomSet).sort();
+    return { jams: JAM_OPTIONS, rooms, lookup, daySessions };
+  }, [filtered, viewType, tableDate]);
 
   const selectedSemester = semesters.find(s => s.id === selectedSemesterId);
   const deleteSemesterTarget = semesters.find(s => s.id === deleteSemesterTargetId);
@@ -729,23 +781,6 @@ export default function ManajemenJadwalPage() {
     () => lecturerList.find(l => l.id === form.id_dosen) ?? null,
     [lecturerList, form.id_dosen],
   );
-
-  const hasActiveSearch = Boolean(searchTerm.trim()) || filterTipe !== 'ALL';
-
-  const filtered = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    return sessions.filter(s => {
-      const matchSearch =
-        !q ||
-        s.mata_kuliah.toLowerCase().includes(q) ||
-        s.nama_kelas.toLowerCase().includes(q) ||
-        s.ruangan.toLowerCase().includes(q) ||
-        s.pengajar.toLowerCase().includes(q) ||
-        sessionDateKey(s.tanggal).includes(q);
-      const matchTipe = filterTipe === 'ALL' || normalizeSessionTipe(s.tipe) === filterTipe;
-      return matchSearch && matchTipe;
-    });
-  }, [sessions, searchTerm, filterTipe]);
 
   const buildPayload = () => ({
     id_kelas: form.id_kelas,
@@ -1105,42 +1140,71 @@ export default function ManajemenJadwalPage() {
 
         <div className="mb-6 md:mb-2 flex flex-col gap-2 relative z-20 w-full">
           <div className="flex flex-col md:flex-row md:items-end gap-3 w-full">
+            {/* Date pickers */}
             <div className="flex flex-col sm:flex-row items-end gap-3 w-full md:w-auto shrink-0">
               <div className="flex flex-col w-full sm:w-auto">
-                <div className="flex gap-3 w-full sm:w-auto">
-                  <div className="w-full sm:w-[190px] md:w-[200px]">
-                    <DatePickerField label="Dari Tanggal" value={startDate} onChange={handleStartDateChange} />
+                {viewType === 'TABLE' ? (
+                  <div className="w-full sm:w-[200px]">
+                    <DatePickerField label="Tanggal" value={tableDate} onChange={handleTableDateChange} />
                   </div>
-                  <div className="w-full sm:w-[190px] md:w-[200px]">
-                    <DatePickerField
-                      label="Sampai Tanggal"
-                      value={endDate}
-                      min={startDate}
-                      max={maxEndDate}
-                      onChange={handleEndDateChange}
-                      align="right"
-                    />
+                ) : (
+                  <div className="flex gap-3 w-full sm:w-auto">
+                    <div className="w-full sm:w-[190px] md:w-[200px]">
+                      <DatePickerField label="Dari Tanggal" value={startDate} onChange={handleStartDateChange} />
+                    </div>
+                    <div className="w-full sm:w-[190px] md:w-[200px]">
+                      <DatePickerField
+                        label="Sampai Tanggal"
+                        value={endDate}
+                        min={startDate}
+                        max={maxEndDate}
+                        onChange={handleEndDateChange}
+                        align="right"
+                      />
+                    </div>
                   </div>
-                </div>
-                <p className="text-xs font-medium text-slate-400 mt-1.5 md:hidden">
-                  Pilih rentang tanggal maksimal 7 hari.
-                </p>
+                )}
+                {viewType === 'CARD' && (
+                  <p className="text-xs font-medium text-slate-400 mt-1.5 md:hidden">
+                    Pilih rentang tanggal maksimal 7 hari.
+                  </p>
+                )}
               </div>
             </div>
 
-            <div className="flex gap-3 w-full md:ml-auto md:w-auto md:max-w-[300px]">
+            {/* Search + Filter + Toggle */}
+            <div className="flex gap-2 w-full md:ml-auto md:w-auto md:max-w-[480px] items-center">
+              {/* Toggle — desktop: kiri search */}
+              <div className="hidden md:flex bg-slate-100 p-0.5 rounded-xl shrink-0">
+                {([
+                  { type: 'CARD' as const, icon: <LayoutList size={15} />, label: 'Kartu' },
+                  { type: 'TABLE' as const, icon: <Table2 size={15} />, label: 'Tabel' },
+                ]).map(({ type, icon, label }) => (
+                  <button
+                    key={type}
+                    onClick={() => handleViewTypeChange(type)}
+                    className={`h-[46px] flex items-center gap-1.5 px-3 rounded-[9px] text-xs font-semibold transition-all ${
+                      viewType === type ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    {icon}{label}
+                  </button>
+                ))}
+              </div>
+
               <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 pointer-events-none" />
                 <input
                   type="text"
-                  placeholder="Cari MK, kelas, ruangan, pengajar..."
+                  placeholder="Cari MK, kelas, ruangan..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                   className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200/80 outline-none text-sm font-medium text-slate-800 bg-white/95 placeholder-slate-400 focus:border-crimson focus:ring-2 focus:ring-crimson/15 transition-all"
                 />
               </div>
 
-              <div className="relative shrink-0">
+              {/* Filter — desktop only */}
+              <div className="hidden md:block relative shrink-0">
                 <CustomSelect
                   variant="icon"
                   align="right"
@@ -1152,12 +1216,32 @@ export default function ManajemenJadwalPage() {
                   triggerClassName={filterTipe !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : ''}
                 />
               </div>
+
+              {/* Toggle — mobile: menggantikan filter */}
+              <div className="md:hidden flex bg-slate-100 p-0.5 rounded-[14px] shrink-0">
+                {([
+                  { type: 'CARD' as const, icon: <LayoutList size={15} /> },
+                  { type: 'TABLE' as const, icon: <Table2 size={15} /> },
+                ]).map(({ type, icon }) => (
+                  <button
+                    key={type}
+                    onClick={() => handleViewTypeChange(type)}
+                    className={`h-[46px] w-[46px] flex items-center justify-center rounded-[11px] transition-all ${
+                      viewType === type ? 'bg-white text-crimson shadow-sm' : 'text-slate-400'
+                    }`}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          
-          <p className="hidden md:block text-xs font-medium text-slate-400">
-            Pilih rentang tanggal maksimal 7 hari.
-          </p>
+
+          {viewType === 'CARD' && (
+            <p className="hidden md:block text-xs font-medium text-slate-400">
+              Pilih rentang tanggal maksimal 7 hari.
+            </p>
+          )}
         </div>
       </div>
 
@@ -1172,7 +1256,99 @@ export default function ManajemenJadwalPage() {
               </div>
             )}
 
-            {!loading &&
+            {/* ── TABLE VIEW ── */}
+            {!loading && viewType === 'TABLE' && timetableData && (
+              timetableData.rooms.length > 0 ? (
+                <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+                  <div className="h-3 border-b border-slate-100" />
+                  <div className="overflow-auto max-h-[70vh]">
+                    <table className="w-full">
+                      <thead className="sticky top-0 z-20">
+                        <tr className="bg-slate-50/70 border-b border-slate-100">
+                          <th className="px-3 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap min-w-[110px] border-r border-slate-100">
+                            Jam
+                          </th>
+                          {timetableData.rooms.map(room => (
+                            <th key={room} className="px-4 py-3 text-center text-[10px] font-black text-slate-500 uppercase tracking-wider whitespace-nowrap min-w-[160px]">
+                              {room}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {timetableData.jams.map(jam => (
+                          <tr key={jam.value} className="hover:bg-slate-50/30 transition-colors">
+                            <td className="px-3 py-3 border-r border-slate-100">
+                              <span className="text-[11px] font-bold text-slate-600 whitespace-nowrap font-mono">{jam.range}</span>
+                            </td>
+                            {timetableData.rooms.map(room => {
+                              const s = timetableData.lookup[jam.value]?.[room];
+                              if (!s) {
+                                return (
+                                  <td key={room} className="px-3 py-3 text-center">
+                                    <span className="text-slate-200 text-sm">—</span>
+                                  </td>
+                                );
+                              }
+                              const isPengganti = isPenggantiTipe(s.tipe);
+                              return (
+                                <td key={room} className="px-2.5 py-2">
+                                  <div className={`rounded-lg px-3 py-2.5 text-left ${isPengganti ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
+                                    <p className="text-xs font-bold leading-snug line-clamp-2 text-slate-700">{s.mata_kuliah}</p>
+                                    {s.nama_kelas && (
+                                      <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">{s.nama_kelas}</p>
+                                    )}
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <User className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                                      <p className="text-[10px] text-slate-400 truncate">{pengajarDisplayName(s.pengajar) || '-'}</p>
+                                    </div>
+                                    {isPengganti && (
+                                      <span className="mt-1.5 inline-block text-[9px] font-bold uppercase tracking-wider text-crimson bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">
+                                        Pengganti
+                                      </span>
+                                    )}
+                                    <div className="flex gap-1 mt-2 pt-1.5 border-t border-slate-100">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenModal('edit', s)}
+                                        disabled={isPengganti}
+                                        className="flex-1 h-6 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-crimson/30 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                        title={isPengganti ? 'Sesi pengganti tidak bisa diedit' : 'Edit sesi'}
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteOpen(s)}
+                                        className="flex-1 h-6 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-rose-200 hover:bg-rose-50 active:scale-95 transition-all"
+                                        title="Hapus sesi"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl p-8 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
+                  <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+                    <CalendarDays size={26} />
+                  </div>
+                  <p className="text-sm md:text-base font-semibold text-slate-700">Tidak ada sesi jadwal.</p>
+                  <p className="text-xs md:text-sm text-slate-500 mt-1">Belum ada sesi pada tanggal ini.</p>
+                </div>
+              )
+            )}
+
+            {/* ── CARD VIEW ── */}
+            {!loading && viewType === 'CARD' &&
               (() => {
                 const grouped = filtered.reduce<Record<string, SessionTimeline[]>>((acc, s) => {
                   const key = sessionDateKey(s.tanggal);
@@ -1322,7 +1498,7 @@ export default function ManajemenJadwalPage() {
                 );
               })()}
 
-            {!loading && !fetchError && filtered.length === 0 && (
+            {!loading && viewType === 'CARD' && !fetchError && filtered.length === 0 && (
               <div className="bg-white rounded-2xl p-8 md:p-12 border border-dashed border-slate-200 text-center shadow-sm">
                 <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
                   <CalendarDays size={26} />

@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, ArrowUp } from 'lucide-react';
 
 type AsdosPageShellProps = {
   children: React.ReactNode;
@@ -9,9 +9,33 @@ type AsdosPageShellProps = {
 };
 
 export function AsdosPageShell({ children, className = '' }: AsdosPageShellProps) {
+  const [showTop, setShowTop] = useState(false);
+
+  useEffect(() => {
+    const container = document.getElementById('dashboard-children-container');
+    if (!container) return;
+    const onScroll = () => setShowTop(container.scrollTop > 300);
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => container.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    const container = document.getElementById('dashboard-children-container');
+    if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className={`relative w-full text-slate-800 bg-transparent md:max-w-5xl md:mx-auto md:px-6 md:pt-8 lg:px-8 lg:pt-12 pb-8 pt-2 min-h-screen font-sans ${className}`}>
       {children}
+      {showTop && (
+        <button
+          onClick={scrollToTop}
+          className="lg:hidden fixed bottom-7 right-4 w-12 h-12 bg-white border border-slate-200 rounded-full shadow-lg flex items-center justify-center text-slate-500 active:scale-90 transition-all z-30"
+          aria-label="Kembali ke atas"
+        >
+          <ArrowUp size={18} strokeWidth={2.5} />
+        </button>
+      )}
     </div>
   );
 }

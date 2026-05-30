@@ -2,6 +2,7 @@
 import { Plus_Jakarta_Sans } from 'next/font/google'
 import "./globals.css"
 import { Toaster } from 'sonner'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -40,6 +41,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={plusJakartaSans.variable}>
       <body className={plusJakartaSans.className}>
+        <PullToRefresh />
         {children}
         <Toaster richColors position="top-center" />
       </body>

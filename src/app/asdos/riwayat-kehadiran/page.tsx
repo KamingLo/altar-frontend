@@ -1,14 +1,16 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Clock, MapPin, BookOpen, Info } from 'lucide-react';
+import { Search, Filter, Clock, MapPin, BookOpen, Info, Table2, LayoutList, Check } from 'lucide-react';
 import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 
+type ViewType = 'CARD' | 'TABLE';
+
 type HistoryItem = {
-  id: string; subject: string; date: string;
+  id: string; subject: string; date: string; rawDate: string;
   checkIn: string; checkOut: string; room: string;
   status: 'BERJALAN' | 'SELESAI'; materi: string;
   isVerified: boolean; isPaid: boolean;
@@ -35,6 +37,11 @@ function formatDate(value: string) {
   });
 }
 
+function formatDateCompact(value: string) {
+  if (!value || value === 'null' || value.startsWith('0001')) return '-';
+  return new Date(value).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 function formatTime(value?: string) {
   if (!value || value === 'null' || String(value).startsWith('0001')) return '--:--';
   return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -46,6 +53,7 @@ function mapPresensiToHistory(item: PresensiResponseDTO): HistoryItem {
     id: item.id_presensi,
     subject: item.nama_mata_kuliah,
     date: formatDate(item.tanggal_mengajar || item.waktu_checkin),
+    rawDate: item.tanggal_mengajar || item.waktu_checkin || '',
     checkIn: formatTime(item.waktu_checkin),
     checkOut: active ? '--:--' : formatTime(item.waktu_checkout),
     room: item.nama_ruangan,
@@ -59,6 +67,7 @@ function mapPresensiToHistory(item: PresensiResponseDTO): HistoryItem {
 export default function RiwayatKehadiranPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'BERJALAN' | 'SELESAI'>('ALL');
+  const [viewType, setViewType] = useState<ViewType>('CARD');
   const {
     items,
     fetched,
@@ -113,7 +122,25 @@ export default function RiwayatKehadiranPage() {
         title="Riwayat Kehadiran"
         description="Log aktivitas mengajar Anda."
         action={
-          <div className="flex gap-3 relative z-20 w-full md:w-auto md:min-w-[380px]">
+          <div className="flex gap-3 relative z-20 w-full md:w-auto md:min-w-[380px] items-center">
+            {/* Toggle card/table — kiri search (mobile & desktop) */}
+            <div className="flex bg-slate-100 p-0.5 rounded-[14px] md:rounded-xl shrink-0">
+              {([
+                { type: 'CARD' as ViewType, icon: <LayoutList size={15} />, label: 'Kartu' },
+                { type: 'TABLE' as ViewType, icon: <Table2 size={15} />, label: 'Tabel' },
+              ]).map(({ type, icon, label }) => (
+                <button
+                  key={type}
+                  onClick={() => setViewType(type)}
+                  className={`h-[46px] md:h-[38px] w-[46px] md:w-auto md:flex md:items-center md:gap-1.5 md:px-3 flex items-center justify-center rounded-[11px] md:rounded-[9px] text-xs font-semibold transition-all ${
+                    viewType === type ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  {icon}
+                  <span className="hidden md:inline">{label}</span>
+                </button>
+              ))}
+            </div>
             <div className="relative flex-1">
               <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
                 <Search className="w-[18px] h-[18px] md:w-5 md:h-5" />
@@ -122,55 +149,178 @@ export default function RiwayatKehadiranPage() {
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]" />
             </div>
-            <CustomSelect
-              value={filterStatus}
-              onChange={(val) => setFilterStatus(val as 'ALL' | 'BERJALAN' | 'SELESAI')}
-              options={[
-                { value: 'ALL', label: 'Semua Status' },
-                { value: 'BERJALAN', label: 'Sedang Berjalan' },
-                { value: 'SELESAI', label: 'Selesai' },
-              ]}
-              variant="icon"
-              icon={<Filter className="w-[18px] h-[18px] md:w-5 md:h-5" />}
-              align="right"
-              triggerClassName={filterStatus !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}
-            />
+            {/* Filter — desktop only */}
+            <div className="hidden md:block">
+              <CustomSelect
+                value={filterStatus}
+                onChange={(val) => setFilterStatus(val as 'ALL' | 'BERJALAN' | 'SELESAI')}
+                options={[
+                  { value: 'ALL', label: 'Semua Status' },
+                  { value: 'BERJALAN', label: 'Sedang Berjalan' },
+                  { value: 'SELESAI', label: 'Selesai' },
+                ]}
+                variant="icon"
+                icon={<Filter className="w-5 h-5" />}
+                align="right"
+                triggerClassName={filterStatus !== 'ALL' ? 'bg-red-50 border-crimson text-crimson' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}
+              />
+            </div>
+
           </div>
         }
       />
 
+
       <div className="flex flex-col gap-6 w-full pb-8">
         {isLoading ? (
-          <div className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col gap-6 w-full animate-pulse">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div className="flex flex-col gap-3 w-full md:w-1/3">
-                <div className="h-6 md:h-8 w-3/4 rounded-lg bg-slate-100" />
-                <div className="h-4 w-1/2 rounded-lg bg-slate-100" />
+          viewType === 'TABLE' ? (
+            /* Skeleton tabel */
+            <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px]">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-100">
+                      {['No', 'Mata Kuliah', 'Ruangan', 'Tanggal', 'Check-In', 'Check-Out', 'Bahasan Materi', 'Verifikasi', 'Dibayar'].map(col => (
+                        <th key={col} className="px-4 py-3 text-left">
+                          <div className="h-2.5 bg-slate-100 rounded animate-pulse w-16" />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...Array(8)].map((_, i) => (
+                      <tr key={i} className="border-b border-slate-50">
+                        <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-4" /></td>
+                        <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-32" /></td>
+                        <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-16" /></td>
+                        <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-24" /></td>
+                        <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-12" /></td>
+                        <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-12" /></td>
+                        <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-28" /></td>
+                        <td className="px-4 py-3"><div className="h-5 w-5 bg-slate-100 rounded animate-pulse mx-auto" /></td>
+                        <td className="px-4 py-3"><div className="h-5 w-5 bg-slate-100 rounded animate-pulse mx-auto" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-
-              <div className="flex flex-row gap-6 md:gap-8 w-full md:w-auto">
-                <div className="border-l-2 border-slate-100 pl-4 space-y-2">
-                  <div className="h-3 w-14 rounded bg-slate-100" />
-                  <div className="h-4 w-24 rounded bg-slate-100" />
+            </div>
+          ) : (
+            <div className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col gap-6 w-full animate-pulse">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="flex flex-col gap-3 w-full md:w-1/3">
+                  <div className="h-6 md:h-8 w-3/4 rounded-lg bg-slate-100" />
+                  <div className="h-4 w-1/2 rounded-lg bg-slate-100" />
                 </div>
-                <div className="border-l-2 border-slate-100 pl-4 space-y-2">
-                  <div className="h-3 w-12 rounded bg-slate-100" />
-                  <div className="h-4 w-28 rounded bg-slate-100" />
+                <div className="flex flex-row gap-6 md:gap-8 w-full md:w-auto">
+                  <div className="border-l-2 border-slate-100 pl-4 space-y-2">
+                    <div className="h-3 w-14 rounded bg-slate-100" />
+                    <div className="h-4 w-24 rounded bg-slate-100" />
+                  </div>
+                  <div className="border-l-2 border-slate-100 pl-4 space-y-2">
+                    <div className="h-3 w-12 rounded bg-slate-100" />
+                    <div className="h-4 w-28 rounded bg-slate-100" />
+                  </div>
                 </div>
+                <div className="h-9 w-24 rounded-xl bg-slate-100 mt-2 md:mt-0" />
               </div>
-
-              <div className="h-9 w-24 rounded-xl bg-slate-100 mt-2 md:mt-0" />
+              <div className="bg-fog rounded-[12px] md:rounded-[20px] p-5 space-y-3">
+                <div className="h-4 w-40 rounded bg-slate-200/70" />
+                <div className="h-4 w-full rounded bg-slate-200/70" />
+                <div className="h-4 w-2/3 rounded bg-slate-200/70" />
+              </div>
+              <p className="sr-only">Memuat riwayat kehadiran...</p>
             </div>
-
-            <div className="bg-fog rounded-[12px] md:rounded-[20px] p-5 space-y-3">
-              <div className="h-4 w-40 rounded bg-slate-200/70" />
-              <div className="h-4 w-full rounded bg-slate-200/70" />
-              <div className="h-4 w-2/3 rounded bg-slate-200/70" />
-            </div>
-            <p className="sr-only">Memuat riwayat kehadiran...</p>
-          </div>
+          )
         ) : error ? (
           <AsdosState variant="error" message={error} />
+        ) : viewType === 'TABLE' ? (
+          /* ── TABEL VIEW ── */
+          filtered.length > 0 ? (
+            <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px]">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-100">
+                      <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider w-8">No</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Mata Kuliah</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Ruangan</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Tanggal</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Check-In</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Check-Out</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider min-w-[160px]">Bahasan Materi</th>
+                      <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-24">Verifikasi</th>
+                      <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-24">Dibayar</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filtered.map((item, index) => (
+                      <tr
+                        key={item.id}
+                        className="hover:bg-slate-50/40 transition-colors"
+                      >
+                        <td className="px-4 py-3 text-xs text-slate-400 font-medium">{index + 1}</td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">{item.subject}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-slate-600 whitespace-nowrap">{item.room}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-slate-600 whitespace-nowrap">{formatDateCompact(item.rawDate)}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-slate-600 font-mono whitespace-nowrap">{item.checkIn}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-slate-600 font-mono whitespace-nowrap">{item.checkOut}</span>
+                        </td>
+                        <td className="px-4 py-3 min-w-[160px]">
+                          {item.materi && item.materi !== '-' ? (
+                            <span className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">{item.materi}</span>
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto ${
+                            item.isVerified ? 'bg-crimson border-crimson' : 'border-slate-200 bg-white'
+                          }`}>
+                            {item.isVerified && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto ${
+                            item.isPaid ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200 bg-white'
+                          }`}>
+                            {item.isPaid && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {/* Baris kosong sampai 15 */}
+                    {filtered.length < 15 && [...Array(15 - filtered.length)].map((_, i) => (
+                      <tr key={`empty-${i}`} className="opacity-20">
+                        <td className="px-4 py-3 text-xs text-slate-400">{filtered.length + i + 1}</td>
+                        <td colSpan={8} className="px-4 py-3">
+                          <div className="h-2 bg-slate-100 rounded-full w-24" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-100 rounded-xl p-8 text-center">
+              <div className="mx-auto mb-4 w-12 h-12 rounded-[14px] bg-fog flex items-center justify-center text-slate-500">
+                <Clock size={20} />
+              </div>
+              <p className="text-base font-bold text-slate-700">Belum ada riwayat kehadiran.</p>
+              <p className="text-sm text-slate-400 mt-1">Riwayat akan muncul setelah Anda melakukan check-in.</p>
+            </div>
+          )
         ) : displayed.length > 0 ? displayed.map(item => {
           return (
             <section
@@ -233,19 +383,29 @@ export default function RiwayatKehadiranPage() {
           </div>
         )}
 
-        <p className="text-xs font-medium text-slate-400 text-center mt-2">
-          Menampilkan {displayed.length} dari {filtered.length} riwayat kehadiran.
-        </p>
+        {viewType === 'CARD' && (
+          <>
+            <p className="text-xs font-medium text-slate-400 text-center mt-2">
+              Menampilkan {displayed.length} dari {filtered.length} riwayat kehadiran.
+            </p>
 
-        {hasMore && (
-          <div className="flex justify-center pt-2">
-            <button
-              onClick={showMore}
-              className="px-6 py-3 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:border-crimson/30 hover:text-crimson shadow-sm transition-all active:scale-95"
-            >
-              Tampilkan Lebih Banyak
-            </button>
-          </div>
+            {hasMore && (
+              <div className="flex justify-center pt-2">
+                <button
+                  onClick={showMore}
+                  className="px-6 py-3 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:border-crimson/30 hover:text-crimson shadow-sm transition-all active:scale-95"
+                >
+                  Tampilkan Lebih Banyak
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {viewType === 'TABLE' && filtered.length > 0 && (
+          <p className="text-xs font-medium text-slate-400 text-center mt-2">
+            Menampilkan {filtered.length} riwayat kehadiran.
+          </p>
         )}
       </div>
 

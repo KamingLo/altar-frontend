@@ -15,6 +15,9 @@ interface JadwalState {
   isLoading: boolean;
   error: string | null;
 
+  jadwalAjarCache: Record<string, SessionFromAPI[]>;
+  setJadwalAjarCache: (key: string, sessions: SessionFromAPI[]) => void;
+
   addPersonalSessions: (sessions: SessionFromAPI[]) => void;
   addAllSessions: (sessions: SessionFromAPI[]) => void;
   markMonthFetched: (monthKey: string, type: 'PERSONAL' | 'ALL') => void;
@@ -37,6 +40,10 @@ export const useJadwalStore = create<JadwalState>()((set) => ({
   selectedDate: now.getDate().toString(),
   isLoading: false,
   error: null,
+
+  jadwalAjarCache: {},
+  setJadwalAjarCache: (key, sessions) =>
+    set((state) => ({ jadwalAjarCache: { ...state.jadwalAjarCache, [key]: sessions } })),
 
   addPersonalSessions: (newSessions) => set((state) => {
     const existing = new Set(state.personalSessions.map(s => `${s.id_sesi}-${s.waktu}`));
@@ -69,6 +76,7 @@ export const useJadwalStore = create<JadwalState>()((set) => ({
     selectedDate: now.getDate().toString(),
     isLoading: false,
     error: null,
+    jadwalAjarCache: {},
   }),
 }));
 

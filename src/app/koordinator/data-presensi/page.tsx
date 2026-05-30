@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useTransition } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useTransition, useRef } from 'react';
 import {
   CalendarDays,
   User,
@@ -31,18 +31,29 @@ type TabId = 'ALL' | 'PENDING' | 'VERIFIED';
 type TipeFilter = 'ALL' | 'QR' | 'LINK';
 type PageTab = 'VERIFY' | 'PAY';
 
-function toMonthKey(dateStr: string) {
+function findCurrentSemesterId(semesters: SemesterItem[]): string {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
 
-const part = (dateStr || '').split('T')[0] || '';
-  const [y, m] = part.split('-');
-  if (!y || !m) return '';
-  return `${y}-${m}`;
-}
+  let tipe: 'Ganjil' | 'Genap';
+  let yearA: number, yearB: number;
 
-function formatMonthLabel(monthKey: string) {
-  const [y, m] = monthKey.split('-').map(Number);
-  if (!y || !m) return monthKey || '-';
-  return new Date(y, m - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  if (month >= 8) {
+    tipe = 'Ganjil'; yearA = year; yearB = year + 1;
+  } else if (month >= 2) {
+    tipe = 'Genap'; yearA = year - 1; yearB = year;
+  } else {
+    tipe = 'Ganjil'; yearA = year - 1; yearB = year;
+  }
+
+  const match = semesters.find(s =>
+    s.tipe_semester === tipe &&
+    s.tahun_ajaran.includes(String(yearA)) &&
+    s.tahun_ajaran.includes(String(yearB))
+  );
+
+  return match?.id ?? semesters[0]?.id ?? '';
 }
 
 const FILTER_TIPE_OPTIONS = [
@@ -69,18 +80,28 @@ export default function DataPresensiPage() {
   const [bulkPending, setBulkPending] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [semesters, setSemesters] = useState<SemesterItem[]>([]);
-
-  const [payingIndividual, setPayingIndividual] = useState<string | null>(null);
   const [bayarFilter, setBayarFilter] = useState<'ALL' | 'PAID' | 'UNPAID'>('ALL');
-  const [confirmingPayKey, setConfirmingPayKey] = useState<string | null>(null);
-
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [payRowPending, setPayRowPending] = useState<Set<string>>(new Set());
+
+  const [paySearchInput, setPaySearchInput] = useState('');
+  const [selectedAsdosName, setSelectedAsdosName] = useState<string | null>(null);
+  const [payDropdownOpen, setPayDropdownOpen] = useState(false);
+  const paySearchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getSemesterList(1, '', 100).then((res) => {
-      if (res.success && res.data) setSemesters(res.data.items);
+      if (res.success && res.data) {
+        const items = res.data.items;
+        setSemesters(items);
+        const currentId = findCurrentSemesterId(items);
+        if (currentId) {
+          setSemesterFilter(currentId);
+          fetchPresensi(false, currentId);
+        }
+      }
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchPresensi = useCallback(async (silent = false, semId?: string) => {
     if (!silent) {
@@ -121,14 +142,12 @@ export default function DataPresensiPage() {
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
-
     const poll = async () => {
       if (document.visibilityState === 'visible') {
         await fetchPresensi(true);
       }
       timeoutId = setTimeout(poll, 30_000);
     };
-
     timeoutId = setTimeout(poll, 30_000);
     return () => clearTimeout(timeoutId);
   }, [fetchPresensi]);
@@ -190,20 +209,52 @@ export default function DataPresensiPage() {
     });
   };
 
-  const filteredList = presensiList.filter((item) => {
+  const handleRowVerify = useCallback(async (id: string, newVal: boolean) => {
+    const key = `verify-${id}`;
+    setPayRowPending(prev => new Set(prev).add(key));
+    verifyPresensiLocal(id, newVal);
+    try {
+      const res = await verifyPresensi(id, newVal);
+      if (!res.success) {
+        toast.error(res.message || 'Gagal memperbarui verifikasi.');
+        await fetchPresensi(true);
+      }
+    } catch {
+      toast.error('Gagal memproses verifikasi.');
+      await fetchPresensi(true);
+    } finally {
+      setPayRowPending(prev => { const s = new Set(prev); s.delete(key); return s; });
+    }
+  }, [verifyPresensiLocal, fetchPresensi]);
 
+  const handleRowPay = useCallback(async (id: string, newVal: boolean) => {
+    const key = `pay-${id}`;
+    setPayRowPending(prev => new Set(prev).add(key));
+    updatePaymentLocal([id], newVal);
+    try {
+      const res = await updatePaymentStatus([id], newVal);
+      if (!res.success) {
+        toast.error(res.message || 'Gagal memperbarui pembayaran.');
+        await fetchPresensi(true);
+      }
+    } catch {
+      toast.error('Gagal memproses pembayaran.');
+      await fetchPresensi(true);
+    } finally {
+      setPayRowPending(prev => { const s = new Set(prev); s.delete(key); return s; });
+    }
+  }, [updatePaymentLocal, fetchPresensi]);
+
+  const filteredList = presensiList.filter((item) => {
     if (activeTab === 'PENDING' && item.is_verified) return false;
     if (activeTab === 'VERIFIED' && !item.is_verified) return false;
-
     if (tipeFilter === 'QR' && item.tipe_absensi !== 'qr') return false;
     if (tipeFilter === 'LINK' && item.tipe_absensi !== 'link') return false;
-
     const search = searchQuery.toLowerCase();
     const asdosName = (item.nama_asdos || '').toLowerCase();
     const asdosRekan = (item.nama_asdos_rekan || '').toLowerCase();
     const matkul = (item.nama_mata_kuliah || '').toLowerCase();
     const kelas = (item.nama_kelas || '').toLowerCase();
-
     return (
       asdosName.includes(search) ||
       asdosRekan.includes(search) ||
@@ -212,108 +263,35 @@ export default function DataPresensiPage() {
     );
   });
 
-
-const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
-    return presensiList.filter((item) => {
-      if (!item.is_verified) return false;
-      if (tipeFilter === 'QR' && item.tipe_absensi !== 'qr') return false;
-      if (tipeFilter === 'LINK' && item.tipe_absensi !== 'link') return false;
-      const search = searchQuery.toLowerCase();
-      const asdosName = (item.nama_asdos || '').toLowerCase();
-      return asdosName.includes(search);
-    });
-  }, [presensiList, tipeFilter, searchQuery]);
-
-  const currentMonthKey = useMemo(() => toMonthKey(new Date().toISOString()), []);
-
-  const paymentSections = useMemo(() => {
-    
-    const monthMap = new Map<string, PresensiResponseDTO[]>();
-    for (const item of payVerifiedList) {
-      const key = toMonthKey(item.tanggal_mengajar);
-      if (!key) continue;
-      monthMap.set(key, [...(monthMap.get(key) || []), item]);
-    }
-
-    const months = Array.from(monthMap.entries())
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([monthKey, items]) => {
-        const asdosMap = new Map<string, PresensiResponseDTO[]>();
-        for (const it of items) {
-          const name = (it.nama_asdos || '—').trim() || '—';
-          asdosMap.set(name, [...(asdosMap.get(name) || []), it]);
-        }
-
-        let asdosRows = Array.from(asdosMap.entries())
-          .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([name, list]) => {
-            const unpaidIds = list.filter(x => !x.is_paid).map(x => x.id_presensi);
-            return {
-              name,
-              totalSessions: list.length,
-              unpaidCount: unpaidIds.length,
-              isPaid: unpaidIds.length === 0,
-              unpaidIds,
-            };
-          });
-
-        if (bayarFilter === 'PAID') {
-          asdosRows = asdosRows.filter(r => r.isPaid);
-        } else if (bayarFilter === 'UNPAID') {
-          asdosRows = asdosRows.filter(r => !r.isPaid);
-        }
-
-        const unpaidIdsAll = asdosRows.flatMap(r => r.unpaidIds);
-        const canPay = monthKey < currentMonthKey; 
-
-        return {
-          monthKey,
-          monthLabel: formatMonthLabel(monthKey),
-          asdosRows,
-          unpaidIdsAll,
-          canPay,
-        };
-      })
-      .filter(section => section.asdosRows.length > 0);
-
-    return months;
-  }, [payVerifiedList, currentMonthKey, bayarFilter]);
-
-  const handleIndividualPayment = useCallback(async (ids: string[], isPaid: boolean, asdosName: string, monthKey: string) => {
-    let targetIds = ids;
-    if (!isPaid) {
-      const matchingPresensi = presensiList.filter(p =>
-        p.is_verified &&
-        p.is_paid &&
-        ((p.nama_asdos || '—').trim() || '—') === asdosName &&
-        toMonthKey(p.tanggal_mengajar) === monthKey
-      );
-      targetIds = matchingPresensi.map(p => p.id_presensi);
-    }
-    if (!targetIds.length) return;
-
-    const key = `${asdosName}-${monthKey}`;
-    setPayingIndividual(key);
-    updatePaymentLocal(targetIds, isPaid);
-    try {
-      const res = await updatePaymentStatus(targetIds, isPaid);
-      if (res.success) {
-        toast.success(
-          isPaid 
-            ? `Pembayaran asisten ${asdosName} berhasil ditandai lunas.` 
-            : `Status pembayaran asisten ${asdosName} berhasil dibatalkan.`
-        );
-      } else {
-        toast.error(res.message || 'Gagal memperbarui status pembayaran.');
-        fetchPresensi(true);
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (paySearchRef.current && !paySearchRef.current.contains(e.target as Node)) {
+        setPayDropdownOpen(false);
       }
-    } catch {
-      toast.error('Gagal memproses status pembayaran.');
-      fetchPresensi(true);
-    } finally {
-      setPayingIndividual(null);
-    }
-  }, [presensiList, fetchPresensi, updatePaymentLocal]);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const asdosOptions = useMemo(() => {
+    const search = paySearchInput.toLowerCase();
+    const names = new Set<string>();
+    presensiList.forEach(item => {
+      const name = (item.nama_asdos || '').trim();
+      if (name && name.toLowerCase().includes(search)) names.add(name);
+    });
+    return Array.from(names).sort();
+  }, [presensiList, paySearchInput]);
+
+  const payTableData = useMemo<PresensiResponseDTO[] | null>(() => {
+    if (!selectedAsdosName) return null;
+    let list = presensiList.filter(item =>
+      (item.nama_asdos || '').trim() === selectedAsdosName
+    );
+    if (bayarFilter === 'PAID') list = list.filter(r => r.is_paid);
+    else if (bayarFilter === 'UNPAID') list = list.filter(r => !r.is_paid);
+    return list.sort((a, b) => a.tanggal_mengajar.localeCompare(b.tanggal_mengajar));
+  }, [presensiList, selectedAsdosName, bayarFilter]);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr || dateStr === 'null' || dateStr.startsWith('0001')) return '-';
@@ -325,6 +303,15 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
         month: 'long',
         year: 'numeric'
       });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatDateCompact = (dateStr: string) => {
+    if (!dateStr || dateStr === 'null' || dateStr.startsWith('0001')) return '-';
+    try {
+      return new Date(dateStr).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
     } catch {
       return dateStr;
     }
@@ -379,7 +366,6 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
         </div>
       </div>
 
-      
       <div className="space-y-6 relative z-20 mb-3 px-1">
         <div className="w-full z-20 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex w-full md:w-auto">
@@ -412,7 +398,6 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
                 })}
               </div>
             ) : (
-              
               <div className="hidden md:block h-12" />
             )}
           </div>
@@ -420,8 +405,7 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
           <div className="flex gap-3 flex-1 md:max-w-max md:ml-auto w-full items-end">
             {semesters.length > 0 && (
               <>
-                
-                <div className="hidden md:flex flex-col gap-1 w-[180px] shrink-0">
+                <div className={`hidden md:flex flex-col gap-1 shrink-0 ${pageTab === 'PAY' ? 'w-[240px]' : 'w-[180px]'}`}>
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Semester</span>
                   <CustomSelect
                     variant="field"
@@ -440,7 +424,6 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
                   />
                 </div>
 
-                
                 <div className="md:hidden fixed bottom-7 right-4 z-50">
                   <CustomSelect
                     variant="icon"
@@ -462,32 +445,93 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
               </>
             )}
 
-            <div className="flex-1 md:flex-initial w-full md:w-[200px] md:shrink-0">
-              <div className="relative w-full">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                  <Search className="w-5 h-5 text-slate-400" />
-                </span>
-                <input
-                  type="text"
-                  placeholder="Cari..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-11 pr-10 py-3.5 rounded-xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+            {pageTab === 'VERIFY' ? (
+              <div className="flex-1 md:flex-initial w-full md:w-[200px] md:shrink-0">
+                <div className="relative w-full">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                    <Search className="w-5 h-5 text-slate-400" />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Cari..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-11 pr-10 py-3.5 rounded-xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div ref={paySearchRef} className="flex-1 md:flex-initial w-full md:w-[220px] md:shrink-0 relative">
+                <div className="relative w-full">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                    <Search className="w-5 h-5 text-slate-400" />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Cari nama asdos..."
+                    value={paySearchInput}
+                    onChange={(e) => {
+                      setPaySearchInput(e.target.value);
+                      setSelectedAsdosName(null);
+                      setPayDropdownOpen(true);
+                    }}
+                    onFocus={() => setPayDropdownOpen(true)}
+                    className="w-full pl-11 pr-10 py-3.5 rounded-xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                  />
+                  {(paySearchInput || selectedAsdosName) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaySearchInput('');
+                        setSelectedAsdosName(null);
+                        setPayDropdownOpen(false);
+                      }}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {payDropdownOpen && !selectedAsdosName && (
+                  <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden max-h-56 overflow-y-auto">
+                    {asdosOptions.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-slate-400 text-center">
+                        {paySearchInput ? `Tidak ada asdos "${paySearchInput}"` : 'Ketik nama untuk mencari'}
+                      </div>
+                    ) : (
+                      asdosOptions.map(name => (
+                        <button
+                          key={name}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setSelectedAsdosName(name);
+                            setPaySearchInput(name);
+                            setPayDropdownOpen(false);
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5"
+                        >
+                          <User className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                          {name}
+                        </button>
+                      ))
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
+            )}
 
-            <div className="shrink-0">
-              {pageTab === 'VERIFY' ? (
+            {pageTab === 'VERIFY' && (
+              <div className="shrink-0">
                 <CustomSelect
                   variant="icon"
                   align="right"
@@ -502,23 +546,8 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
                       : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 py-3.5 px-4 rounded-xl flex items-center justify-center'
                   }
                 />
-              ) : (
-                <CustomSelect
-                  variant="icon"
-                  align="right"
-                  value={bayarFilter}
-                  onChange={(v) => setBayarFilter(v as 'ALL' | 'PAID' | 'UNPAID')}
-                  options={FILTER_BAYAR_OPTIONS}
-                  placeholder="Filter status"
-                  icon={<Filter className="w-5 h-5" />}
-                  triggerClassName={
-                    bayarFilter !== 'ALL'
-                      ? 'bg-red-50 border-crimson text-crimson py-3.5 px-4 rounded-xl flex items-center justify-center'
-                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 py-3.5 px-4 rounded-xl flex items-center justify-center'
-                  }
-                />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -531,295 +560,86 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
             transition: 'transform 500ms cubic-bezier(0.16, 1, 0.3, 1)',
           }}
         >
+          {/* ── VERIFY TAB ── */}
           <div
             className={`w-1/2 shrink-0 transition-opacity duration-300 ${
               pageTab === 'PAY' ? 'opacity-0 pointer-events-none' : 'opacity-100'
             }`}
           >
-
             {isLoading ? (
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 relative z-10">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-3xl p-6 border border-slate-100 animate-shimmer space-y-6 flex flex-col justify-between">
-              <div>
-                <div className="flex gap-4 items-center">
-                  <div className="w-11 h-11 rounded-2xl bg-slate-100 shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-slate-100 rounded w-2/3" />
-                    <div className="h-3 bg-slate-100 rounded w-1/3" />
-                  </div>
-                </div>
-                <div className="space-y-3 pt-6 border-t border-slate-100 mt-6">
-                  <div className="h-8 bg-slate-100 rounded-xl w-full" />
-                  <div className="h-8 bg-slate-100 rounded-xl w-full" />
-                </div>
-              </div>
-              <div className="pt-4 border-t border-slate-50 flex gap-3 mt-4">
-                <div className="h-10 bg-slate-100 rounded-xl flex-1" />
-              </div>
-            </div>
-          ))}
-        </div>
-
-      ) : filteredList.length === 0 ? (
-
-        <AsdosState
-          icon={<Inbox size={24} />}
-          title="Tidak Ada Presensi"
-          message={
-            searchQuery
-              ? 'Tidak menemukan rekaman presensi asisten yang cocok dengan kata pencarian Anda.'
-              : `Tidak ada berkas presensi asisten dengan status "${activeTab === 'ALL' ? 'Semua' : activeTab === 'PENDING' ? 'Pending' : 'Terverifikasi'}" saat ini.`
-          }
-          className="mt-8"
-        />      ) : (
-        (() => {
-          const groupedList = filteredList.reduce<Record<string, typeof filteredList>>((acc, item) => {
-            const datePart = item.tanggal_mengajar ? item.tanggal_mengajar.split('T')[0] : 'other';
-            acc[datePart] = [...(acc[datePart] || []), item];
-            return acc;
-          }, {});
-
-          const sortedDateKeys = Object.keys(groupedList).sort((a, b) => b.localeCompare(a));
-
-          return (
-            <div className="space-y-8 relative z-10">
-              {sortedDateKeys.map((dateKey) => {
-                const items = groupedList[dateKey];
-                const displayDate = dateKey === 'other' ? 'Tanggal Lainnya' : formatDate(dateKey);
-
-                return (
-                  <div key={dateKey} className="space-y-4">
-                    <div className="flex items-center px-1 pt-2">
-                      <h3 className="text-sm font-bold text-slate-800">{displayDate}</h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {items.map((item) => {
-                        const isPendingStatus = !item.is_verified;
-                        const isLink = item.tipe_absensi === 'link';
-                        const isCheckoutEmpty = !isLink && (!item.waktu_checkout || item.waktu_checkout === '' || item.waktu_checkout === 'null' || String(item.waktu_checkout).startsWith('0001'));
-                        return (
-                          <section
-                            key={item.id_presensi}
-                            className="bg-white rounded-[12px] p-5 border border-slate-100 flex flex-col w-full"
-                          >
-                            <article className="flex flex-col flex-1 gap-3">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <h2 className="font-bold text-slate-900 leading-snug line-clamp-2 text-sm">
-                                    {item.nama_mata_kuliah}
-                                  </h2>
-                                  <p className="text-slate-500 font-medium text-[11px] mt-0.5 truncate">
-                                    {item.nama_kelas || '-'}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="border-t border-slate-100 pt-3">
-                                <div className="grid grid-cols-2 gap-x-0 gap-y-2.5">
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
-                                    <span className="text-[11px] font-bold text-slate-800">
-                                      {(!item.tanggal_mengajar || item.tanggal_mengajar === '' || item.tanggal_mengajar === 'null' || String(item.tanggal_mengajar).startsWith('0001')) ? '-' : formatDate(item.tanggal_mengajar)}
-                                    </span>
-                                  </div>
-                                  <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-1.5">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
-                                    <span className="text-[11px] font-bold text-slate-800 truncate" title={item.nama_ruangan || '-'}>
-                                      {item.nama_ruangan || '-'}
-                                      {item.menggantikan && (
-                                        <span className="text-[8px] font-extrabold text-crimson bg-rose-50 border border-rose-100 px-1 py-0.2 rounded uppercase ml-1">
-                                          Ganti
-                                        </span>
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-In</span>
-                                    <span className="text-[11px] font-bold text-slate-800">
-                                      {(!item.waktu_checkin || item.waktu_checkin === '' || item.waktu_checkin === 'null' || String(item.waktu_checkin).startsWith('0001')) ? '-' : formatTime(item.waktu_checkin)}
-                                    </span>
-                                  </div>
-                                  <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-1.5">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-Out</span>
-                                    <span className="text-[11px] font-bold text-slate-800">
-                                      {isLink ? 'Sesi Online' : (isCheckoutEmpty ? '-' : formatTime(item.waktu_checkout))}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="border-t border-slate-100 pt-3">
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Asisten Dosen</span>
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                  <span className="text-xs font-semibold text-slate-700 truncate" title={item.nama_asdos}>
-                                    {item.nama_asdos}
-                                  </span>
-                                </div>
-                                {item.nama_asdos_rekan && (
-                                  <div className="flex items-center gap-2 min-w-0 mt-1 pl-5">
-                                    <span className="text-[9px] text-slate-400 font-medium">Rekan:</span>
-                                    <span className="text-xs text-slate-500 font-medium truncate">{item.nama_asdos_rekan}</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {item.deskripsi_materi ? (
-                                <div className="bg-fog border border-slate-100 rounded-[12px] p-3">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
-                                    Materi
-                                  </span>
-                                  <p className="text-xs text-slate-600 font-medium leading-relaxed line-clamp-2 hover:line-clamp-none cursor-pointer transition-all">
-                                    &quot;{item.deskripsi_materi}&quot;
-                                  </p>
-                                </div>
-                              ) : null}
-
-                              {isLink && item.link_video && (
-                                <a
-                                  href={item.link_video}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-rose-200 bg-rose-50/30 text-rose-600 hover:bg-rose-50 text-[11px] font-bold transition-all mt-1 active:scale-98"
-                                >
-                                  <Video className="w-3.5 h-3.5" />
-                                  <span>Buka Rekaman Video</span>
-                                  <ExternalLink className="w-3 h-3 text-rose-400 shrink-0" />
-                                </a>
-                              )}
-
-                              {isCheckoutEmpty && (
-                                <p className="text-xs font-bold text-crimson mt-2 mb-2 text-center w-full">
-                                  Tidak melakukan checkout
-                                </p>
-                              )}
-
-                              <div className="pt-3 border-t border-slate-100 flex gap-2 mt-auto">
-                                {confirmingId === item.id_presensi ? (
-                                  <div className="w-full h-10 flex items-center justify-between gap-3 bg-slate-50/50 rounded-xl px-3 border border-slate-100">
-                                    <span className="text-xs font-extrabold text-slate-700 animate-pulse">
-                                      Anda Yakin?
-                                    </span>
-                                    <div className="flex gap-1.5 shrink-0">
-                                      <button
-                                        type="button"
-                                        onClick={() => setConfirmingId(null)}
-                                        className="w-7 h-7 rounded-full border border-rose-200 bg-white text-crimson hover:bg-rose-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-sm"
-                                        title="Batal"
-                                      >
-                                        <X className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        disabled={isPending}
-                                        onClick={() => handleVerifyDirect(item.id_presensi, isPendingStatus)}
-                                        className="w-7 h-7 rounded-full border border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer disabled:opacity-50 shadow-sm"
-                                        title="Ya, Konfirmasi"
-                                      >
-                                        {isPending ? (
-                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                        ) : (
-                                          <Check className="w-3.5 h-3.5" />
-                                        )}
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : isPendingStatus ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmingId(item.id_presensi)}
-                                    className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                                  >
-                                    <span>Verfikasi</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmingId(item.id_presensi)}
-                                    className="w-full h-10 rounded-xl border border-rose-200 text-crimson hover:bg-rose-50/50 font-extrabold text-xs transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                                  >
-                                    <span>Batalkan</span>
-                                  </button>
-                                )}
-                              </div>
-                            </article>
-                          </section>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()
-      )}
-
-          </div>
-          <div
-            className={`w-1/2 shrink-0 transition-opacity duration-300 ${
-              pageTab === 'PAY' ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
-          >
-              {(() => {
-                if (isLoading) {
-                  return (
-                    <div className="grid grid-cols-1 gap-6">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 animate-shimmer space-y-4">
-                          <div className="h-5 w-40 rounded" />
-                          <div className="h-10 w-full rounded-2xl" />
-                          <div className="h-24 w-full rounded-2xl" />
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 relative z-10">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-white rounded-3xl p-6 border border-slate-100 animate-shimmer space-y-6 flex flex-col justify-between">
+                    <div>
+                      <div className="flex gap-4 items-center">
+                        <div className="w-11 h-11 rounded-2xl bg-slate-100 shrink-0" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 bg-slate-100 rounded w-2/3" />
+                          <div className="h-3 bg-slate-100 rounded w-1/3" />
                         </div>
-                      ))}
+                      </div>
+                      <div className="space-y-3 pt-6 border-t border-slate-100 mt-6">
+                        <div className="h-8 bg-slate-100 rounded-xl w-full" />
+                        <div className="h-8 bg-slate-100 rounded-xl w-full" />
+                      </div>
                     </div>
-                  );
+                    <div className="pt-4 border-t border-slate-50 flex gap-3 mt-4">
+                      <div className="h-10 bg-slate-100 rounded-xl flex-1" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredList.length === 0 ? (
+              <AsdosState
+                icon={<Inbox size={24} />}
+                title="Tidak Ada Presensi"
+                message={
+                  searchQuery
+                    ? 'Tidak menemukan rekaman presensi asisten yang cocok dengan kata pencarian Anda.'
+                    : `Tidak ada berkas presensi asisten dengan status "${activeTab === 'ALL' ? 'Semua' : activeTab === 'PENDING' ? 'Pending' : 'Terverifikasi'}" saat ini.`
                 }
+                className="mt-8"
+              />
+            ) : (
+              (() => {
+                const groupedList = filteredList.reduce<Record<string, typeof filteredList>>((acc, item) => {
+                  const datePart = item.tanggal_mengajar ? item.tanggal_mengajar.split('T')[0] : 'other';
+                  acc[datePart] = [...(acc[datePart] || []), item];
+                  return acc;
+                }, {});
 
-                if (paymentSections.length === 0) {
-                  return (
-                    <AsdosState
-                      icon={<Inbox size={24} />}
-                      title="Belum ada progress"
-                      message="Tidak ada presensi terverifikasi untuk pembayaran."
-                      className="mt-2"
-                    />
-                  );
-                }
+                const sortedDateKeys = Object.keys(groupedList).sort((a, b) => b.localeCompare(a));
 
                 return (
                   <div className="space-y-8 relative z-10">
-                    {paymentSections.map(section => {
+                    {sortedDateKeys.map((dateKey) => {
+                      const items = groupedList[dateKey];
+                      const displayDate = dateKey === 'other' ? 'Tanggal Lainnya' : formatDate(dateKey);
+
                       return (
-                        <div key={section.monthKey} className="space-y-4">
+                        <div key={dateKey} className="space-y-4">
                           <div className="flex items-center px-1 pt-2">
-                            <h3 className="text-sm font-bold text-slate-800">{section.monthLabel}</h3>
+                            <h3 className="text-sm font-bold text-slate-800">{displayDate}</h3>
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {section.asdosRows.map(r => {
-                              const unverifiedCount = presensiList.filter(p =>
-                                !p.is_verified &&
-                                ((p.nama_asdos || '—').trim() || '—') === r.name &&
-                                toMonthKey(p.tanggal_mengajar) === section.monthKey
-                              ).length;
-
+                            {items.map((item) => {
+                              const isPendingStatus = !item.is_verified;
+                              const isLink = item.tipe_absensi === 'link';
+                              const isCheckoutEmpty = !isLink && (!item.waktu_checkout || item.waktu_checkout === '' || item.waktu_checkout === 'null' || String(item.waktu_checkout).startsWith('0001'));
                               return (
                                 <section
-                                  key={r.name}
+                                  key={item.id_presensi}
                                   className="bg-white rounded-[12px] p-5 border border-slate-100 flex flex-col w-full"
                                 >
                                   <article className="flex flex-col flex-1 gap-3">
                                     <div className="flex items-start justify-between gap-3">
                                       <div className="min-w-0">
-                                        <h2 className="font-bold text-slate-900 leading-snug truncate text-sm" title={r.name}>
-                                          {r.name}
+                                        <h2 className="font-bold text-slate-900 leading-snug line-clamp-2 text-sm">
+                                          {item.nama_mata_kuliah}
                                         </h2>
-                                        <p className="text-slate-500 font-medium text-[11px] mt-0.5 uppercase tracking-wider">
-                                          Asisten Dosen
+                                        <p className="text-slate-500 font-medium text-[11px] mt-0.5 truncate">
+                                          {item.nama_kelas || '-'}
                                         </p>
                                       </div>
                                     </div>
@@ -827,39 +647,93 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
                                     <div className="border-t border-slate-100 pt-3">
                                       <div className="grid grid-cols-2 gap-x-0 gap-y-2.5">
                                         <div className="flex flex-col gap-0.5">
-                                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Kehadiran</span>
+                                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
                                           <span className="text-[11px] font-bold text-slate-800">
-                                            {r.totalSessions} / 15
+                                            {(!item.tanggal_mengajar || item.tanggal_mengajar === '' || item.tanggal_mengajar === 'null' || String(item.tanggal_mengajar).startsWith('0001')) ? '-' : formatDate(item.tanggal_mengajar)}
                                           </span>
                                         </div>
                                         <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-1.5">
-                                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Belum Diverifikasi</span>
+                                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+                                          <span className="text-[11px] font-bold text-slate-800 truncate" title={item.nama_ruangan || '-'}>
+                                            {item.nama_ruangan || '-'}
+                                            {item.menggantikan && (
+                                              <span className="text-[8px] font-extrabold text-crimson bg-rose-50 border border-rose-100 px-1 py-0.2 rounded uppercase ml-1">
+                                                Ganti
+                                              </span>
+                                            )}
+                                          </span>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-In</span>
                                           <span className="text-[11px] font-bold text-slate-800">
-                                            {unverifiedCount}
+                                            {(!item.waktu_checkin || item.waktu_checkin === '' || item.waktu_checkin === 'null' || String(item.waktu_checkin).startsWith('0001')) ? '-' : formatTime(item.waktu_checkin)}
+                                          </span>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-1.5">
+                                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-Out</span>
+                                          <span className="text-[11px] font-bold text-slate-800">
+                                            {isLink ? 'Sesi Online' : (isCheckoutEmpty ? '-' : formatTime(item.waktu_checkout))}
                                           </span>
                                         </div>
                                       </div>
                                     </div>
 
+                                    <div className="border-t border-slate-100 pt-3">
+                                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Asisten Dosen</span>
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <span className="text-xs font-semibold text-slate-700 truncate" title={item.nama_asdos}>
+                                          {item.nama_asdos}
+                                        </span>
+                                      </div>
+                                      {item.nama_asdos_rekan && (
+                                        <div className="flex items-center gap-2 min-w-0 mt-1 pl-5">
+                                          <span className="text-[9px] text-slate-400 font-medium">Rekan:</span>
+                                          <span className="text-xs text-slate-500 font-medium truncate">{item.nama_asdos_rekan}</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {item.deskripsi_materi ? (
+                                      <div className="bg-fog border border-slate-100 rounded-[12px] p-3">
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
+                                          Materi
+                                        </span>
+                                        <p className="text-xs text-slate-600 font-medium leading-relaxed line-clamp-2 hover:line-clamp-none cursor-pointer transition-all">
+                                          &quot;{item.deskripsi_materi}&quot;
+                                        </p>
+                                      </div>
+                                    ) : null}
+
+                                    {isLink && item.link_video && (
+                                      <a
+                                        href={item.link_video}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-rose-200 bg-rose-50/30 text-rose-600 hover:bg-rose-50 text-[11px] font-bold transition-all mt-1 active:scale-98"
+                                      >
+                                        <Video className="w-3.5 h-3.5" />
+                                        <span>Buka Rekaman Video</span>
+                                        <ExternalLink className="w-3 h-3 text-rose-400 shrink-0" />
+                                      </a>
+                                    )}
+
+                                    {isCheckoutEmpty && (
+                                      <p className="text-xs font-bold text-crimson mt-2 mb-2 text-center w-full">
+                                        Tidak melakukan checkout
+                                      </p>
+                                    )}
+
                                     <div className="pt-3 border-t border-slate-100 flex gap-2 mt-auto">
-                                      {payingIndividual === `${r.name}-${section.monthKey}` ? (
-                                        <button
-                                          type="button"
-                                          disabled
-                                          className="w-full h-10 rounded-xl bg-slate-100 text-slate-400 font-extrabold text-xs flex items-center justify-center gap-2"
-                                        >
-                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                          <span>Memproses...</span>
-                                        </button>
-                                      ) : confirmingPayKey === `${r.name}-${section.monthKey}` ? (
-                                        <div className="w-full h-10 flex items-center justify-between gap-3 bg-slate-50/50 rounded-xl px-3 border border-slate-100 animate-fadeIn">
+                                      {confirmingId === item.id_presensi ? (
+                                        <div className="w-full h-10 flex items-center justify-between gap-3 bg-slate-50/50 rounded-xl px-3 border border-slate-100">
                                           <span className="text-xs font-extrabold text-slate-700 animate-pulse">
                                             Anda Yakin?
                                           </span>
                                           <div className="flex gap-1.5 shrink-0">
                                             <button
                                               type="button"
-                                              onClick={() => setConfirmingPayKey(null)}
+                                              onClick={() => setConfirmingId(null)}
                                               className="w-7 h-7 rounded-full border border-rose-200 bg-white text-crimson hover:bg-rose-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-sm"
                                               title="Batal"
                                             >
@@ -867,37 +741,34 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
                                             </button>
                                             <button
                                               type="button"
-                                              onClick={async () => {
-                                                setConfirmingPayKey(null);
-                                                await handleIndividualPayment(
-                                                  !r.isPaid ? r.unpaidIds : [],
-                                                  !r.isPaid,
-                                                  r.name,
-                                                  section.monthKey
-                                                );
-                                              }}
-                                              className="w-7 h-7 rounded-full border border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-sm"
+                                              disabled={isPending}
+                                              onClick={() => handleVerifyDirect(item.id_presensi, isPendingStatus)}
+                                              className="w-7 h-7 rounded-full border border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer disabled:opacity-50 shadow-sm"
                                               title="Ya, Konfirmasi"
                                             >
-                                              <Check className="w-3.5 h-3.5" />
+                                              {isPending ? (
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                              ) : (
+                                                <Check className="w-3.5 h-3.5" />
+                                              )}
                                             </button>
                                           </div>
                                         </div>
-                                      ) : !r.isPaid ? (
+                                      ) : isPendingStatus ? (
                                         <button
                                           type="button"
-                                          onClick={() => setConfirmingPayKey(`${r.name}-${section.monthKey}`)}
+                                          onClick={() => setConfirmingId(item.id_presensi)}
                                           className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                                         >
-                                          <span>Bayar</span>
+                                          <span>Verfikasi</span>
                                         </button>
                                       ) : (
                                         <button
                                           type="button"
-                                          onClick={() => setConfirmingPayKey(`${r.name}-${section.monthKey}`)}
+                                          onClick={() => setConfirmingId(item.id_presensi)}
                                           className="w-full h-10 rounded-xl border border-rose-200 text-crimson hover:bg-rose-50/50 font-extrabold text-xs transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                                         >
-                                          <span>Batalkan Bayar</span>
+                                          <span>Batalkan</span>
                                         </button>
                                       )}
                                     </div>
@@ -911,7 +782,203 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
                     })}
                   </div>
                 );
-              })()}
+              })()
+            )}
+          </div>
+
+          {/* ── PAY TAB ── */}
+          <div
+            className={`w-1/2 shrink-0 transition-opacity duration-300 ${
+              pageTab === 'PAY' ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            {isLoading ? (
+              /* Skeleton loading berbentuk tabel */
+              <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+                  <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                    <div className="space-y-1.5">
+                      <div className="h-4 w-36 bg-slate-100 rounded animate-shimmer" />
+                      <div className="h-3 w-24 bg-slate-100 rounded animate-shimmer" />
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[900px]">
+                      <thead>
+                        <tr className="bg-slate-50/70 border-b border-slate-100">
+                          {['No', 'Nama Pelajaran', 'Kelas', 'Tgl Perkuliahan', 'Mulai', 'Selesai', 'Bahasan Materi', 'Pengajar', 'Verifikasi', 'Pembayaran'].map(col => (
+                            <th key={col} className="px-4 py-3 text-left">
+                              <div className="h-2.5 bg-slate-100 rounded animate-shimmer w-16" />
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...Array(8)].map((_, i) => (
+                          <tr key={i} className="border-b border-slate-50">
+                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-4" /></td>
+                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-32" /></td>
+                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-16" /></td>
+                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-24" /></td>
+                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-12" /></td>
+                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-12" /></td>
+                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-28" /></td>
+                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-20" /></td>
+                            <td className="px-4 py-3"><div className="h-5 w-5 bg-slate-100 rounded animate-shimmer mx-auto" /></td>
+                            <td className="px-4 py-3"><div className="h-5 w-5 bg-slate-100 rounded animate-shimmer mx-auto" /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Konten tabel / prompt */}
+                {payTableData === null ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
+                      <Search className="w-6 h-6 text-slate-400" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-600 mb-1">Pilih asisten dosen</p>
+                    <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                      Ketik dan pilih nama dari dropdown untuk melihat data kehadiran.
+                    </p>
+                  </div>
+                ) : payTableData.length === 0 ? (
+                  <AsdosState
+                    icon={<Inbox size={24} />}
+                    title="Tidak Ada Data"
+                    message={`Tidak ada presensi tercatat untuk "${selectedAsdosName}".`}
+                    className="mt-2"
+                  />
+                ) : (
+              /* Tabel presensi asdos */
+              <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+                {/* Tabel — scrollable kiri kanan */}
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[900px]">
+                    <thead>
+                      <tr className="bg-slate-50/70 border-b border-slate-100">
+                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider w-8">No</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Nama Pelajaran</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Kelas</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Tgl Perkuliahan</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Mulai</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Selesai</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider min-w-[160px]">Bahasan Materi</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Pengajar</th>
+                        <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-24">Verifikasi</th>
+                        <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-24">Pembayaran</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {payTableData.map((item, index) => {
+                        const verifyKey = `verify-${item.id_presensi}`;
+                        const payKey = `pay-${item.id_presensi}`;
+                        const verifyPending = payRowPending.has(verifyKey);
+                        const payPending = payRowPending.has(payKey);
+                        const isOnline = item.tipe_absensi === 'link';
+                        return (
+                          <tr key={item.id_presensi} className="hover:bg-slate-50/40 transition-colors">
+                            <td className="px-4 py-3 text-xs text-slate-400 font-medium">{index + 1}</td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">
+                                {item.nama_mata_kuliah || '-'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs text-slate-600 whitespace-nowrap">{item.nama_kelas || '-'}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs text-slate-600 whitespace-nowrap">{formatDateCompact(item.tanggal_mengajar)}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkin)}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {isOnline ? (
+                                <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full whitespace-nowrap">Online</span>
+                              ) : (
+                                <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkout)}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 min-w-[160px]">
+                              {item.deskripsi_materi ? (
+                                <span className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">{item.deskripsi_materi}</span>
+                              ) : (
+                                <span className="text-slate-300 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {item.nama_asdos_rekan ? (
+                                <span className="text-xs text-slate-600 whitespace-nowrap">{item.nama_asdos_rekan}</span>
+                              ) : (
+                                <span className="text-slate-300 text-xs">—</span>
+                              )}
+                            </td>
+
+                            {/* Checkbox Verifikasi */}
+                            <td className="px-4 py-3 text-center">
+                              {verifyPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-slate-300 mx-auto" />
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRowVerify(item.id_presensi, !item.is_verified)}
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all active:scale-90 cursor-pointer ${
+                                    item.is_verified
+                                      ? 'bg-crimson border-crimson shadow-sm'
+                                      : 'border-slate-300 bg-white hover:border-crimson'
+                                  }`}
+                                  title={item.is_verified ? 'Batalkan verifikasi' : 'Verifikasi'}
+                                >
+                                  {item.is_verified && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                </button>
+                              )}
+                            </td>
+
+                            {/* Checkbox Pembayaran */}
+                            <td className="px-4 py-3 text-center">
+                              {payPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-slate-300 mx-auto" />
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRowPay(item.id_presensi, !item.is_paid)}
+                                  disabled={!item.is_verified}
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all active:scale-90 ${
+                                    !item.is_verified
+                                      ? 'border-slate-200 bg-slate-50 opacity-30 cursor-not-allowed'
+                                      : item.is_paid
+                                      ? 'bg-emerald-600 border-emerald-600 shadow-sm cursor-pointer'
+                                      : 'border-slate-300 bg-white hover:border-emerald-600 cursor-pointer'
+                                  }`}
+                                  title={!item.is_verified ? 'Verifikasi dahulu sebelum bayar' : item.is_paid ? 'Batalkan pembayaran' : 'Tandai lunas'}
+                                >
+                                  {item.is_paid && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                      {/* Baris kosong sampai 15 sesi */}
+                      {payTableData.length < 15 && [...Array(15 - payTableData.length)].map((_, i) => (
+                        <tr key={`empty-${i}`} className="opacity-20">
+                          <td className="px-4 py-3 text-xs text-slate-400">{payTableData.length + i + 1}</td>
+                          <td colSpan={9} className="px-4 py-3">
+                            <div className="h-2 bg-slate-100 rounded-full w-24" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -943,9 +1010,6 @@ const payVerifiedList = useMemo<PresensiResponseDTO[]>(() => {
         </div>
       )}
 
-
-
     </AsdosPageShell>
   );
 }
-

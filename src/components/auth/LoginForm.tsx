@@ -263,7 +263,7 @@ export default function LoginForm() {
     </div>
   );
 
-  const currentBg = isEntering || isExiting ? 'bg-canvas' : 'bg-[#EDF2F4]';
+  const currentBg = 'bg-canvas';
 
   return (
     <>
@@ -277,15 +277,12 @@ export default function LoginForm() {
 
       {renderToasts()}
 
-      <div className={`hidden lg:flex min-h-screen w-full items-center font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${currentBg}`}>
+      <div className={`hidden lg:flex min-h-screen w-full items-center font-['Plus_Jakarta_Sans',sans-serif] ${currentBg}`}>
         <div className="relative w-[55%] self-stretch shrink-0">
           <div
             className={`absolute inset-0 bg-[url('/gedung-untar-fl.webp')] bg-cover bg-center bg-no-repeat z-0 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-100' : 'opacity-50'}`}
           />
-          
-          <div className="absolute inset-y-0 right-0 w-[60%] z-10 bg-gradient-to-r from-[#f4f4f5]/0 via-[#f4f4f5]/80 to-[#f4f4f5]" />
-          
-          <div className={`absolute inset-y-0 right-0 w-[60%] z-10 bg-gradient-to-r from-[#EDF2F4]/0 via-[#EDF2F4]/80 to-[#EDF2F4] transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-0' : 'opacity-100'}`} />
+          <div className="absolute inset-y-0 right-0 w-[60%] z-10 bg-gradient-to-r from-canvas/0 via-canvas/80 to-canvas" />
         </div>
 
         <div className={`flex flex-col flex-1 justify-center items-start pl-20 pr-16 relative z-20 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExiting ? 'opacity-0 translate-y-[22px]' : 'opacity-100 translate-y-0'}`}>
@@ -295,20 +292,15 @@ export default function LoginForm() {
         </div>
       </div>
 
-      <div className={`flex lg:hidden min-h-[100svh] w-full justify-center font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${currentBg}`}>
-        <div className={`relative w-full max-w-[450px] md:max-w-[650px] min-h-[100svh] flex flex-col mx-auto shadow-[0_0_40px_rgba(0,0,0,0.05)] transition-colors duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${currentBg}`}>
+      <div className={`flex lg:hidden min-h-[100svh] w-full justify-center font-['Plus_Jakarta_Sans',sans-serif] ${currentBg}`}>
+        <div className={`relative w-full max-w-[450px] md:max-w-[650px] min-h-[100svh] flex flex-col mx-auto shadow-[0_0_40px_rgba(0,0,0,0.05)] ${currentBg}`}>
           <div className="absolute inset-0 z-0 pointer-events-none flex flex-col">
             <div className="relative w-full h-[50svh] min-h-[300px] shrink-0">
               <div
                 className={`absolute inset-0 bg-gray-300 bg-[url('/gedung-untar.png')] bg-cover bg-[center_top] z-0 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-100' : 'opacity-50'}`}
               />
-              
               <div className="absolute inset-0 z-10" style={{
                 background: 'linear-gradient(to top, #f4f4f5 0%, #f4f4f5 12%, rgba(244, 244, 245, 0.85) 22%, rgba(244, 244, 245, 0.55) 35%, rgba(244, 244, 245, 0.2) 50%, transparent 65%)'
-              }} />
-              
-              <div className={`absolute inset-0 z-10 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isEntering || isExiting ? 'opacity-0' : 'opacity-100'}`} style={{
-                background: 'linear-gradient(to top, #EDF2F4 0%, #EDF2F4 12%, rgba(237, 242, 244, 0.85) 22%, rgba(237, 242, 244, 0.55) 35%, rgba(237, 242, 244, 0.2) 50%, transparent 65%)'
               }} />
             </div>
           </div>
