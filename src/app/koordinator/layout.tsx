@@ -15,7 +15,7 @@ export default function KoordinatorLayout({ children }: { children: React.ReactN
     menuGroups.push({ id: 'koordinator', title: 'Koordinator', items: koordinatorMenuItems });
   }
   if (user?.id_asisten) {
-    menuGroups.push({ id: 'asdos', title: 'Asdos', items: asdosMenuItems });
+    menuGroups.push({ id: 'asdos', title: 'Asisten Dosen', items: asdosMenuItems });
   }
   if (menuGroups.length === 0) {
     menuGroups.push({ id: 'koordinator', title: 'Koordinator', items: koordinatorMenuItems });

@@ -80,8 +80,8 @@ export default function ManajemenAsdosPage() {
   const modalSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const tabs: Array<{ id: TabId; label: string; short: string }> = [
-    { id: 'asdos', label: 'Asisten Dosen', short: 'Asdos' },
-    { id: 'koordinator', label: 'Koordinator', short: 'Koord' },
+    { id: 'asdos', label: 'Asisten Dosen', short: 'Asisten Dosen' },
+    { id: 'koordinator', label: 'Koordinator', short: 'Koordinator' },
     { id: 'user', label: 'Data User', short: 'User' },
   ];
 
@@ -351,7 +351,7 @@ export default function ManajemenAsdosPage() {
       <AsdosPageHeader
         eyebrow="Manajemen User"
         title="Kelola Akses"
-        description="Atur data asdos, koordinator, dan user dalam satu halaman."
+        description="Atur data asisten dosen, koordinator, dan user dalam satu halaman."
         action={
           showAddButton ? (
             <AsdosPrimaryButton
@@ -390,7 +390,7 @@ export default function ManajemenAsdosPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-11 pr-4 py-3.5 rounded-[14px] md:rounded-2xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-              placeholder="Ketik nama asdos, koor, user"
+              placeholder="Ketik nama asisten dosen, koordinator, user"
             />
           </div>
           {activeTab !== 'user' && (

@@ -610,7 +610,7 @@ export default function GenerateQrPage() {
         <AsdosPageShell className="pb-24 md:pb-12">
 
           <AsdosPageHeader
-            eyebrow="Presensi Asdos"
+            eyebrow="Presensi Asisten Dosen"
             title="Kiosk & QR Presensi"
             description="Konfigurasi kode QR asisten dosen atau jalankan layar Kiosk Mandiri di kelas Anda."
             className="relative z-10 !mb-4 md:!mb-8"
@@ -802,13 +802,13 @@ export default function GenerateQrPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 lg:flex-1 lg:min-h-0 h-auto mt-6 md:mt-8 mb-4 items-stretch">
 
-              <div className="lg:col-span-7 lg:bg-white lg:border lg:border-slate-100 lg:rounded-[2.5rem] lg:p-8 lg:shadow-sm flex flex-col items-center justify-center relative overflow-hidden text-slate-800">
+              <div className="lg:col-span-7 bg-white border border-slate-100 rounded-[1.75rem] p-5 shadow-sm lg:rounded-[2.5rem] lg:p-8 flex flex-col items-center justify-center relative overflow-hidden text-slate-800">
 
                 <div className="flex flex-col items-center max-w-sm w-full">
                   <h2 className="text-lg md:text-xl font-extrabold text-slate-800 text-center tracking-tight">SCAN QR CHECK-IN</h2>
-                  <p className="text-xs text-slate-400 mt-1 mb-6 md:mb-8 text-center font-medium">Buka aplikasi asdos Anda dan scan kode QR ini</p>
+                  <p className="text-xs text-slate-400 mt-1 mb-6 md:mb-8 text-center font-medium">Buka aplikasi asisten dosen Anda dan scan kode QR ini</p>
 
-                  <div className="bg-transparent lg:bg-white p-0 lg:p-7 rounded-none lg:rounded-[3rem] shadow-none lg:shadow-lg border-0 lg:border lg:border-slate-150 flex items-center justify-center aspect-square max-w-[280px] sm:max-w-[320px] w-full relative">
+                  <div className="bg-white p-4 sm:p-5 lg:p-7 rounded-[2rem] lg:rounded-[3rem] shadow-[0_12px_30px_rgba(15,23,42,0.08)] lg:shadow-lg border border-slate-100 lg:border-slate-150 flex items-center justify-center aspect-square max-w-[280px] sm:max-w-[320px] w-full relative">
                     {qrToken ? (
                       <Image
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrToken)}`}

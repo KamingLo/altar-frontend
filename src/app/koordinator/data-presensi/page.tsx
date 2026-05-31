@@ -56,6 +56,13 @@ function findCurrentSemesterId(semesters: SemesterItem[]): string {
   return match?.id ?? semesters[0]?.id ?? '';
 }
 
+function toExternalUrl(value?: string | null) {
+  const trimmed = value?.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 const FILTER_TIPE_OPTIONS = [
   { value: 'ALL', label: 'Semua Absensi' },
   { value: 'QR', label: 'Scan QR (Reguler)' },
@@ -101,7 +108,7 @@ export default function DataPresensiPage() {
         }
       }
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); 
 
   const fetchPresensi = useCallback(async (silent = false, semId?: string) => {
     if (!silent) {
@@ -477,7 +484,7 @@ export default function DataPresensiPage() {
                   </span>
                   <input
                     type="text"
-                    placeholder="Cari nama asdos..."
+                    placeholder="Cari nama asisten dosen..."
                     value={paySearchInput}
                     onChange={(e) => {
                       setPaySearchInput(e.target.value);
@@ -505,7 +512,7 @@ export default function DataPresensiPage() {
                   <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden max-h-56 overflow-y-auto">
                     {asdosOptions.length === 0 ? (
                       <div className="px-4 py-3 text-sm text-slate-400 text-center">
-                        {paySearchInput ? `Tidak ada asdos "${paySearchInput}"` : 'Ketik nama untuk mencari'}
+                        {paySearchInput ? `Tidak ada asisten dosen "${paySearchInput}"` : 'Ketik nama untuk mencari'}
                       </div>
                     ) : (
                       asdosOptions.map(name => (
@@ -626,6 +633,7 @@ export default function DataPresensiPage() {
                             {items.map((item) => {
                               const isPendingStatus = !item.is_verified;
                               const isLink = item.tipe_absensi === 'link';
+                              const videoUrl = toExternalUrl(item.link_video);
                               const isCheckoutEmpty = !isLink && (!item.waktu_checkout || item.waktu_checkout === '' || item.waktu_checkout === 'null' || String(item.waktu_checkout).startsWith('0001'));
                               return (
                                 <section
@@ -705,9 +713,9 @@ export default function DataPresensiPage() {
                                       </div>
                                     ) : null}
 
-                                    {isLink && item.link_video && (
+                                    {isLink && videoUrl && (
                                       <a
-                                        href={item.link_video}
+                                        href={videoUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-rose-200 bg-rose-50/30 text-rose-600 hover:bg-rose-50 text-[11px] font-bold transition-all mt-1 active:scale-98"
@@ -852,7 +860,7 @@ export default function DataPresensiPage() {
                     className="mt-2"
                   />
                 ) : (
-              /* Tabel presensi asdos */
+              /* Tabel presensi asisten dosen */
               <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
                 {/* Tabel — scrollable kiri kanan */}
                 <div className="overflow-x-auto">
@@ -926,9 +934,9 @@ export default function DataPresensiPage() {
                                   type="button"
                                   onClick={() => handleRowVerify(item.id_presensi, !item.is_verified)}
                                   className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all active:scale-90 cursor-pointer ${
-                                    item.is_verified
-                                      ? 'bg-crimson border-crimson shadow-sm'
-                                      : 'border-slate-300 bg-white hover:border-crimson'
+                                      item.is_verified
+                                        ? 'bg-emerald-600 border-emerald-600 shadow-sm'
+                                        : 'border-slate-300 bg-white hover:border-emerald-600'
                                   }`}
                                   title={item.is_verified ? 'Batalkan verifikasi' : 'Verifikasi'}
                                 >

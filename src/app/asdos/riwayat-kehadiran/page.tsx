@@ -284,7 +284,7 @@ export default function RiwayatKehadiranPage() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto ${
-                            item.isVerified ? 'bg-crimson border-crimson' : 'border-slate-200 bg-white'
+                            item.isVerified ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200 bg-white'
                           }`}>
                             {item.isVerified && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                           </div>

@@ -67,7 +67,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
 
   const hasDualRole = !!(user?.id_asisten && user?.id_koordinator);
   const otherDashboardHref = homeHref === '/koordinator' ? '/asdos' : '/koordinator';
-  const otherDashboardLabel = homeHref === '/koordinator' ? 'Asdos' : 'Koor';
+  const otherDashboardLabel = homeHref === '/koordinator' ? 'Asisten Dosen' : 'Koordinator';
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
@@ -432,7 +432,15 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
           className="relative z-10 w-full max-w-md lg:max-w-none h-screen bg-transparent overflow-hidden flex flex-col mx-auto lg:mx-0 transition-all duration-300"
           style={{ fontFamily: "'Inter', sans-serif" }}
         >
-          <div id="dashboard-top-left" className="hidden lg:flex absolute top-7 left-7 z-20 items-center gap-2">
+          <header
+            id="dashboard-header-desktop"
+            className={`hidden lg:flex absolute top-0 left-0 right-0 z-20 items-start justify-between gap-6 px-7 pt-7 pb-4 transition-all duration-300 ${
+              isScrolled
+                ? 'bg-white/60 backdrop-blur-md shadow-sm border-b border-white/30'
+                : 'bg-transparent border-b border-transparent shadow-none'
+            }`}
+          >
+          <div id="dashboard-top-left" className="flex items-center gap-2">
             {hasDualRole ? (
               <>
                 <Link
@@ -440,14 +448,14 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/koordinator' ? 'bg-crimson/90 text-white border-white/20 shadow-lg shadow-crimson/20' : 'text-crimson bg-white/80 border-white/50 shadow-sm hover:shadow-md'}`}
                 >
                   <LayoutDashboard size={16} strokeWidth={2.5} />
-                  Dash Koor
+                  Dashboard Koordinator
                 </Link>
                 <Link
                   href="/asdos"
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 text-sm font-bold ${homeHref === '/asdos' ? 'bg-crimson/90 text-white border-white/20 shadow-lg shadow-crimson/20' : 'text-crimson bg-white/80 border-white/50 shadow-sm hover:shadow-md'}`}
                 >
                   <GraduationCap size={16} strokeWidth={2.5} />
-                  Dash Asdos
+                  Dashboard Asisten Dosen
                 </Link>
               </>
             ) : (
@@ -461,7 +469,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
             )}
           </div>
 
-          <div id="dashboard-top-right" className="hidden lg:flex flex-col absolute top-7 right-7 z-20 items-end gap-3">
+          <div id="dashboard-top-right" className="flex flex-col items-end gap-3">
             <div className="flex items-center gap-4">
               {pathname !== homeHref && !hasSeen && pendingCount > 0 && (
                 <button
@@ -484,6 +492,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
               </div>
             </div>
           </div>
+          </header>
 
           <header id="dashboard-header-mobile" className={`lg:hidden absolute top-0 left-0 right-0 flex items-center justify-between gap-3 px-6 py-3.5 z-20 transition-all duration-300 ${isScrolled ? 'bg-white/60 backdrop-blur-md shadow-sm border-b border-white/30' : 'bg-transparent'}`}>
             <button

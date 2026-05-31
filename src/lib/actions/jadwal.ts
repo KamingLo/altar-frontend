@@ -11,6 +11,16 @@ export interface SessionFromAPI {
   pengajar: string;
   waktu: string;
   tipe_jadwal: 'REGULAR' | 'PENGGANTI';
+  tipe_absensi?: string;
+  tipe_presensi?: string;
+  mode_presensi?: string;
+  presensi_mode?: string;
+  attendance_mode?: string;
+  id_sesi_pengganti?: string;
+  id_pengganti?: string;
+  id_substitute_session?: string;
+  id_substitute?: string;
+  is_online?: boolean;
 }
 
 export async function getSessionsByDate(date: string) {

@@ -7,14 +7,29 @@ import { getMySubstitutions, deleteSubstitution } from '@/lib/actions/pergantian
 
 import { AsdosQrScanSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 import { decodeJwtPayload } from '@/lib/auth/jwt';
+import { getSubstituteSessionId, isQrSession } from '@/lib/presensi-mode';
 
-const isSessionExpired = (waktu: string): boolean => {
-  const match = waktu.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
-  if (!match) return false;
-  const endHour = parseInt(match[3], 10);
-  const endMin = parseInt(match[4], 10);
+const getCurrentMinutes = () => {
   const now = new Date();
-  return endHour * 60 + endMin < now.getHours() * 60 + now.getMinutes();
+  return now.getHours() * 60 + now.getMinutes();
+};
+
+const getSessionStartMinutes = (waktu: string): number | null => {
+  const match = waktu.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+};
+
+const canShowForCheckIn = (session: SessionFromAPI, nowMinutes = getCurrentMinutes()): boolean => {
+  const startMinutes = getSessionStartMinutes(session.waktu);
+  if (startMinutes === null) return true;
+  return nowMinutes >= startMinutes - 15;
+};
+
+const isLateCheckInSession = (session: SessionFromAPI, nowMinutes = getCurrentMinutes()): boolean => {
+  const startMinutes = getSessionStartMinutes(session.waktu);
+  if (startMinutes === null) return false;
+  return nowMinutes > startMinutes + 30;
 };
 
 const normalizeScannedQrToken = (rawToken: string): string => {
@@ -118,14 +133,23 @@ export default function CheckInPage() {
     );
 
     if (res.success) {
-      const fetchedSessions = (res.data ?? [])
-        .filter(s => !isSessionExpired(s.waktu))
+      const availableSessions = (res.data ?? [])
         .filter(s => !completedSessionIds.has(s.id_sesi));
+      const fetchedSessions = availableSessions
+        .filter(isQrSession)
+        .filter(s => canShowForCheckIn(s))
+        .sort((a, b) => Number(isLateCheckInSession(a)) - Number(isLateCheckInSession(b)));
       setSessions(fetchedSessions);
 
       const { sessionId } = parseAndValidateQrToken(token);
       const matchedSession = sessionId
         ? fetchedSessions.find(s => s.id_sesi === sessionId)
+        : null;
+      const matchedNonQrSession = sessionId
+        ? availableSessions.find(s => s.id_sesi === sessionId && !isQrSession(s))
+        : null;
+      const matchedUpcomingQrSession = sessionId
+        ? availableSessions.find(s => s.id_sesi === sessionId && isQrSession(s) && !canShowForCheckIn(s))
         : null;
 
       if (matchedSession) {
@@ -141,6 +165,11 @@ export default function CheckInPage() {
           setSheetDragY(0);
         }, 100);
       } else {
+        if (matchedNonQrSession) {
+          setScanMessage('Sesi ini menggunakan presensi online, bukan QR. Silakan gunakan menu Presensi Kelas Online.');
+        } else if (matchedUpcomingQrSession) {
+          setScanMessage('Sesi QR ini belum masuk waktu check-in. Silakan coba lagi mendekati jam mengajar.');
+        }
         if (fetchedSessions.length > 0) {
           setSelectedSessionId(fetchedSessions[0].id_sesi);
         }
@@ -308,6 +337,9 @@ export default function CheckInPage() {
 
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   const selectedSession = sessions.find(s => s.id_sesi === selectedSessionId);
+  const currentMinutes = getCurrentMinutes();
+  const normalSessions = sessions.filter(s => !isLateCheckInSession(s, currentMinutes));
+  const lateSessions = sessions.filter(s => isLateCheckInSession(s, currentMinutes));
 
   const handleCloseSheet = () => {
     setIsSheetClosing(true);
@@ -331,12 +363,13 @@ export default function CheckInPage() {
 
   const handleConfirmCheckIn = async () => {
     if (!selectedSessionId) return;
+    const substituteSessionId = getSubstituteSessionId(selectedSession);
     setIsSubmitting(true);
     const res = await submitCheckIn({
       id_sesi: selectedSessionId,
       qr_token: qrToken,
-      menggantikan: selectedSession?.tipe_jadwal === 'PENGGANTI',
-      id_sesi_pengganti: selectedSession?.tipe_jadwal === 'PENGGANTI' ? selectedSession.id_sesi : undefined,
+      menggantikan: selectedSession?.tipe_jadwal === 'PENGGANTI' && !!substituteSessionId,
+      id_sesi_pengganti: substituteSessionId,
     });
     if (res.success) {
 
@@ -365,6 +398,122 @@ try {
   const handleSelectSession = (sessionId: string) => {
     setSelectedSessionId(sessionId);
     setIsInlineConfirmOpen(false);
+  };
+
+  const renderSessionOption = (s: SessionFromAPI, isLate = false) => {
+    const isSel = selectedSessionId === s.id_sesi;
+    const datePart = s.waktu.split(', ')[0] ?? '-';
+    const timePart = s.waktu.split(', ')[1] ?? s.waktu;
+
+    return (
+      <React.Fragment key={s.id_sesi}>
+        <section
+          onClick={() => handleSelectSession(s.id_sesi)}
+          className={`bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 border transition-all cursor-pointer active:scale-[0.99] flex flex-col gap-6 w-full ${
+            isSel
+              ? 'border-crimson shadow-[0_10px_25px_rgba(148,28,47,0.12)]'
+              : isLate
+                ? 'border-amber-100 hover:border-amber-200 bg-amber-50/30'
+                : 'border-slate-100 hover:border-slate-200'
+          }`}
+        >
+          <article className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="flex flex-col gap-1 w-full md:w-1/3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 leading-snug line-clamp-2">
+                  {s.mata_kuliah}
+                </h3>
+                {isLate && (
+                  <span className="mb-1 px-2.5 py-1 rounded-xl text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-100 uppercase">
+                    Terlambat
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-slate-500 font-medium">{s.nama_kelas || 'Kelas tidak tersedia'}</p>
+              {s.tipe_jadwal === 'PENGGANTI' && (
+                <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">
+                  Pengganti
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full md:w-[480px]">
+              <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
+                <span className="text-sm md:text-base font-bold text-slate-800">{datePart}</span>
+              </div>
+              <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Jam</span>
+                <span className="text-sm md:text-base font-bold text-slate-800">{timePart}</span>
+              </div>
+              <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+                <span className="text-sm md:text-base font-bold text-slate-800">{s.ruangan}</span>
+              </div>
+              <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipe</span>
+                <span className="text-sm md:text-base font-bold text-slate-800">{s.tipe_jadwal}</span>
+              </div>
+            </div>
+
+            <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isSel ? 'bg-crimson text-white shadow-md shadow-crimson/20' : 'bg-slate-100 text-slate-300'}`}>
+              <Check size={17} strokeWidth={3} />
+            </div>
+          </article>
+
+          {isLate && (
+            <div className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 text-left">
+              <p className="text-[11px] md:text-xs font-semibold text-amber-700 leading-relaxed">
+                Sesi ini sudah melewati batas untuk check-in, namun masih dapat dicatat hari ini.
+              </p>
+            </div>
+          )}
+        </section>
+
+        {isSel && (
+          <div className="-mt-1 mb-2">
+            {isInlineConfirmOpen ? (
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <p className="text-base font-bold text-slate-800">Anda yakin?</p>
+                  <p className="text-sm text-slate-400 mt-0.5">Check-in akan langsung dicatat.</p>
+                </div>
+                <div className="grid grid-cols-2 sm:flex gap-3 md:shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsInlineConfirmOpen(false)}
+                    disabled={isSubmitting}
+                    className="px-6 py-3 rounded-[14px] bg-white border border-slate-200 text-slate-600 font-bold text-sm active:scale-[0.98] transition-all hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmCheckIn}
+                    disabled={isSubmitting}
+                    className="px-6 py-3 rounded-[14px] bg-crimson text-white font-bold text-sm shadow-lg shadow-crimson/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                    Ya, Check-in
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex md:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsInlineConfirmOpen(true)}
+                  disabled={!selectedSessionId}
+                  className="w-full md:w-auto bg-crimson text-white font-bold py-4 md:py-3.5 md:px-10 text-[15px] rounded-[14px] shadow-lg shadow-crimson/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] disabled:opacity-50"
+                >
+                  Check-in Sekarang
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </React.Fragment>
+    );
   };
 
   if (isLoading) {
@@ -473,14 +622,14 @@ try {
           <div className="mb-6 md:mb-8">
             <p className="text-left text-[11px] font-bold text-crimson tracking-[0.15em] uppercase mb-1 md:text-xs">Check-in Kehadiran</p>
             <h2 className="text-left text-[28px] md:text-3xl leading-8 font-extrabold text-[#1F2937]">Pindai Kode QR</h2>
-            <p className="text-left text-sm mt-1 md:text-base text-slate-500">Arahkan kamera ke kode QR yang disediakan koordinator.</p>
+            <p className="text-left text-sm mt-1 md:text-base text-slate-500">Arahkan kamera ke kode QR yang disediakan oleh koordinator.</p>
           </div>
 
           <div className="md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 md:p-12 lg:p-16 md:flex md:items-start md:gap-16">
             <div className="hidden md:flex md:flex-1 flex-col justify-center pt-8">
               <h3 className="text-2xl lg:text-3xl font-extrabold text-[#1F2937] mb-3">Pindai Kode QR</h3>
               <p className="text-base text-slate-500 leading-relaxed">
-                Arahkan kamera Anda ke kode QR yang disediakan oleh Koordinator di depan kelas untuk melakukan check-in kehadiran. Pastikan pencahayaan cukup dan kode QR berada di dalam area pindai.
+                Arahkan kamera Anda ke kode QR yang disediakan oleh Koordinator untuk melakukan check-in kehadiran. Pastikan pencahayaan cukup dan kode QR berada di dalam area pindai.
               </p>
               <div className="mt-8 flex flex-row gap-4 w-full">
                 {cameraStatus === 'idle' || cameraStatus === 'denied' ? (
@@ -667,106 +816,43 @@ try {
                     <Scan size={20} />
                   </div>
                   <p className="text-base md:text-lg text-slate-800 font-bold">Tidak ada sesi mengajar.</p>
-                  <p className="text-sm text-slate-400 mt-1">
-                    Sesi hari ini belum tersedia atau sudah tercatat check-in.
+                  <p className="text-sm text-slate-400 mt-1 max-w-md mx-auto leading-relaxed">
+                    Sesi QR hari ini belum tersedia, sudah melewati jam mengajar, atau sudah tercatat check-in.
                   </p>
                 </div>
               ) : (
-                sessions.map(s => {
-                  const isSel = selectedSessionId === s.id_sesi;
-                  const datePart = s.waktu.split(', ')[0] ?? '-';
-                  const timePart = s.waktu.split(', ')[1] ?? s.waktu;
-                  return (
-                    <React.Fragment key={s.id_sesi}>
-                      <section
-                        onClick={() => handleSelectSession(s.id_sesi)}
-                        className={`bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 border transition-all cursor-pointer active:scale-[0.99] flex flex-col gap-6 w-full ${isSel ? 'border-crimson shadow-[0_10px_25px_rgba(148,28,47,0.12)]' : 'border-slate-100 hover:border-slate-200'
-                          }`}
-                      >
-                        <article className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                          <div className="flex flex-col gap-1 w-full md:w-1/3">
-                            <h3 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 leading-snug line-clamp-2">
-                              {s.mata_kuliah}
-                            </h3>
-                            <p className="text-sm text-slate-500 font-medium">{s.nama_kelas || 'Kelas tidak tersedia'}</p>
-                            {s.tipe_jadwal === 'PENGGANTI' && (
-                              <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">
-                                Pengganti
-                              </span>
-                            )}
-                          </div>
+                <>
+                  {normalSessions.length > 0 && (
+                    <div className="space-y-4 md:space-y-6">
+                      <div className="flex items-center justify-between px-1">
+                        <p className="text-[10px] md:text-xs font-extrabold text-slate-400 tracking-widest uppercase">
+                          Siap Check-in
+                        </p>
+                        <span className="text-[10px] font-bold text-slate-400">{normalSessions.length} sesi</span>
+                      </div>
+                      {normalSessions.map(s => renderSessionOption(s))}
+                    </div>
+                  )}
 
-                          <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full md:w-[480px]">
-                            <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
-                              <span className="text-sm md:text-base font-bold text-slate-800">{datePart}</span>
-                            </div>
-                            <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Jam</span>
-                              <span className="text-sm md:text-base font-bold text-slate-800">{timePart}</span>
-                            </div>
-                            <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
-                              <span className="text-sm md:text-base font-bold text-slate-800">{s.ruangan}</span>
-                            </div>
-                            <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipe</span>
-                              <span className="text-sm md:text-base font-bold text-slate-800">{s.tipe_jadwal}</span>
-                            </div>
-                          </div>
-
-                          <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isSel ? 'bg-crimson text-white shadow-md shadow-crimson/20' : 'bg-slate-100 text-slate-300'
-                            }`}>
-                            <Check size={17} strokeWidth={3} />
-                          </div>
-                        </article>
-                      </section>
-
-                      {isSel && (
-                        <div className="-mt-1 mb-2">
-                          {isInlineConfirmOpen ? (
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                              <div>
-                                <p className="text-base font-bold text-slate-800">Anda yakin?</p>
-                                <p className="text-sm text-slate-400 mt-0.5">Check-in akan langsung dicatat.</p>
-                              </div>
-                              <div className="grid grid-cols-2 sm:flex gap-3 md:shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => setIsInlineConfirmOpen(false)}
-                                  disabled={isSubmitting}
-                                  className="px-6 py-3 rounded-[14px] bg-white border border-slate-200 text-slate-600 font-bold text-sm active:scale-[0.98] transition-all hover:bg-slate-50 disabled:opacity-50"
-                                >
-                                  Batal
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleConfirmCheckIn}
-                                  disabled={isSubmitting}
-                                  className="px-6 py-3 rounded-[14px] bg-crimson text-white font-bold text-sm shadow-lg shadow-crimson/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                  {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-                                  Ya, Check-in
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex md:justify-end">
-                              <button
-                                type="button"
-                                onClick={() => setIsInlineConfirmOpen(true)}
-                                disabled={!selectedSessionId}
-                                className="w-full md:w-auto bg-crimson text-white font-bold py-4 md:py-3.5 md:px-10 text-[15px] rounded-[14px] shadow-lg shadow-crimson/20 active:scale-[0.98] transition-all hover:bg-[#7a1727] disabled:opacity-50"
-                              >
-                                Check-in Sekarang
-                              </button>
-                            </div>
-                          )}
+                  {lateSessions.length > 0 && (
+                    <div className="space-y-4 md:space-y-6">
+                      <div className="flex items-center justify-between px-1 pt-2">
+                        <div>
+                          <p className="text-[10px] md:text-xs font-extrabold text-amber-700 tracking-widest uppercase">
+                            Terlambat Check-in
+                          </p>
+                          <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                            Sesi di bawah masih dapat dicatat selama hari ini.
+                          </p>
                         </div>
-                      )}
-                    </React.Fragment>
-                  );
-                })
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full">
+                          {lateSessions.length} sesi
+                        </span>
+                      </div>
+                      {lateSessions.map(s => renderSessionOption(s, true))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

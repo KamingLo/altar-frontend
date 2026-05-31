@@ -16,6 +16,7 @@ import {
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 import { getMySubstitutions } from '@/lib/actions/pergantian-kelas';
 import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
+import { getSessionPresensiMode, isOnlinePresensi, isQrPresensi } from '@/lib/presensi-mode';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useUserStore } from '@/store/useUserStore';
 import type { SubstituteSessionDetail } from '@/types/api';
@@ -119,7 +120,14 @@ function getCurrentMinutes() {
 
 function getKpStatusClass(status: SubstituteSessionDetail['status']) {
   if (status === 'PENDING') return 'bg-fog text-ink';
-  return 'bg-obsidian text-white';
+  if (status === 'VERIFIED') return 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+  return 'bg-rose-50 text-rose-700 border border-rose-100';
+}
+
+function getKpStatusLabel(status: SubstituteSessionDetail['status']) {
+  if (status === 'PENDING') return 'MENUNGGU';
+  if (status === 'VERIFIED') return 'DISETUJUI';
+  return 'DITOLAK';
 }
 
 function getDisplayName(email?: string | null) {
@@ -320,7 +328,7 @@ export default function AsdosHome() {
           title: 'Kehadiran telah diverifikasi',
           detail: `${subject} • ${context}`,
           date: item.tanggal_mengajar,
-          badge: 'Terverifikasi',
+          badge: 'Sudah Diverifikasi',
           tone: 'emerald',
         });
       }
@@ -331,7 +339,7 @@ export default function AsdosHome() {
           title: 'Pembayaran sudah masuk',
           detail: `${subject} • ${context}`,
           date: item.tanggal_mengajar,
-          badge: 'Dibayar',
+          badge: 'Sudah Dibayar',
           tone: 'blue',
         });
       }
@@ -364,6 +372,8 @@ export default function AsdosHome() {
     const today = todayISO();
     const startMinutes = getScheduleStartMinutes(schedule);
     const canCheckIn = currentMinutes >= startMinutes - 10;
+    const presensiMode = getSessionPresensiMode(schedule);
+    const isQrMode = presensiMode === 'qr';
 
     const sessionPresensi = presensiItems.find(p => {
       const matchDate = String(p.tanggal_mengajar).split('T')[0] === today;
@@ -371,6 +381,7 @@ export default function AsdosHome() {
     });
     const hasCheckedIn = !!sessionPresensi;
     const hasCheckedOut = hasCheckedIn && !!sessionPresensi!.waktu_checkout && !String(sessionPresensi!.waktu_checkout).startsWith('0001');
+    const hasSubmittedOnline = !!sessionPresensi && isOnlinePresensi(sessionPresensi);
 
     return (
       <div key={`${schedule.id_sesi}-${schedule.waktu}`} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-all duration-200 hover:bg-white hover:shadow-sm">
@@ -397,16 +408,32 @@ export default function AsdosHome() {
         </div>
         {showActions && (
           <div className="mt-4 flex flex-wrap gap-2">
-            {canCheckIn ? (
-              <Link href="/asdos/check-in" className="inline-flex items-center justify-center rounded-xl bg-crimson px-4 py-2 text-xs font-bold text-white shadow-sm shadow-crimson/20 active:scale-[0.98]">
-                Check-in
-              </Link>
-            ) : (
-              <span className="inline-flex items-center justify-center rounded-xl bg-crimson/40 px-4 py-2 text-xs font-bold text-white cursor-not-allowed select-none">
-                Check-in
+            {isQrMode ? (
+              hasCheckedIn ? (
+                <span className="inline-flex items-center justify-center rounded-xl bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 border border-emerald-100">
+                  Sudah check-in
+                </span>
+              ) : (
+                canCheckIn ? (
+                  <Link href="/asdos/check-in" className="inline-flex items-center justify-center rounded-xl bg-crimson px-4 py-2 text-xs font-bold text-white shadow-sm shadow-crimson/20 active:scale-[0.98]">
+                    Check-in
+                  </Link>
+                ) : (
+                  <span className="inline-flex items-center justify-center rounded-xl bg-crimson/40 px-4 py-2 text-xs font-bold text-white cursor-not-allowed select-none">
+                    Check-in
+                  </span>
+                )
+              )
+            ) : hasSubmittedOnline ? (
+              <span className="inline-flex items-center justify-center rounded-xl bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 border border-emerald-100">
+                Presensi online sudah tercatat
               </span>
+            ) : (
+              <Link href="/asdos/presensi-kelas-online" className="inline-flex items-center justify-center rounded-xl bg-crimson px-4 py-2 text-xs font-bold text-white shadow-sm shadow-crimson/20 active:scale-[0.98]">
+                Isi Presensi Online
+              </Link>
             )}
-            {hasCheckedIn && !hasCheckedOut && (
+            {isQrMode && sessionPresensi && isQrPresensi(sessionPresensi) && hasCheckedIn && !hasCheckedOut && (
               <Link href="/asdos/check-out" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 active:scale-[0.98]">
                 Check-out
               </Link>
@@ -421,13 +448,13 @@ export default function AsdosHome() {
     <div className="max-w-6xl mx-auto px-1.5 sm:px-2 md:px-0 pb-10 md:pb-12">
       <div className="mb-6 md:mb-8 animate-fade-up">
         <p className="text-[11px] font-bold text-crimson tracking-[0.15em] uppercase mb-1 md:text-xs">
-          Dashboard Asdos
+          Dashboard Asisten Dosen
         </p>
         <h1 className="text-[24px] md:text-[30px] font-extrabold text-slate-900 leading-tight">
           Halo, {displayName}
         </h1>
         <p className="text-xs md:text-sm text-slate-700 mt-2 max-w-2xl">
-          Pantau jadwal mengajar, status presensi, dan pengajuan kelas pengganti dalam satu ringkasan.
+          Pantau jadwal mengajar, status presensi, dan pengajuan kelas pengganti Anda di sini.
         </p>
       </div>
 
@@ -556,16 +583,16 @@ export default function AsdosHome() {
                 <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-all duration-200 hover:bg-white hover:shadow-sm">
                   <div className="flex justify-between items-start mb-1 gap-3">
                     <h4 className="text-sm font-bold text-slate-800 truncate">{item.title}</h4>
-                    <span className="text-[10px] lg:text-xs text-slate-700 whitespace-nowrap">
-                      {formatShortDate(item.date)}
+                    <span className="text-[10px] font-extrabold px-3 py-1 rounded-full shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-100">
+                      {item.badge}
                     </span>
                   </div>
                   <p className="text-[11px] font-bold text-slate-700 mb-2 truncate uppercase tracking-wider">
                     {item.detail}
                   </p>
-                  <span className={`inline-block text-[10px] lg:text-xs font-bold px-3 py-1.5 rounded-full ${item.tone === 'emerald' ? 'text-emerald-600 bg-emerald-50' : 'text-blue-600 bg-blue-50'}`}>
-                    {item.badge}
-                  </span>
+                  <p className="text-[10px] lg:text-xs text-slate-500 font-semibold">
+                    {formatShortDate(item.date)}
+                  </p>
                 </div>
               ))
             )}
@@ -595,7 +622,7 @@ export default function AsdosHome() {
                         {item.session?.mata_kuliah ?? 'Kelas Pengganti'}
                       </h4>
                       <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full shrink-0 ${getKpStatusClass(item.status)}`}>
-                        {item.status}
+                        {getKpStatusLabel(item.status)}
                       </span>
                     </div>
                     <p className="text-xs text-slate-700 truncate">

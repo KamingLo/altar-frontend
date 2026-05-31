@@ -83,7 +83,7 @@ export async function createAsdosAccount(data: {
   );
   return {
     success: asdosRes.success,
-    message: asdosRes.success ? 'Akun Asdos berhasil dibuat.' : asdosRes.message,
+    message: asdosRes.success ? 'Akun Asisten Dosen berhasil dibuat.' : asdosRes.message,
   };
 }
 

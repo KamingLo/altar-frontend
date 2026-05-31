@@ -233,7 +233,7 @@ export default function ManajemenKpPage() {
               </span>
               <input
                 type="text"
-                placeholder="Cari matkul, kelas, atau asdos"
+                placeholder="Cari matkul, kelas, atau asisten dosen"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-11 pr-4 py-3.5 rounded-[14px] md:rounded-2xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"

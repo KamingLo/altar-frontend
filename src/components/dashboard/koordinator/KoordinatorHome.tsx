@@ -99,10 +99,10 @@ export default function KoordinatorHome() {
     const events: ActivityEvent[] = [];
 
     for (const p of allPresensiItems) {
-      const isOnline = p.tipe_absensi === 'ONLINE';
+      const isOnline = p.tipe_absensi === 'link';
       const hasCheckout = !!p.waktu_checkout && !String(p.waktu_checkout).startsWith('0001');
       const subject = `${p.nama_mata_kuliah} - ${p.nama_ruangan}`;
-      const name = p.nama_asdos || 'Asdos';
+      const name = p.nama_asdos || 'Asisten Dosen';
 
       if (isOnline) {
         events.push({
@@ -250,7 +250,7 @@ export default function KoordinatorHome() {
 
         <div className="animate-fade-up" style={{ animationDelay: '0.15s' }}>
           <div className="flex justify-between items-center mb-4 lg:mb-6 px-1">
-            <h3 className="font-bold text-lg lg:text-xl text-slate-800">Aktivitas Asdos</h3>
+            <h3 className="font-bold text-lg lg:text-xl text-slate-800">Aktivitas Asisten Dosen</h3>
             <Link href="/koordinator/data-presensi" className="text-xs lg:text-sm font-semibold text-crimson active:scale-95 transition">
               Lihat Semua
             </Link>

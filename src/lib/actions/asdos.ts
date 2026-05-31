@@ -42,7 +42,7 @@ export async function createAsdos(payload: CreateAsdosPayload) {
   const newUser = searchRes.data?.find(u => u.email.toLowerCase() === payload.email.toLowerCase());
 
   if (!newUser?.id) {
-    return { success: false, message: 'User berhasil dibuat, tapi gagal mengambil ID untuk registrasi asdos' };
+    return { success: false, message: 'User berhasil dibuat, tapi gagal mengambil ID untuk registrasi asisten dosen' };
   }
 
   const asdosRes = await apiClient.post('/asdos/', {

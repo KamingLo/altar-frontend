@@ -1,10 +1,12 @@
 ﻿'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { Check, ArrowLeft, BookOpen, Send, Loader2, AlertCircle } from 'lucide-react';
-import { submitOnlineAttendance } from '@/lib/actions/presensi';
+import { toast } from 'sonner';
+import { getMyPresensi, submitOnlineAttendance } from '@/lib/actions/presensi';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 
 import { AsdosOnlineSessionSkeleton, AsdosPageHeader, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
+import { getSubstituteSessionId, isOnlineSession } from '@/lib/presensi-mode';
 
 function todayIso() {
   return new Date().toISOString().split('T')[0];
@@ -42,24 +44,54 @@ export default function PresensiKelasOnlinePage() {
   const [waktuSelesai, setWaktuSelesai] = useState('');
   const [materi, setMateri] = useState('');
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [completedSessionIds, setCompletedSessionIds] = useState<Set<string>>(new Set());
 
   const MAX_MATERI = 100;
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-  const onlineSessions = useMemo(() => sessions.filter(s => !isSessionPast(s)), [sessions]);
+  const onlineSessions = useMemo(() => {
+    return sessions
+      .filter(isOnlineSession)
+      .filter(s => !isSessionPast(s))
+      .filter(s => {
+        const substituteSessionId = getSubstituteSessionId(s);
+        return !completedSessionIds.has(s.id_sesi) && (!substituteSessionId || !completedSessionIds.has(substituteSessionId));
+      });
+  }, [sessions, completedSessionIds]);
   const selectedSession = onlineSessions.find(s => s.id_sesi === selectedSessionId);
 
   useEffect(() => {
     async function fetchSessions() {
       setIsLoading(true);
-      const res = await getSessionsByDate(todayIso());
+      const today = todayIso();
+      const [res, presensiRes] = await Promise.all([
+        getSessionsByDate(today),
+        getMyPresensi(),
+      ]);
+      const completedIds = new Set<string>(
+        (presensiRes.success ? presensiRes.data ?? [] : [])
+          .filter(p => p.tanggal_mengajar?.slice(0, 10) === today)
+          .flatMap(p => [p.id_sesi, p.id_sesi_pengganti].filter((v): v is string => !!v))
+      );
+      setCompletedSessionIds(completedIds);
+
       if (res.success && res.data) {
         setSessions(res.data);
-        const firstSession = res.data.find(s => !isSessionPast(s));
+        const firstSession = res.data.find(s => {
+          const substituteSessionId = getSubstituteSessionId(s);
+          return (
+            isOnlineSession(s) &&
+            !isSessionPast(s) &&
+            !completedIds.has(s.id_sesi) &&
+            (!substituteSessionId || !completedIds.has(substituteSessionId))
+          );
+        });
         if (firstSession) {
           const firstTime = getSessionTime(firstSession);
           setSelectedSessionId(firstSession.id_sesi);
           setWaktuMulai(firstTime.start);
           setWaktuSelesai(firstTime.end);
+        } else {
+          setSelectedSessionId(null);
         }
       }
       setIsLoading(false);
@@ -90,6 +122,13 @@ export default function PresensiKelasOnlinePage() {
   const handleConfirmSend = async () => {
     if (!selectedSession) return;
 
+    const substituteSessionId = getSubstituteSessionId(selectedSession);
+    if (completedSessionIds.has(selectedSession.id_sesi) || (substituteSessionId && completedSessionIds.has(substituteSessionId))) {
+      toast.error('Presensi untuk sesi ini sudah tercatat.');
+      setStep(1);
+      return;
+    }
+
     setIsSubmitting(true);
     const res = await submitOnlineAttendance({
       id_sesi: selectedSession.id_sesi,
@@ -97,12 +136,20 @@ export default function PresensiKelasOnlinePage() {
       waktu_selesai: waktuSelesai,
       deskripsi_materi: materi,
       link_video: link,
-      menggantikan: selectedSession.tipe_jadwal === 'PENGGANTI',
-      id_sesi_pengganti: selectedSession.tipe_jadwal === 'PENGGANTI' ? selectedSession.id_sesi : undefined,
+      menggantikan: selectedSession.tipe_jadwal === 'PENGGANTI' && !!substituteSessionId,
+      id_sesi_pengganti: substituteSessionId,
     });
 
     if (res.success) {
+      setCompletedSessionIds(prev => {
+        const next = new Set(prev);
+        next.add(selectedSession.id_sesi);
+        if (substituteSessionId) next.add(substituteSessionId);
+        return next;
+      });
       setStep(3);
+    } else {
+      toast.error(res.message || 'Gagal mengirim presensi online.');
     }
     setIsSubmitting(false);
   };
@@ -121,9 +168,9 @@ export default function PresensiKelasOnlinePage() {
         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 mb-6">
           <AlertCircle size={40} />
         </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-2">Tidak Ada Jadwal Hari Ini</h2>
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">Tidak Ada Jadwal Online Hari Ini</h2>
         <p className="text-slate-500 mb-8 max-w-xs">
-          Tambahkan jadwal mengajar hari ini terlebih dahulu agar presensi online bisa dilakukan.
+          Sesi online hari ini belum tersedia, sudah berakhir, atau presensinya sudah tercatat.
         </p>
       </div>
     );

@@ -668,7 +668,7 @@ function NotFoundAuth() {
   const menuGroups: MenuGroup[] = useMemo(() => {
     const groups: MenuGroup[] = [];
     if (user?.id_koordinator) groups.push({ id: 'koordinator', title: 'Koordinator', items: koordinatorMenuItems });
-    if (user?.id_asisten)     groups.push({ id: 'asdos',       title: 'Asdos',       items: asdosMenuItems });
+    if (user?.id_asisten)     groups.push({ id: 'asdos',       title: 'Asisten Dosen',       items: asdosMenuItems });
     return groups;
   }, [user]);
 
@@ -928,11 +928,11 @@ function NotFoundAuth() {
               <>
                 <Link href="/koordinator"
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 text-sm font-bold ${dashBtnCls}`}>
-                  <Home size={16} strokeWidth={2.5} /> Dash Koor
+                  <Home size={16} strokeWidth={2.5} /> Dashboard Koordinator
                 </Link>
                 <Link href="/asdos"
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 text-sm font-bold ${dashBtnCls}`}>
-                  <Home size={16} strokeWidth={2.5} /> Dash Asdos
+                  <Home size={16} strokeWidth={2.5} /> Dashboard Asisten Dosen
                 </Link>
               </>
             ) : (

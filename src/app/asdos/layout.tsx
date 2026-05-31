@@ -15,10 +15,10 @@ export default function AsdosLayout({ children }: { children: React.ReactNode })
     menuGroups.push({ id: 'koordinator', title: 'Koordinator', items: koordinatorMenuItems });
   }
   if (user?.id_asisten) {
-    menuGroups.push({ id: 'asdos', title: 'Asdos', items: asdosMenuItems });
+    menuGroups.push({ id: 'asdos', title: 'Asisten Dosen', items: asdosMenuItems });
   }
   if (menuGroups.length === 0) {
-    menuGroups.push({ id: 'asdos', title: 'Asdos', items: asdosMenuItems });
+    menuGroups.push({ id: 'asdos', title: 'Asisten Dosen', items: asdosMenuItems });
   }
 
   return (

@@ -5,6 +5,7 @@ import { getMyPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/a
 
 import Link from 'next/link';
 import { AsdosQrScanSkeleton, AsdosPageShell, AsdosPageHeader } from '@/components/dashboard/asdos/AsdosUI';
+import { isQrPresensi } from '@/lib/presensi-mode';
 
 export default function CheckOutPage() {
   const MAX_HURUF = 100;
@@ -35,6 +36,7 @@ export default function CheckOutPage() {
         if (res.success && res.data) {
           const today = new Date().toISOString().split('T')[0];
           const active = res.data.find(p => {
+            if (!isQrPresensi(p)) return false;
             const checkout = p.waktu_checkout;
             const isOpen = !checkout ||
                            checkout === '' ||
@@ -233,8 +235,7 @@ export default function CheckOutPage() {
         </div>
         <h2 className="text-2xl font-bold text-slate-800 mb-2">Tidak Ada Sesi Aktif</h2>
         <p className="text-slate-500 mb-8 max-w-xs">
-          Anda belum melakukan check-in pada sesi apapun hari ini. Silakan check-in terlebih dahulu.
-        </p>
+          Anda belum memiliki sesi QR aktif hari ini. Pastikan sudah melakukan check-in.        </p>
         <Link
           href="/asdos/check-in"
           className="bg-crimson text-white font-bold py-3 px-8 rounded-xl shadow-md shadow-crimson/20 hover:bg-[#7a1727] transition-all"

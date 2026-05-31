@@ -1694,7 +1694,7 @@ export default function ManajemenJadwalPage() {
                         }}
                         options={[
                           { value: 'DOSEN', label: 'Dosen' },
-                          { value: 'ASDOS', label: 'Asisten Dosen (Asdos)' },
+                          { value: 'ASDOS', label: 'Asisten Dosen' },
                         ]}
                         icon={instructorType === 'DOSEN' ? <User className="w-4 h-4" /> : <Users className="w-4 h-4" />}
                       />
@@ -1737,8 +1737,8 @@ export default function ManajemenJadwalPage() {
                               id_asdos1: v,
                               id_dosen: ''
                             }))}
-                            options={[{ value: '', label: 'Pilih Asdos 1' }, ...asdosOptions]}
-                            placeholder="Pilih Asdos 1"
+                            options={[{ value: '', label: 'Pilih Asisten Dosen 1' }, ...asdosOptions]}
+                            placeholder="Pilih Asisten Dosen 1"
                             icon={<Users className="w-4 h-4" />}
                           />
                         </Field>
@@ -1751,7 +1751,7 @@ export default function ManajemenJadwalPage() {
                               id_asdos2: v,
                               id_dosen: ''
                             }))}
-                            options={[{ value: '', label: 'Opsional (Asdos 2)' }, ...asdos2Options]}
+                            options={[{ value: '', label: 'Opsional (Asisten Dosen 2)' }, ...asdos2Options]}
                             placeholder="Opsional"
                             icon={<Users className="w-4 h-4" />}
                           />

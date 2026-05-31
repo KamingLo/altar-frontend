@@ -418,8 +418,8 @@ function renderFields(
     case 'asdos':
       return (
         <>
-          <Field label="Username Asdos">
-            <input className={inputClass} placeholder="cth: asdos1" value={form.username ?? ''} onChange={set('username')} disabled={disabled} />
+          <Field label="Username Asisten Dosen">
+            <input className={inputClass} placeholder="cth: asisten1" value={form.username ?? ''} onChange={set('username')} disabled={disabled} />
           </Field>
           <Field label="NIM">
             <input className={inputClass} placeholder="cth: 535200001" value={form.nim ?? ''} onChange={set('nim')} disabled={disabled} />
@@ -519,7 +519,7 @@ function validateForm(resource: MasterResource, form: Record<string, string>): V
     case 'asdos': {
       const username = trim(form.username);
       const nim = trim(form.nim);
-      if (!username) return { ok: false, message: 'Username asdos wajib diisi.' };
+      if (!username) return { ok: false, message: 'Username asisten dosen wajib diisi.' };
       if (!nim) return { ok: false, message: 'NIM wajib diisi.' };
       return { ok: true, payload: { username, nim } };
     }

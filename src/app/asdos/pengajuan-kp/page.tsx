@@ -27,8 +27,8 @@ const SLOT_OPTIONS = [
 type KpStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 const statusConfig: Record<KpStatus, { bg: string; text: string; label: string }> = {
   PENDING: { bg: 'bg-fog', text: 'text-ink', label: 'MENUNGGU' },
-  VERIFIED: { bg: 'bg-obsidian', text: 'text-white', label: 'DISETUJUI' },
-  REJECTED: { bg: 'bg-obsidian', text: 'text-white', label: 'DITOLAK' },
+  VERIFIED: { bg: 'bg-emerald-50 border border-emerald-100', text: 'text-emerald-700', label: 'DISETUJUI' },
+  REJECTED: { bg: 'bg-rose-50 border border-rose-100', text: 'text-rose-700', label: 'DITOLAK' },
 };
 
 function formatDate(iso: string) {
