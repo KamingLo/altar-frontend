@@ -434,12 +434,15 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
         >
           <header
             id="dashboard-header-desktop"
-            className={`hidden lg:flex absolute top-0 left-0 right-0 z-20 items-start justify-between gap-6 px-7 pt-7 pb-4 transition-all duration-300 ${
-              isScrolled
-                ? 'bg-white/60 backdrop-blur-md shadow-sm border-b border-white/30'
-                : 'bg-transparent border-b border-transparent shadow-none'
-            }`}
+            className="hidden lg:flex absolute top-0 left-0 right-0 z-20 items-start justify-between gap-6 px-7 pt-7 pb-4"
           >
+            <div
+              className={`absolute inset-0 transition-all duration-300 pointer-events-none border-b ${isScrolled ? 'bg-white/60 backdrop-blur-md shadow-sm border-white/30' : 'border-transparent shadow-none'}`}
+              style={isScrolled ? {
+                WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 15%)',
+                maskImage: 'linear-gradient(to right, transparent 0%, black 15%)',
+              } : undefined}
+            />
           <div id="dashboard-top-left" className="flex items-center gap-2">
             {hasDualRole ? (
               <>

@@ -101,6 +101,7 @@ export default function PengajuanKpPage() {
   const [occupiedSchedules, setOccupiedSchedules] = useState<Array<{ room: string; time: string; title: string }>>([]);
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState<string | null>(null);
+  const [coveredByOtherIds, setCoveredByOtherIds] = useState<Set<string>>(new Set());
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -109,6 +110,13 @@ export default function PengajuanKpPage() {
       const res = await getMySubstitutions();
       if (res.success && res.data) {
         setPage(1, res.data.items, res.data.total);
+        const covered = new Set(
+          res.data.items
+            .filter(item => item.status !== 'REJECTED' && item.id_asdos1 !== user?.id_asisten)
+            .map(item => item.session?.id_sesi)
+            .filter((id): id is string => !!id),
+        );
+        setCoveredByOtherIds(covered);
       } else {
         setHistoryError(res.message || 'Gagal memuat riwayat pengajuan.');
       }
@@ -309,7 +317,8 @@ useEffect(() => {
   );
 
   const selectedSessionCheckedIn = !!idSession && checkedInSessionIds.has(idSession);
-  const canSubmit = isFormValid && !roomConflict && !selectedSessionCheckedIn;
+  const sessionAlreadyCovered = !!idSession && coveredByOtherIds.has(idSession);
+  const canSubmit = isFormValid && !roomConflict && !selectedSessionCheckedIn && !sessionAlreadyCovered;
 
   const renderFormContent = () => {
     if (isSuccess) {
@@ -449,6 +458,18 @@ useEffect(() => {
               </div>
             </div>
 
+            {sessionAlreadyCovered && (
+              <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3.5 text-sm text-blue-700">
+                <Info className="w-[18px] h-[18px] mt-0.5 shrink-0 text-blue-500" strokeWidth={2.5} />
+                <div>
+                  <p className="font-bold">Sesi ini sudah diajukan KP</p>
+                  <p className="font-medium text-blue-600/80 mt-0.5">
+                    Asdos lain sudah mengajukan Kelas Pengganti untuk sesi ini. Anda tidak perlu mengajukan lagi.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {(selectedSessionCheckedIn || roomConflict) && (
               <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700 font-semibold leading-relaxed">
                 {selectedSessionCheckedIn
@@ -541,6 +562,17 @@ useEffect(() => {
           <div className={`md:w-1/2 w-full shrink-0 transition-opacity duration-300 ${(!isMobile && isFormOpen) ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
 
             <div className="flex flex-col gap-6 w-full pb-28 md:pb-8">
+              {coveredByOtherIds.size > 0 && !historyLoading && (
+                <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3.5 text-sm text-blue-700">
+                  <Info className="w-[18px] h-[18px] mt-0.5 shrink-0 text-blue-500" strokeWidth={2.5} />
+                  <div>
+                    <p className="font-bold">Sudah ada pengajuan dari rekan Anda</p>
+                    <p className="font-medium text-blue-600/80 mt-0.5">
+                      Asdos lain sudah mengajukan Kelas Pengganti untuk {coveredByOtherIds.size === 1 ? 'satu sesi' : `${coveredByOtherIds.size} sesi`}. Anda tidak perlu mengajukan lagi untuk sesi-sesi tersebut.
+                    </p>
+                  </div>
+                </div>
+              )}
               {historyLoading && (
                 <div className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 border border-slate-100 flex flex-col gap-6 w-full animate-pulse">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">

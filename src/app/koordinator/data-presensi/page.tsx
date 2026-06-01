@@ -22,6 +22,7 @@ import {
   type PresensiResponseDTO
 } from '@/lib/actions/presensi';
 import { getSemesterList } from '@/lib/actions/data-master';
+import { getAllSessions } from '@/lib/actions/jadwal';
 import type { SemesterItem } from '@/types/api';
 import { usePresensiStore } from '@/store/usePresensiStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
@@ -63,6 +64,19 @@ function toExternalUrl(value?: string | null) {
   return `https://${trimmed}`;
 }
 
+function parseWaktuStartMinutes(waktu: string): number | null {
+  const match = String(waktu).match(/(\d{1,2})[:.h](\d{2})/);
+  if (!match) return null;
+  return parseInt(match[1]) * 60 + parseInt(match[2]);
+}
+
+function isCheckInLate(waktu_checkin: string | Date, sessionStartMinutes: number | undefined): boolean {
+  if (sessionStartMinutes === undefined) return false;
+  const d = new Date(waktu_checkin);
+  if (isNaN(d.getTime())) return false;
+  return d.getHours() * 60 + d.getMinutes() > sessionStartMinutes;
+}
+
 const FILTER_TIPE_OPTIONS = [
   { value: 'ALL', label: 'Semua Absensi' },
   { value: 'QR', label: 'Scan QR (Reguler)' },
@@ -95,6 +109,7 @@ export default function DataPresensiPage() {
   const [selectedAsdosName, setSelectedAsdosName] = useState<string | null>(null);
   const [payDropdownOpen, setPayDropdownOpen] = useState(false);
   const paySearchRef = useRef<HTMLDivElement>(null);
+  const [sessionStartMap, setSessionStartMap] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     getSemesterList(1, '', 100).then((res) => {
@@ -109,6 +124,19 @@ export default function DataPresensiPage() {
       }
     });
   }, []); 
+
+  useEffect(() => {
+    if (!semesterFilter) return;
+    getAllSessions({ id_semester: semesterFilter }).then((res) => {
+      if (!res.success || !res.data) return;
+      const map = new Map<string, number>();
+      for (const s of res.data.items) {
+        const mins = parseWaktuStartMinutes(s.waktu);
+        if (mins !== null) map.set(s.id_sesi, mins);
+      }
+      setSessionStartMap(map);
+    }).catch(() => {});
+  }, [semesterFilter]);
 
   const fetchPresensi = useCallback(async (silent = false, semId?: string) => {
     if (!silent) {
@@ -635,6 +663,7 @@ export default function DataPresensiPage() {
                               const isLink = item.tipe_absensi === 'link';
                               const videoUrl = toExternalUrl(item.link_video);
                               const isCheckoutEmpty = !isLink && (!item.waktu_checkout || item.waktu_checkout === '' || item.waktu_checkout === 'null' || String(item.waktu_checkout).startsWith('0001'));
+                              const isLate = isCheckInLate(item.waktu_checkin, sessionStartMap.get(item.id_sesi));
                               return (
                                 <section
                                   key={item.id_presensi}
@@ -673,9 +702,16 @@ export default function DataPresensiPage() {
                                         </div>
                                         <div className="flex flex-col gap-0.5">
                                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-In</span>
-                                          <span className="text-[11px] font-bold text-slate-800">
-                                            {(!item.waktu_checkin || item.waktu_checkin === '' || item.waktu_checkin === 'null' || String(item.waktu_checkin).startsWith('0001')) ? '-' : formatTime(item.waktu_checkin)}
-                                          </span>
+                                          <div className="flex items-center gap-1 flex-wrap">
+                                            <span className="text-[11px] font-bold text-slate-800">
+                                              {(!item.waktu_checkin || item.waktu_checkin === '' || item.waktu_checkin === 'null' || String(item.waktu_checkin).startsWith('0001')) ? '-' : formatTime(item.waktu_checkin)}
+                                            </span>
+                                            {isLate && (
+                                              <span className="text-[8px] font-extrabold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase">
+                                                Terlambat
+                                              </span>
+                                            )}
+                                          </div>
                                         </div>
                                         <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-1.5">
                                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-Out</span>
@@ -873,6 +909,7 @@ export default function DataPresensiPage() {
                         <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Tgl Perkuliahan</th>
                         <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Mulai</th>
                         <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Selesai</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Link Video</th>
                         <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider min-w-[160px]">Bahasan Materi</th>
                         <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Pengajar</th>
                         <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-24">Verifikasi</th>
@@ -886,6 +923,7 @@ export default function DataPresensiPage() {
                         const verifyPending = payRowPending.has(verifyKey);
                         const payPending = payRowPending.has(payKey);
                         const isOnline = item.tipe_absensi === 'link';
+                        const isLate = isCheckInLate(item.waktu_checkin, sessionStartMap.get(item.id_sesi));
                         return (
                           <tr key={item.id_presensi} className="hover:bg-slate-50/40 transition-colors">
                             <td className="px-4 py-3 text-xs text-slate-400 font-medium">{index + 1}</td>
@@ -901,13 +939,35 @@ export default function DataPresensiPage() {
                               <span className="text-xs text-slate-600 whitespace-nowrap">{formatDateCompact(item.tanggal_mengajar)}</span>
                             </td>
                             <td className="px-4 py-3">
-                              <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkin)}</span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkin)}</span>
+                                {isLate && (
+                                  <span className="text-[8px] font-extrabold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                                    Terlambat
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-3">
                               {isOnline ? (
                                 <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full whitespace-nowrap">Online</span>
                               ) : (
                                 <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkout)}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {isOnline && item.link_video ? (
+                                <a
+                                  href={toExternalUrl(item.link_video)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-crimson hover:underline whitespace-nowrap"
+                                >
+                                  <ExternalLink size={12} />
+                                  Buka
+                                </a>
+                              ) : (
+                                <span className="text-slate-300 text-xs">—</span>
                               )}
                             </td>
                             <td className="px-4 py-3 min-w-[160px]">

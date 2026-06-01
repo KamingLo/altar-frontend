@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import type { UserListItem } from '@/lib/actions/manajemen';
 import { useManajemenStore } from '@/store/useManajemenStore';
 import Image from 'next/image';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Power } from 'lucide-react';
 import { AsdosPageShell, AsdosPageHeader, AsdosState, AsdosListSkeleton, AsdosPrimaryButton } from '@/components/dashboard/asdos/AsdosUI';
 
 type TabId = 'asdos' | 'koordinator' | 'user';
@@ -343,7 +343,7 @@ export default function ManajemenAsdosPage() {
 
   const isEmptyResult = !isLoading && activeItems.length === 0;
   const showAddButton = activeTab !== 'user';
-  const identifierLabel = activeTab === 'asdos' ? 'NIM / NPM' : activeTab === 'koordinator' ? 'NIP' : 'Email User';
+  const identifierLabel = activeTab === 'asdos' ? 'NIM' : activeTab === 'koordinator' ? 'NIP' : 'Email';
 
   return (
     <AsdosPageShell>
@@ -393,28 +393,13 @@ export default function ManajemenAsdosPage() {
               placeholder="Ketik nama asisten dosen, koordinator, user"
             />
           </div>
-          {activeTab !== 'user' && (
-            <button
-              type="button"
-              onClick={() => {
-                setShowInactive(v => !v);
-                loadedTabsRef.current.delete(activeTab);
-              }}
-              className={`shrink-0 h-[50px] px-3.5 rounded-[14px] md:rounded-2xl border text-xs font-bold transition-all active:scale-95 whitespace-nowrap ${
-                showInactive
-                  ? 'bg-slate-800 text-white border-slate-800'
-                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              {showInactive ? 'Sembunyikan' : 'Nonaktif'}
-            </button>
-          )}
         </div>
       </div>
 
-      <div className="space-y-3 relative z-10 pb-24 md:pb-12">
+      <div className="relative z-10 pb-24 md:pb-12 space-y-3">
         {isLoading && activeItems.length === 0 && <AsdosListSkeleton count={4} />}
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {activeItems.map((item) => {
           const isActive = !item.deactivated_at;
           const isPendingToggle = togglePending.has(item.id);
@@ -425,29 +410,23 @@ export default function ManajemenAsdosPage() {
                 isActive ? 'border-slate-100 active:scale-[0.99] md:hover:shadow-md md:hover:border-slate-200' : 'border-slate-100 opacity-60'
               }`}
             >
-              <div className="flex items-center space-x-3 md:space-x-4 min-w-0 md:w-1/3">
+              <div className="flex items-center space-x-3 md:space-x-4 min-w-0 flex-1">
                 <div className={`w-11 h-11 md:w-12 md:h-12 rounded-xl shrink-0 overflow-hidden shadow-md ${tabTheme[activeTab].iconBg}`}>
                   <Image src="/icon-512x512.png" alt="" width={48} height={48} className="w-full h-full object-cover" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{item.username}</h3>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-xs text-slate-400 font-medium flex md:hidden items-center gap-1">
-                      <span className="text-[10px]">#</span> {item.identifier}
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-[15px] md:text-base text-[#1F2937] truncate">{item.username}</h3>
                     {activeTab !== 'user' && !isActive && (
-                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full text-crimson bg-rose-50">
+                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100 shrink-0">
                         Nonaktif
                       </span>
                     )}
                   </div>
-                </div>
-              </div>
-
-              <div className="hidden md:flex flex-1 items-center px-4">
-                <div className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{identifierLabel}</span>
-                  <span className="text-[13px] font-semibold text-slate-700">{item.identifier}</span>
+                  <p className="text-[11px] text-slate-400 font-medium mt-0.5 truncate">
+                    <span className="font-bold uppercase tracking-wider text-[10px]">{identifierLabel}</span>
+                    <span className="ml-1">{item.identifier}</span>
+                  </p>
                 </div>
               </div>
 
@@ -458,8 +437,8 @@ export default function ManajemenAsdosPage() {
                     disabled={isPendingToggle}
                     className={`p-2.5 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                       isActive
-                        ? 'hover:text-slate-500 active:bg-slate-50 md:hover:bg-slate-50'
-                        : 'hover:text-emerald-600 active:bg-emerald-50 md:hover:bg-emerald-50'
+                        ? 'hover:text-crimson active:bg-rose-50 md:hover:bg-rose-50'
+                        : 'hover:text-slate-500 active:bg-slate-50 md:hover:bg-slate-50'
                     }`}
                     aria-label={isActive ? 'Nonaktifkan' : 'Aktifkan'}
                     title={isActive ? 'Nonaktifkan' : 'Aktifkan'}
@@ -474,9 +453,7 @@ export default function ManajemenAsdosPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                       </svg>
                     ) : (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v9m4.243-7.757A9 9 0 1112 21" />
-                      </svg>
+                      <Power className="w-5 h-5" />
                     )}
                   </button>
                   <button
@@ -491,6 +468,7 @@ export default function ManajemenAsdosPage() {
             </div>
           );
         })}
+        </div>
 
         {isEmptyResult && (
           <AsdosState

@@ -121,6 +121,32 @@ export default function CheckOutPage() {
     return () => stopCamera();
   }, [step, stopCamera]);
 
+  const handleAutoCheckOut = useCallback(async (token: string) => {
+    if (!activePresensi || !materi.trim()) return;
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      const res = await submitCheckOut({
+        id_presensi: activePresensi.id_presensi,
+        deskripsi_materi: materi,
+        qr_token: token,
+      });
+      if (res.success) {
+        setStep(3);
+        return;
+      }
+      setQrToken(token);
+      setSubmitError(res.message || 'Check-out gagal dicatat. Silakan pindai ulang QR dan coba lagi.');
+      setStep(2);
+    } catch {
+      setQrToken(token);
+      setSubmitError('Check-out gagal dicatat. Silakan pindai ulang QR dan coba lagi.');
+      setStep(2);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [activePresensi, materi]);
+
   const startDecodeLoop = useCallback(async () => {
     const jsQR = (await import('jsqr')).default;
 
@@ -145,8 +171,12 @@ export default function CheckOutPage() {
 
       if (code) {
         stopCamera();
-        setQrToken(code.data);
-        setStep(2);
+        if (partnerMateri && materi.trim()) {
+          handleAutoCheckOut(code.data);
+        } else {
+          setQrToken(code.data);
+          setStep(2);
+        }
         return;
       }
 
@@ -154,7 +184,7 @@ export default function CheckOutPage() {
     };
 
     animFrameRef.current = requestAnimationFrame(tick);
-  }, [stopCamera]);
+  }, [stopCamera, partnerMateri, materi, handleAutoCheckOut]);
 
   const startCamera = useCallback(async (deviceId?: string) => {
     setCameraStatus('requesting');
@@ -230,9 +260,13 @@ export default function CheckOutPage() {
       URL.revokeObjectURL(url);
 
       if (code) {
-        setQrToken(code.data);
         setCameraStatus('idle');
-        setStep(2);
+        if (partnerMateri && materi.trim()) {
+          handleAutoCheckOut(code.data);
+        } else {
+          setQrToken(code.data);
+          setStep(2);
+        }
       } else {
         setCameraStatus('idle');
         setScanMessage('QR Code tidak ditemukan di gambar ini. Coba gambar lain.');
@@ -246,7 +280,7 @@ export default function CheckOutPage() {
     };
 
     e.target.value = '';
-  }, []);
+  }, [partnerMateri, materi, handleAutoCheckOut]);
 
   const handleConfirmCheckOut = async () => {
     if (!activePresensi) return;
@@ -272,6 +306,7 @@ export default function CheckOutPage() {
       setIsSubmitting(false);
     }
   };
+
 
   if (isLoading) {
     return (
@@ -323,7 +358,7 @@ export default function CheckOutPage() {
                     <Camera size={18} />
                     Aktifkan Kamera
                   </button>
-                ) : cameraStatus === 'requesting' || cameraStatus === 'scanning' ? (
+                ) : cameraStatus === 'requesting' || cameraStatus === 'scanning' || isSubmitting ? (
                   <button disabled
                     className="flex-1 flex items-center justify-center gap-2.5 bg-crimson/60 text-white font-bold py-3.5 rounded-xl text-sm cursor-not-allowed">
                     <Loader2 size={18} className="animate-spin" />
@@ -341,7 +376,7 @@ export default function CheckOutPage() {
 
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={cameraStatus === 'requesting' || cameraStatus === 'scanning'}
+                  disabled={cameraStatus === 'requesting' || cameraStatus === 'scanning' || isSubmitting}
                   className="flex-1 flex items-center justify-center gap-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-all hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
                 >
                   <ImageIcon size={17} />
@@ -375,7 +410,7 @@ export default function CheckOutPage() {
               <div className="w-full max-w-[280px] md:max-w-[320px] relative group mx-auto">
                 <div className={`w-full aspect-square flex flex-col items-center justify-center text-slate-300 bg-slate-50 rounded-2xl border border-slate-200 shadow-inner
                   ${cameraStatus === 'active' ? 'opacity-0' : 'opacity-100'} transition-opacity`}>
-                  {cameraStatus === 'requesting' || cameraStatus === 'scanning' ? (
+                  {cameraStatus === 'requesting' || cameraStatus === 'scanning' || isSubmitting ? (
                     <Loader2 size={48} className="opacity-60 animate-spin mb-3 text-crimson" />
                   ) : cameraStatus === 'denied' ? (
                     <AlertCircle size={48} className="opacity-60 mb-3 text-amber-400" />
@@ -424,7 +459,7 @@ export default function CheckOutPage() {
                     <Camera size={18} />
                     Aktifkan Kamera
                   </button>
-                ) : cameraStatus === 'requesting' || cameraStatus === 'scanning' ? (
+                ) : cameraStatus === 'requesting' || cameraStatus === 'scanning' || isSubmitting ? (
                   <button disabled
                     className="w-full flex items-center justify-center gap-2.5 bg-crimson/60 text-white font-bold py-3.5 rounded-xl text-sm cursor-not-allowed">
                     <Loader2 size={18} className="animate-spin" />
@@ -442,7 +477,7 @@ export default function CheckOutPage() {
 
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={cameraStatus === 'requesting' || cameraStatus === 'scanning'}
+                  disabled={cameraStatus === 'requesting' || cameraStatus === 'scanning' || isSubmitting}
                   className="w-full flex items-center justify-center gap-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-all hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
                 >
                   <ImageIcon size={17} />
