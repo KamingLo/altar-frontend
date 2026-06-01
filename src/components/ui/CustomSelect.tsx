@@ -46,7 +46,7 @@ export function CustomSelect({
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
-  const [isMobile] = useState(() => typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
+  const [isMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches);
   const triggerRef = useRef<HTMLDivElement>(null);
 
   const closeDropdown = useCallback(() => {

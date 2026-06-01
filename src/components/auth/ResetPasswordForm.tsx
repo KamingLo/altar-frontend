@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { useResetPassword } from '@/hooks/auth/useResetPassword';
 
 export function ResetPasswordForm() {
-  const { passwords, setPasswords, isLoading, message, token, handleSubmit } = useResetPassword();
+  const { passwords, setPasswords, isLoading, message, token, isExpired, handleSubmit } = useResetPassword();
 
   const [showErrorToast, setShowErrorToast] = React.useState(false);
   const [showSuccessToast, setShowSuccessToast] = React.useState(false);
@@ -83,78 +83,92 @@ export function ResetPasswordForm() {
 
   const renderFormArea = () => (
     <div className="relative w-full">
-      <div className="text-left mb-6" style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.05s both' }}>
-        <h1 className="text-[38px] font-extrabold tracking-[-1px] leading-[1.1] mb-3">
-          <span className="text-[#0D1B2A]">Buat</span><br />
-          <span className="text-crimson">Password.</span>
-        </h1>
-        <p className="text-[14px] text-[#4B5563] leading-[1.6] font-medium max-w-[280px]">
-          Buat kata sandi baru yang kuat untuk akunmu.
-        </p>
-      </div>
-
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col gap-[14px] w-full text-left"
-        style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.25s both' }}
-      >
-        <div className="relative">
-          <input
-            type={showNew ? 'text' : 'password'}
-            placeholder="Kata sandi baru"
-            className="w-full px-5 py-4 pr-12 bg-white border border-[#E2E8F0] rounded-2xl text-[#0F172A] text-[14px] font-semibold outline-none transition-all duration-200 placeholder:text-[#94A3B8] placeholder:font-medium focus:border-crimson focus:ring-4 focus:ring-crimson/10 disabled:opacity-60 disabled:bg-[#F8FAFC] disabled:cursor-not-allowed"
-            value={passwords.new}
-            onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
-            required
-            minLength={8}
-            disabled={isLoading}
-          />
-          <button
-            type="button"
-            onClick={() => setShowNew(!showNew)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-crimson transition-colors"
-            tabIndex={-1}
-          >
-            <EyeIcon open={showNew} />
-          </button>
+      {isExpired ? (
+        <div className="text-left mb-6" style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.05s both' }}>
+          <h1 className="text-[38px] font-extrabold tracking-[-1px] leading-[1.1] mb-3">
+            <span className="text-[#0D1B2A]">Ups,</span><br />
+            <span className="text-crimson">sudah kadarluwarsa.</span>
+          </h1>
+          <p className="text-[14px] text-[#4B5563] leading-[1.6] font-medium max-w-[280px]">
+            Tautan reset password ini sudah tidak valid atau telah melewati batas waktu 15 menit. Silakan lakukan permintaan lupa password kembali.
+          </p>
         </div>
+      ) : (
+        <>
+          <div className="text-left mb-6" style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.05s both' }}>
+            <h1 className="text-[38px] font-extrabold tracking-[-1px] leading-[1.1] mb-3">
+              <span className="text-[#0D1B2A]">Buat</span><br />
+              <span className="text-crimson">Password.</span>
+            </h1>
+            <p className="text-[14px] text-[#4B5563] leading-[1.6] font-medium max-w-[280px]">
+              Buat kata sandi baru yang kuat untuk akunmu.
+            </p>
+          </div>
 
-        <div className="relative">
-          <input
-            type={showConfirm ? 'text' : 'password'}
-            placeholder="Konfirmasi kata sandi baru"
-            className="w-full px-5 py-4 pr-12 bg-white border border-[#E2E8F0] rounded-2xl text-[#0F172A] text-[14px] font-semibold outline-none transition-all duration-200 placeholder:text-[#94A3B8] placeholder:font-medium focus:border-crimson focus:ring-4 focus:ring-crimson/10 disabled:opacity-60 disabled:bg-[#F8FAFC] disabled:cursor-not-allowed"
-            value={passwords.confirm}
-            onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-            required
-            disabled={isLoading}
-          />
-          <button
-            type="button"
-            onClick={() => setShowConfirm(!showConfirm)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-crimson transition-colors"
-            tabIndex={-1}
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-[14px] w-full text-left"
+            style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.25s both' }}
           >
-            <EyeIcon open={showConfirm} />
-          </button>
-        </div>
+            <div className="relative">
+              <input
+                type={showNew ? 'text' : 'password'}
+                placeholder="Kata sandi baru"
+                className="w-full px-5 py-4 pr-12 bg-white border border-[#E2E8F0] rounded-2xl text-[#0F172A] text-[14px] font-semibold outline-none transition-all duration-200 placeholder:text-[#94A3B8] placeholder:font-medium focus:border-crimson focus:ring-4 focus:ring-crimson/10 disabled:opacity-60 disabled:bg-[#F8FAFC] disabled:cursor-not-allowed"
+                value={passwords.new}
+                onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                required
+                minLength={8}
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNew(!showNew)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-crimson transition-colors"
+                tabIndex={-1}
+              >
+                <EyeIcon open={showNew} />
+              </button>
+            </div>
 
-        <button
-          type="submit"
-          disabled={isLoading || !token}
-          className="flex items-center justify-center w-full bg-crimson text-white py-4 rounded-2xl text-[15px] font-bold transition-all shadow-[0_8px_25px_-4px_rgba(148,28,47,0.4)] mt-2 active:scale-[0.98] disabled:opacity-70"
-        >
-          {isLoading ? (
-            <span className="flex items-center gap-2">
-              <svg className="animate-spin w-[18px] h-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              Memperbarui...
-            </span>
-          ) : 'Simpan Kata Sandi'}
-        </button>
-      </form>
+            <div className="relative">
+              <input
+                type={showConfirm ? 'text' : 'password'}
+                placeholder="Konfirmasi kata sandi baru"
+                className="w-full px-5 py-4 pr-12 bg-white border border-[#E2E8F0] rounded-2xl text-[#0F172A] text-[14px] font-semibold outline-none transition-all duration-200 placeholder:text-[#94A3B8] placeholder:font-medium focus:border-crimson focus:ring-4 focus:ring-crimson/10 disabled:opacity-60 disabled:bg-[#F8FAFC] disabled:cursor-not-allowed"
+                value={passwords.confirm}
+                onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                required
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(!showConfirm)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-crimson transition-colors"
+                tabIndex={-1}
+              >
+                <EyeIcon open={showConfirm} />
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading || !token}
+              className="flex items-center justify-center w-full bg-crimson text-white py-4 rounded-2xl text-[15px] font-bold transition-all shadow-[0_8px_25px_-4px_rgba(148,28,47,0.4)] mt-2 active:scale-[0.98] disabled:opacity-70"
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin w-[18px] h-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Memperbarui...
+                </span>
+              ) : 'Simpan Kata Sandi'}
+            </button>
+          </form>
+        </>
+      )}
 
       <div style={{ animation: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.35s both' }}>
         <a

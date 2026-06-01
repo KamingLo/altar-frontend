@@ -552,7 +552,7 @@ export default function ManajemenAsdosPage() {
                               <input
                                 type="text"
                                 value={modalForm.nim}
-                                onChange={(e) => setModalForm(prev => ({ ...prev, nim: e.target.value }))}
+                                onChange={(e) => setModalForm(prev => ({ ...prev, nim: e.target.value.replace(/[^0-9]/g, '') }))}
                                 className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                                 placeholder="Contoh: 535200000"
                               />
@@ -570,7 +570,7 @@ export default function ManajemenAsdosPage() {
                                 <input
                                   type="tel"
                                   value={modalForm.phone_number}
-                                  onChange={(e) => setModalForm(prev => ({ ...prev, phone_number: e.target.value }))}
+                                  onChange={(e) => setModalForm(prev => ({ ...prev, phone_number: e.target.value.replace(/[^0-9+\-\s()]/g, '') }))}
                                   className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                                   placeholder="Contoh: 081234567890"
                                 />
@@ -587,7 +587,7 @@ export default function ManajemenAsdosPage() {
                             <input
                               type="text"
                               value={modalForm.nip}
-                              onChange={(e) => setModalForm(prev => ({ ...prev, nip: e.target.value }))}
+                              onChange={(e) => setModalForm(prev => ({ ...prev, nip: e.target.value.replace(/[^0-9]/g, '') }))}
                               className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                               placeholder="Contoh: 198001012008011001"
                             />
@@ -802,7 +802,7 @@ export default function ManajemenAsdosPage() {
                               <input
                                 type="text"
                                 value={modalForm.nim}
-                                onChange={(e) => setModalForm(prev => ({ ...prev, nim: e.target.value }))}
+                                onChange={(e) => setModalForm(prev => ({ ...prev, nim: e.target.value.replace(/[^0-9]/g, '') }))}
                                 className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                                 placeholder="Contoh: 535200000"
                               />
@@ -817,7 +817,7 @@ export default function ManajemenAsdosPage() {
                               <input
                                 type="tel"
                                 value={modalForm.phone_number}
-                                onChange={(e) => setModalForm(prev => ({ ...prev, phone_number: e.target.value }))}
+                                onChange={(e) => setModalForm(prev => ({ ...prev, phone_number: e.target.value.replace(/[^0-9+\-\s()]/g, '') }))}
                                 className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                                 placeholder="Contoh: 081234567890"
                               />
@@ -833,7 +833,7 @@ export default function ManajemenAsdosPage() {
                             <input
                               type="text"
                               value={modalForm.nip}
-                              onChange={(e) => setModalForm(prev => ({ ...prev, nip: e.target.value }))}
+                              onChange={(e) => setModalForm(prev => ({ ...prev, nip: e.target.value.replace(/[^0-9]/g, '') }))}
                               className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
                               placeholder="Contoh: 198001012008011001"
                             />

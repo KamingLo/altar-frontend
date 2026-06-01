@@ -1087,7 +1087,7 @@ export default function ManajemenJadwalPage() {
   }
 
   return (
-    <AsdosPageShell className="pb-24 md:pb-12">
+    <AsdosPageShell className="pb-24 md:pb-12" scrollTopBottom="bottom-44">
 
       <div className="shrink-0">
         <AsdosPageHeader
@@ -1140,7 +1140,6 @@ export default function ManajemenJadwalPage() {
 
         <div className="mb-6 md:mb-2 flex flex-col gap-2 relative z-20 w-full">
           <div className="flex flex-col md:flex-row md:items-end gap-3 w-full">
-            {/* Date pickers */}
             <div className="flex flex-col sm:flex-row items-end gap-3 w-full md:w-auto shrink-0">
               <div className="flex flex-col w-full sm:w-auto">
                 {viewType === 'TABLE' ? (
@@ -1172,9 +1171,7 @@ export default function ManajemenJadwalPage() {
               </div>
             </div>
 
-            {/* Search + Filter + Toggle */}
             <div className="flex gap-2 w-full md:ml-auto md:w-auto md:max-w-[480px] items-center">
-              {/* Toggle — desktop: kiri search */}
               <div className="hidden md:flex bg-slate-100 p-0.5 rounded-xl shrink-0">
                 {([
                   { type: 'CARD' as const, icon: <LayoutList size={15} />, label: 'Kartu' },
@@ -1203,7 +1200,6 @@ export default function ManajemenJadwalPage() {
                 />
               </div>
 
-              {/* Filter — desktop only */}
               <div className="hidden md:block relative shrink-0">
                 <CustomSelect
                   variant="icon"
@@ -1217,7 +1213,6 @@ export default function ManajemenJadwalPage() {
                 />
               </div>
 
-              {/* Toggle — mobile: menggantikan filter */}
               <div className="md:hidden flex bg-slate-100 p-0.5 rounded-[14px] shrink-0">
                 {([
                   { type: 'CARD' as const, icon: <LayoutList size={15} /> },
@@ -1256,7 +1251,6 @@ export default function ManajemenJadwalPage() {
               </div>
             )}
 
-            {/* ── TABLE VIEW ── */}
             {!loading && viewType === 'TABLE' && timetableData && (
               timetableData.rooms.length > 0 ? (
                 <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
@@ -1347,7 +1341,6 @@ export default function ManajemenJadwalPage() {
               )
             )}
 
-            {/* ── CARD VIEW ── */}
             {!loading && viewType === 'CARD' &&
               (() => {
                 const grouped = filtered.reduce<Record<string, SessionTimeline[]>>((acc, s) => {

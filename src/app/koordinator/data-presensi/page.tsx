@@ -367,7 +367,7 @@ export default function DataPresensiPage() {
   };
 
   return (
-    <AsdosPageShell>
+    <AsdosPageShell scrollTopBottom="bottom-24">
 
       <div className="mb-2 md:mb-3 px-1">
         <p className="text-[11px] font-black text-crimson tracking-[0.15em] uppercase mb-1 md:text-xs">
@@ -595,7 +595,6 @@ export default function DataPresensiPage() {
             transition: 'transform 500ms cubic-bezier(0.16, 1, 0.3, 1)',
           }}
         >
-          {/* ── VERIFY TAB ── */}
           <div
             className={`w-1/2 shrink-0 transition-opacity duration-300 ${
               pageTab === 'PAY' ? 'opacity-0 pointer-events-none' : 'opacity-100'
@@ -830,7 +829,6 @@ export default function DataPresensiPage() {
             )}
           </div>
 
-          {/* ── PAY TAB ── */}
           <div
             className={`w-1/2 shrink-0 transition-opacity duration-300 ${
               pageTab === 'PAY' ? 'opacity-100' : 'opacity-0 pointer-events-none'
@@ -877,7 +875,6 @@ export default function DataPresensiPage() {
                 </div>
             ) : (
               <div className="space-y-4">
-                {/* Konten tabel / prompt */}
                 {payTableData === null ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
@@ -898,7 +895,6 @@ export default function DataPresensiPage() {
                 ) : (
               /* Tabel presensi asisten dosen */
               <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-                {/* Tabel — scrollable kiri kanan */}
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[900px]">
                     <thead>
@@ -985,7 +981,6 @@ export default function DataPresensiPage() {
                               )}
                             </td>
 
-                            {/* Checkbox Verifikasi */}
                             <td className="px-4 py-3 text-center">
                               {verifyPending ? (
                                 <Loader2 className="w-4 h-4 animate-spin text-slate-300 mx-auto" />
@@ -1005,7 +1000,6 @@ export default function DataPresensiPage() {
                               )}
                             </td>
 
-                            {/* Checkbox Pembayaran */}
                             <td className="px-4 py-3 text-center">
                               {payPending ? (
                                 <Loader2 className="w-4 h-4 animate-spin text-slate-300 mx-auto" />
@@ -1031,7 +1025,6 @@ export default function DataPresensiPage() {
                         );
                       })}
 
-                      {/* Baris kosong sampai 15 sesi */}
                       {payTableData.length < 15 && [...Array(15 - payTableData.length)].map((_, i) => (
                         <tr key={`empty-${i}`} className="opacity-20">
                           <td className="px-4 py-3 text-xs text-slate-400">{payTableData.length + i + 1}</td>

@@ -75,6 +75,147 @@ function getTeacherNames(session?: SessionFromAPI) {
     .filter(Boolean);
 }
 
+function parseLocalDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function toIsoDateFromDate(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function sameMonth(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+function formatInputDate(iso: string) {
+  if (!iso) return null;
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('id-ID', {
+    day: '2-digit', month: 'long', year: 'numeric',
+  });
+}
+
+function DatePickerField({
+  value,
+  min,
+  onChange,
+  align = 'left',
+}: {
+  value: string;
+  min?: string;
+  onChange: (value: string) => void;
+  align?: 'left' | 'right';
+}) {
+  const [open, setOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(() => value ? parseLocalDate(value) : new Date());
+
+  useEffect(() => {
+    if (value) setViewDate(parseLocalDate(value));
+  }, [value]);
+
+  const minDate = min ? parseLocalDate(min) : null;
+  const monthStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  const monthEnd = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+  const offset = monthStart.getDay();
+  const days = Array.from({ length: monthEnd.getDate() }, (_, i) =>
+    new Date(viewDate.getFullYear(), viewDate.getMonth(), i + 1),
+  );
+
+  const changeMonth = (delta: number) =>
+    setViewDate(c => new Date(c.getFullYear(), c.getMonth() + delta, 1));
+
+  const pickDate = (date: Date) => {
+    onChange(toIsoDateFromDate(date));
+    setViewDate(date);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full bg-white border border-slate-200 rounded-[14px] px-5 py-[15px] text-sm text-left font-semibold transition-all flex items-center justify-between focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+      >
+        <span className={value ? 'text-slate-700' : 'text-slate-400'}>
+          {formatInputDate(value) ?? 'Pilih tanggal'}
+        </span>
+        <Calendar size={18} className="text-slate-400 shrink-0" />
+      </button>
+
+      {open && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-30 cursor-default"
+            aria-label="Tutup kalender"
+            onClick={() => setOpen(false)}
+          />
+          <div className={`absolute top-[calc(100%+8px)] z-40 w-[280px] bg-white border border-slate-100 rounded-[20px] p-4 shadow-xl ${align === 'right' ? 'right-0' : 'left-0'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <button type="button" onClick={() => changeMonth(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50">
+                <span className="sr-only">Bulan sebelumnya</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <p className="text-sm font-bold text-slate-800 capitalize">
+                {viewDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+              </p>
+              <button type="button" onClick={() => changeMonth(1)} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50">
+                <span className="sr-only">Bulan berikutnya</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day, i) => (
+                <div key={`${day}-${i}`} className="h-7 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: offset }).map((_, i) => <div key={i} />)}
+              {days.map(day => {
+                const iso = toIsoDateFromDate(day);
+                const selected = iso === value;
+                const disabled = minDate ? day < minDate : false;
+                return (
+                  <button
+                    key={iso}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => pickDate(day)}
+                    className={`h-9 rounded-xl text-xs font-bold transition-all ${
+                      selected
+                        ? 'bg-crimson text-white'
+                        : disabled
+                          ? 'text-slate-300 cursor-not-allowed'
+                          : sameMonth(day, viewDate)
+                            ? 'text-slate-700 hover:bg-slate-50'
+                            : 'text-slate-300'
+                    }`}
+                  >
+                    {day.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function PengajuanKpPage() {
   const { items: history, setPage, removeItem, reset } = usePengajuanKpStore();
   const { user } = useUserStore();
@@ -401,37 +542,14 @@ useEffect(() => {
                 <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
                   Tanggal Kelas Asli (yang Dibatalkan)
                 </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={originalDate}
-                    onChange={e => setOriginalDate(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-[14px] px-5 py-[15px] pr-12 text-sm text-slate-700 focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300 transition-all cursor-pointer relative z-10 font-semibold placeholder-slate-400"
-                    placeholder="dd/mm/yyyy"
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-20">
-                    <Calendar size={18} />
-                  </div>
-                </div>
+                <DatePickerField value={originalDate} onChange={setOriginalDate} />
               </div>
 
               <div>
                 <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
                   Tanggal Kelas Pengganti
                 </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={substituteDate}
-                    min={clientToday}
-                    onChange={e => setSubstituteDate(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-[14px] px-5 py-[15px] pr-12 text-sm text-slate-700 focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300 transition-all cursor-pointer relative z-10 font-semibold placeholder-slate-400"
-                    placeholder="dd/mm/yyyy"
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-20">
-                    <Calendar size={18} />
-                  </div>
-                </div>
+                <DatePickerField value={substituteDate} min={clientToday} onChange={setSubstituteDate} align="right" />
               </div>
             </div>
 
@@ -542,12 +660,18 @@ useEffect(() => {
               <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
                 Alasan Pengajuan
               </label>
-              <textarea
-                value={reason}
-                onChange={e => setReason(e.target.value)}
-                placeholder="Masukkan alasan Anda..."
-                className="w-full bg-white border border-slate-200 rounded-[14px] p-5 text-sm text-slate-700 focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300 transition-all resize-none h-32 font-semibold"
-              />
+              <div className="relative">
+                <textarea
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  maxLength={100}
+                  placeholder="Masukkan alasan Anda..."
+                  className="w-full bg-white border border-slate-200 rounded-[14px] p-5 pb-8 text-sm text-slate-700 focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300 transition-all resize-none h-32 font-semibold"
+                />
+                <span className={`absolute bottom-3 right-4 text-xs font-semibold pointer-events-none ${reason.length >= 100 ? 'text-crimson' : 'text-slate-400'}`}>
+                  {reason.length}/100
+                </span>
+              </div>
             </div>
 
             {submitError && (
@@ -574,22 +698,7 @@ useEffect(() => {
   };
 
   return (
-    <AsdosPageShell>
-      <style>{`
-        input[type="date"]::-webkit-calendar-picker-indicator {
-          opacity: 0;
-          width: 24px;
-          height: 24px;
-          cursor: pointer;
-          position: absolute;
-          right: 12px;
-          z-index: 30;
-        }
-        input[type="date"]::-webkit-inner-spin-button,
-        input[type="date"]::-webkit-clear-button {
-          display: none;
-        }
-      `}</style>
+    <AsdosPageShell hasBottomBar={!isFormOpen && isMobile}>
       <AsdosPageHeader
         eyebrow={(!isMobile && isFormOpen) ? "Formulir" : "Kelas Pengganti"}
         title={(!isMobile && isFormOpen) ? "Ajukan Kelas Pengganti" : "Riwayat Kelas Pengganti"}

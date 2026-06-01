@@ -536,7 +536,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
               onClick={() => setIsSidebarOpen(false)}
             />
             <div
-              className={`absolute top-0 left-0 w-[280px] h-[calc(100dvh-1.5rem)] my-3 ml-3 rounded-[1.5rem] backdrop-blur-2xl border border-white/20 shadow-[20px_0_40px_rgba(0,0,0,0.2)] flex flex-col overscroll-none overflow-x-hidden transition-all duration-300 ease-in-out transform-gpu bg-crimson/85 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}
+              className={`absolute top-0 left-0 w-[280px] h-[calc(100dvh-1.5rem)] my-3 ml-3 rounded-[1.5rem] shadow-[20px_0_40px_rgba(0,0,0,0.2)] flex flex-col overscroll-none overflow-x-hidden transition-all duration-300 ease-in-out transform-gpu bg-crimson ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}
             >
               <div className="pt-8 pb-6 px-6 border-b border-white/10 shrink-0">
                 <Image src="/logo-sb.png" alt="Logo" width={160} height={32} className="h-8 w-auto object-contain drop-shadow-md" style={{ width: 'auto' }} />

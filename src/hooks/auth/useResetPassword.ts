@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -14,6 +14,8 @@ export const useResetPassword = () => {
   
   const email = searchParams.get('email') || '';
   const token = searchParams.get('token') || '';
+
+  const [isExpired, setIsExpired] = useState(() => !email || !token);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +40,18 @@ export const useResetPassword = () => {
         setMessage({ type: 'success', text: result.message });
         setTimeout(() => router.push('/auth/login'), 3000);
       } else {
-        setMessage({ type: 'error', text: result.message });
+        const msg = result.message.toLowerCase();
+        if (
+          msg.includes('kedaluwarsa') ||
+          msg.includes('kadarluwarsa') ||
+          msg.includes('tidak valid') ||
+          msg.includes('expired') ||
+          msg.includes('invalid')
+        ) {
+          setIsExpired(true);
+        } else {
+          setMessage({ type: 'error', text: result.message });
+        }
         setIsLoading(false);
       }
     } catch {
@@ -53,6 +66,7 @@ export const useResetPassword = () => {
     isLoading,
     message,
     token,
+    isExpired,
     handleSubmit
   };
 };

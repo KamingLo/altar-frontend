@@ -6,9 +6,11 @@ import { X, ArrowUp } from 'lucide-react';
 type AsdosPageShellProps = {
   children: React.ReactNode;
   className?: string;
+  hasBottomBar?: boolean;
+  scrollTopBottom?: string;
 };
 
-export function AsdosPageShell({ children, className = '' }: AsdosPageShellProps) {
+export function AsdosPageShell({ children, className = '', hasBottomBar = false, scrollTopBottom }: AsdosPageShellProps) {
   const [showTop, setShowTop] = useState(false);
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function AsdosPageShell({ children, className = '' }: AsdosPageShellProps
       {showTop && (
         <button
           onClick={scrollToTop}
-          className="lg:hidden fixed bottom-7 right-4 w-12 h-12 bg-white border border-slate-200 rounded-full shadow-lg flex items-center justify-center text-slate-500 active:scale-90 transition-all z-30"
+          className={`lg:hidden fixed right-4 w-14 h-14 bg-white border border-slate-200 rounded-full shadow-lg flex items-center justify-center text-slate-500 active:scale-90 transition-all z-30 ${scrollTopBottom ?? (hasBottomBar ? 'bottom-24' : 'bottom-7')}`}
           aria-label="Kembali ke atas"
         >
           <ArrowUp size={18} strokeWidth={2.5} />

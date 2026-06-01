@@ -192,10 +192,6 @@ export default function LoginForm() {
             <Image src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width={18} height={18} />
             Lanjutkan dengan Google
           </button>
-
-          <p className="text-center text-[12px] text-[#8A9BAD] font-medium mt-7">
-            Belum punya akses? <span className="text-[#941C2F] font-bold cursor-pointer hover:underline">Hubungi Admin</span>
-          </p>
         </div>
       </div>
 
