@@ -85,3 +85,15 @@ export function getSubstituteSessionId(session?: SessionFromAPI | null): string 
   if (!candidate || candidate === session.id_sesi) return undefined;
   return candidate;
 }
+
+export function getSessionPartnerAsdosId(
+  session?: SessionFromAPI | null,
+  currentAsdosId?: string | null,
+): string | undefined {
+  if (!session || !currentAsdosId) return undefined;
+
+  if (session.id_asdos1 === currentAsdosId) return session.id_asdos2 ?? undefined;
+  if (session.id_asdos2 === currentAsdosId) return session.id_asdos1 ?? undefined;
+
+  return undefined;
+}

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarPlus, Info, Check, Trash2, XCircle, ArrowLeft, Calendar } from 'lucide-react';
 import { createSubstitution, deleteSubstitution, getMySubstitutions } from '@/lib/actions/pergantian-kelas';
 import { getRuanganList, getSemesterList } from '@/lib/actions/data-master';
-import { getScheduleTimeline, getSessionsByDate } from '@/lib/actions/jadwal';
+import { getMyScheduleTimeline, getScheduleTimeline, getSessionsByDate } from '@/lib/actions/jadwal';
 import { getMyPresensi } from '@/lib/actions/presensi';
 import type { RuanganItem } from '@/types/api';
 import type { SessionFromAPI } from '@/lib/actions/jadwal';
@@ -62,6 +62,17 @@ function overlaps(a: { start: number; end: number }, b: { start: number; end: nu
 
 function roomLabel(room: RuanganItem) {
   return `${room.nama_ruangan} (Lantai ${room.lantai})`;
+}
+
+function cleanTeacherName(value: string) {
+  return value.replace(/\s*\(Pengganti\)\s*/gi, '').trim();
+}
+
+function getTeacherNames(session?: SessionFromAPI) {
+  return (session?.pengajar ?? '')
+    .split('&')
+    .map(name => cleanTeacherName(name))
+    .filter(Boolean);
 }
 
 export default function PengajuanKpPage() {
@@ -125,7 +136,7 @@ export default function PengajuanKpPage() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [setPage]);
+  }, [setPage, user?.id_asisten]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
   useEffect(() => { setClientToday(todayIso()); }, []);
@@ -151,13 +162,27 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
-    if (!originalDate) return;
+    if (!originalDate || !selectedSemesterId) return;
     let cancelled = false;
     setDropdownError(null);
-    Promise.all([getSessionsByDate(originalDate), getMyPresensi()]).then(([res, presensiRes]) => {
+    Promise.all([
+      getSessionsByDate(originalDate),
+      getMyPresensi(),
+      getMyScheduleTimeline({
+        start_date: originalDate,
+        end_date: originalDate,
+        id_semester: selectedSemesterId,
+      }),
+    ]).then(([res, presensiRes, semesterTimelineRes]) => {
       if (cancelled) return;
       if (!res.success) {
         setDropdownError(res.message || 'Gagal memuat sesi pada tanggal ini.');
+        setSessionList([]);
+        setIdSession('');
+        return;
+      }
+      if (!semesterTimelineRes.success) {
+        setDropdownError(semesterTimelineRes.message || 'Gagal memvalidasi sesi berdasarkan semester.');
         setSessionList([]);
         setIdSession('');
         return;
@@ -167,8 +192,9 @@ useEffect(() => {
           .filter(item => String(item.tanggal_mengajar ?? '').split('T')[0] === originalDate)
           .flatMap(item => [item.id_sesi, item.id_sesi_pengganti].filter((value): value is string => !!value)),
       );
+      const semesterSessionIds = new Set((semesterTimelineRes.data?.items ?? []).map(item => item.id_sesi));
       setCheckedInSessionIds(checkedIds);
-      setSessionList(res.data ?? []);
+      setSessionList((res.data ?? []).filter(session => semesterSessionIds.has(session.id_sesi)));
       setIdSession('');
     }).catch((e: unknown) => {
       if (cancelled) return;
@@ -177,7 +203,7 @@ useEffect(() => {
       setIdSession('');
     });
     return () => { cancelled = true; };
-  }, [originalDate]);
+  }, [originalDate, selectedSemesterId]);
 
   useEffect(() => {
     if (!substituteDate || !selectedSemesterId) {
@@ -229,14 +255,20 @@ useEffect(() => {
 
   const handleSubmit = async () => {
     const selectedSession = sessionList.find(session => session.id_sesi === idSession);
+    const currentAsdosId = user?.id_asisten ?? null;
+    const partnerId = selectedSession?.id_asdos1 === currentAsdosId
+      ? selectedSession?.id_asdos2
+      : selectedSession?.id_asdos2 === currentAsdosId
+        ? selectedSession?.id_asdos1
+        : selectedSession?.id_asdos2 ?? null;
     setSubmitLoading(true);
     setSubmitError(null);
     try {
       const res = await createSubstitution({
         id_session: idSession,
         id_ruangan: idRuangan,
-        id_asdos1: selectedSession?.id_asdos1 ?? user?.id_asisten ?? null,
-        id_asdos2: selectedSession?.id_asdos2 ?? null,
+        id_asdos1: currentAsdosId ?? selectedSession?.id_asdos1 ?? null,
+        id_asdos2: partnerId ?? null,
         substitute_date: substituteDate,
         original_date: originalDate,
         slot_option: slotOption,
@@ -283,6 +315,19 @@ useEffect(() => {
     originalDate.trim() !== '' && substituteDate.trim() !== '' &&
     idSession.trim() !== '' && idRuangan.trim() !== '' && reason.trim() !== '';
 
+  const selectedSession = sessionList.find(session => session.id_sesi === idSession);
+  const teacherNames = getTeacherNames(selectedSession);
+  const currentAsdosId = user?.id_asisten ?? null;
+  const originalPartnerId = selectedSession?.id_asdos1 === currentAsdosId
+    ? selectedSession?.id_asdos2
+    : selectedSession?.id_asdos2 === currentAsdosId
+      ? selectedSession?.id_asdos1
+      : selectedSession?.id_asdos2 ?? null;
+  const originalPartnerName = selectedSession?.id_asdos1 === currentAsdosId
+    ? teacherNames[1]
+    : selectedSession?.id_asdos2 === currentAsdosId
+      ? teacherNames[0]
+      : teacherNames[1] ?? teacherNames[0];
   const selectedSlotRange = slotRange(slotOption);
   const selectedRoom = ruanganList.find(room => room.id === idRuangan);
   const selectedRoomLabel = selectedRoom ? roomLabel(selectedRoom) : '';
@@ -402,7 +447,9 @@ useEffect(() => {
                 ) : (
                   <CustomSelect
                     value={idSession}
-                    onChange={setIdSession}
+                    onChange={(value) => {
+                      setIdSession(value);
+                    }}
                     triggerClassName="!rounded-[14px] !py-[15px] !border-slate-200 hover:!border-slate-300 !bg-white !font-semibold"
                     options={sessionList.map(s => ({
                       value: s.id_sesi,
@@ -415,6 +462,19 @@ useEffect(() => {
                     placeholder="-- Pilih Sesi --"
                   />
                 )}
+              </div>
+            )}
+
+            {idSession && (
+              <div className="animate-fade-in">
+                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                  Partner Asisten Dosen
+                </label>
+                <div className="w-full bg-slate-50 border border-slate-200 rounded-[14px] px-5 py-4">
+                  <p className="text-sm font-bold text-slate-800">
+                    {originalPartnerId ? originalPartnerName ?? 'Partner asli' : 'Tidak ada partner pada jadwal asli'}
+                  </p>
+                </div>
               </div>
             )}
 
@@ -464,7 +524,7 @@ useEffect(() => {
                 <div>
                   <p className="font-bold">Sesi ini sudah diajukan KP</p>
                   <p className="font-medium text-blue-600/80 mt-0.5">
-                    Asdos lain sudah mengajukan Kelas Pengganti untuk sesi ini. Anda tidak perlu mengajukan lagi.
+                    Asisten dosen lain sudah mengajukan Kelas Pengganti untuk sesi ini. Anda tidak perlu mengajukan lagi.
                   </p>
                 </div>
               </div>
@@ -568,7 +628,7 @@ useEffect(() => {
                   <div>
                     <p className="font-bold">Sudah ada pengajuan dari rekan Anda</p>
                     <p className="font-medium text-blue-600/80 mt-0.5">
-                      Asdos lain sudah mengajukan Kelas Pengganti untuk {coveredByOtherIds.size === 1 ? 'satu sesi' : `${coveredByOtherIds.size} sesi`}. Anda tidak perlu mengajukan lagi untuk sesi-sesi tersebut.
+                      Asisten dosen lain sudah mengajukan Kelas Pengganti untuk {coveredByOtherIds.size === 1 ? 'satu sesi' : `${coveredByOtherIds.size} sesi`}. Anda tidak perlu mengajukan lagi untuk sesi-sesi tersebut.
                     </p>
                   </div>
                 </div>

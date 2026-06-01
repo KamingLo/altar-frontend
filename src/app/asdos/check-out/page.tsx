@@ -7,6 +7,7 @@ import { getSessionsByDate } from '@/lib/actions/jadwal';
 import Link from 'next/link';
 import { AsdosQrScanSkeleton, AsdosPageShell, AsdosPageHeader } from '@/components/dashboard/asdos/AsdosUI';
 import { isQrPresensi } from '@/lib/presensi-mode';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 function formatTeachingTeam(item: PresensiResponseDTO) {
   return item.nama_asdos_rekan ? `${item.nama_asdos} & ${item.nama_asdos_rekan}` : item.nama_asdos;
@@ -16,12 +17,20 @@ function hasCheckout(value?: string) {
   return !!value && value !== '' && value !== 'null' && !String(value).startsWith('0001');
 }
 
+type SharedMateriOption = {
+  id: string;
+  materi: string;
+  nama: string;
+};
+
 export default function CheckOutPage() {
   const MAX_HURUF = 100;
 
   const [step, setStep] = useState(1);
   const [materi, setMateri] = useState('');
   const [partnerMateri, setPartnerMateri] = useState<{ materi: string; nama: string } | null>(null);
+  const [sharedMateriOptions, setSharedMateriOptions] = useState<SharedMateriOption[]>([]);
+  const [selectedSharedMateriId, setSelectedSharedMateriId] = useState('');
   const [activeTeachingTeam, setActiveTeachingTeam] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,29 +78,45 @@ export default function CheckOutPage() {
             );
             setActiveTeachingTeam(matchedSchedule?.pengajar || formatTeachingTeam(active));
 
-            const partnerRecord = records.find(p => {
+            const sharedOptions = records
+              .filter(p => {
               if (p.id_presensi === active.id_presensi) return false;
-              if (p.id_sesi !== active.id_sesi) return false;
+                const sameMainSession = p.id_sesi === active.id_sesi;
+                const sameSubstituteSession = !!active.id_sesi_pengganti && p.id_sesi_pengganti === active.id_sesi_pengganti;
+                if (!sameMainSession && !sameSubstituteSession) return false;
               if (String(p.tanggal_mengajar ?? '').split('T')[0] !== today) return false;
               return hasCheckout(p.waktu_checkout) && !!p.deskripsi_materi?.trim();
-            });
+              })
+              .map(p => ({
+                id: p.id_presensi,
+                materi: p.deskripsi_materi?.trim() ?? '',
+                nama: p.nama_asdos || 'partner Anda',
+              }));
 
-            if (partnerRecord?.deskripsi_materi?.trim()) {
-              const sharedMateri = partnerRecord.deskripsi_materi.trim();
-              setPartnerMateri({ materi: sharedMateri, nama: partnerRecord.nama_asdos || 'partner Anda' });
-              setMateri(sharedMateri);
+            if (sharedOptions.length > 0) {
+              const firstOption = sharedOptions[0];
+              setSharedMateriOptions(sharedOptions);
+              setSelectedSharedMateriId(firstOption.id);
+              setPartnerMateri({ materi: firstOption.materi, nama: firstOption.nama });
+              setMateri(firstOption.materi);
             } else {
+              setSharedMateriOptions([]);
+              setSelectedSharedMateriId('');
               setPartnerMateri(null);
               setMateri('');
             }
           } else {
             setActiveTeachingTeam('');
+            setSharedMateriOptions([]);
+            setSelectedSharedMateriId('');
             setPartnerMateri(null);
             setMateri('');
           }
         } else {
           setActivePresensi(null);
           setActiveTeachingTeam('');
+          setSharedMateriOptions([]);
+          setSelectedSharedMateriId('');
           setPartnerMateri(null);
           setMateri('');
         }
@@ -305,6 +330,14 @@ export default function CheckOutPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSelectSharedMateri = (id: string) => {
+    const selected = sharedMateriOptions.find(option => option.id === id);
+    if (!selected) return;
+    setSelectedSharedMateriId(id);
+    setPartnerMateri({ materi: selected.materi, nama: selected.nama });
+    setMateri(selected.materi);
   };
 
 
@@ -571,6 +604,25 @@ export default function CheckOutPage() {
                 <BookOpen className="w-[18px] h-[18px] text-slate-800" strokeWidth={2.5} />
                 <span className="text-sm md:text-base font-bold text-slate-800">Bahasan Materi</span>
               </div>
+
+              {sharedMateriOptions.length > 1 && (
+                <div>
+                  <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                    Materi dari Asisten Dosen
+                  </label>
+                  <CustomSelect
+                    value={selectedSharedMateriId}
+                    onChange={handleSelectSharedMateri}
+                    triggerClassName="!rounded-[14px] !py-[15px] !border-slate-200 hover:!border-slate-300 !bg-white !font-semibold"
+                    options={sharedMateriOptions.map(option => ({
+                      value: option.id,
+                      label: option.nama,
+                      description: option.materi,
+                    }))}
+                    placeholder="-- Pilih Materi --"
+                  />
+                </div>
+              )}
 
               <div className="relative">
                 <textarea

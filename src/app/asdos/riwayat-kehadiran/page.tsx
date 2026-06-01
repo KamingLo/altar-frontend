@@ -7,6 +7,7 @@ import { AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashbo
 import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { BottomSheet } from '@/components/ui/BottomSheet';
+import { pengajarDisplayName, subjectDisplayName } from '@/lib/jadwal-utils';
 
 type ViewType = 'CARD' | 'TABLE';
 
@@ -15,6 +16,11 @@ type HistoryItem = {
   checkIn: string; checkOut: string; room: string; className: string; teachingTeam: string;
   status: 'BERJALAN' | 'SELESAI'; materi: string;
   isVerified: boolean; isPaid: boolean;
+};
+
+type TeachingSessionInfo = {
+  teachingTeam: string;
+  isPengganti: boolean;
 };
 
 function isActivePresensi(item: PresensiResponseDTO) {
@@ -49,7 +55,8 @@ function formatTime(value?: string) {
 }
 
 function formatTeachingTeam(item: PresensiResponseDTO) {
-  return item.nama_asdos_rekan ? `${item.nama_asdos} & ${item.nama_asdos_rekan}` : item.nama_asdos;
+  const team = item.nama_asdos_rekan ? `${item.nama_asdos} & ${item.nama_asdos_rekan}` : item.nama_asdos;
+  return pengajarDisplayName(team);
 }
 
 function getHistoryDateKey(item: PresensiResponseDTO) {
@@ -60,17 +67,18 @@ function getTeachingLookupKey(date: string, sessionId?: string) {
   return sessionId ? `${date}-${sessionId}` : '';
 }
 
-function mapPresensiToHistory(item: PresensiResponseDTO, teachingTeamBySession: Record<string, string>): HistoryItem {
+function mapPresensiToHistory(item: PresensiResponseDTO, teachingInfoBySession: Record<string, TeachingSessionInfo>): HistoryItem {
   const active = isActivePresensi(item);
   const dateKey = getHistoryDateKey(item);
-  const teachingTeam =
-    teachingTeamBySession[getTeachingLookupKey(dateKey, item.id_sesi_pengganti)] ||
-    teachingTeamBySession[getTeachingLookupKey(dateKey, item.id_sesi)] ||
-    formatTeachingTeam(item);
+  const teachingInfo =
+    teachingInfoBySession[getTeachingLookupKey(dateKey, item.id_sesi_pengganti)] ||
+    teachingInfoBySession[getTeachingLookupKey(dateKey, item.id_sesi)];
+  const teachingTeam = teachingInfo?.teachingTeam || formatTeachingTeam(item);
+  const isPengganti = item.menggantikan || !!item.id_sesi_pengganti || !!teachingInfo?.isPengganti;
 
   return {
     id: item.id_presensi,
-    subject: item.nama_mata_kuliah,
+    subject: subjectDisplayName(item.nama_mata_kuliah, isPengganti),
     date: formatDate(item.tanggal_mengajar || item.waktu_checkin),
     rawDate: item.tanggal_mengajar || item.waktu_checkin || '',
     checkIn: formatTime(item.waktu_checkin),
@@ -102,7 +110,7 @@ export default function RiwayatKehadiranPage() {
     resetVisible,
   } = useRiwayatKehadiranStore();
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
-  const [teachingTeamBySession, setTeachingTeamBySession] = useState<Record<string, string>>({});
+  const [teachingInfoBySession, setTeachingInfoBySession] = useState<Record<string, TeachingSessionInfo>>({});
 
   useEffect(() => {
     async function fetchHistory() {
@@ -127,7 +135,7 @@ export default function RiwayatKehadiranPage() {
     async function fetchTeachingTeams() {
       const dates = Array.from(new Set(items.map(getHistoryDateKey).filter(Boolean)));
       if (dates.length === 0) {
-        setTeachingTeamBySession({});
+        setTeachingInfoBySession({});
         return;
       }
 
@@ -136,15 +144,18 @@ export default function RiwayatKehadiranPage() {
         return { date, sessions: res.success ? res.data ?? [] : [] };
       }));
 
-      const lookup: Record<string, string> = {};
+      const lookup: Record<string, TeachingSessionInfo> = {};
       results.forEach(({ date, sessions }) => {
         sessions.forEach(session => {
           if (session.pengajar) {
-            lookup[getTeachingLookupKey(date, session.id_sesi)] = session.pengajar;
+            lookup[getTeachingLookupKey(date, session.id_sesi)] = {
+              teachingTeam: pengajarDisplayName(session.pengajar),
+              isPengganti: session.tipe_jadwal === 'PENGGANTI',
+            };
           }
         });
       });
-      setTeachingTeamBySession(lookup);
+      setTeachingInfoBySession(lookup);
     }
 
     fetchTeachingTeams();
@@ -154,7 +165,7 @@ export default function RiwayatKehadiranPage() {
     resetVisible();
   }, [searchTerm, filterStatus, resetVisible]);
 
-  const history = items.map(item => mapPresensiToHistory(item, teachingTeamBySession));
+  const history = items.map(item => mapPresensiToHistory(item, teachingInfoBySession));
   const filtered = history.filter(item =>
     (item.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.className.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -174,7 +185,6 @@ export default function RiwayatKehadiranPage() {
         description="Log aktivitas mengajar Anda."
         action={
           <div className="flex gap-3 relative z-20 w-full md:w-auto md:min-w-[380px] items-center">
-            {/* Toggle card/table — kiri search (mobile & desktop) */}
             <div className="flex bg-slate-100 p-0.5 rounded-[14px] md:rounded-xl shrink-0">
               {([
                 { type: 'CARD' as ViewType, icon: <LayoutList size={15} />, label: 'Kartu' },
@@ -200,7 +210,6 @@ export default function RiwayatKehadiranPage() {
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full bg-white border border-slate-200 text-sm md:text-base rounded-2xl md:rounded-3xl pl-11 md:pl-14 pr-4 py-3.5 md:py-4 focus:outline-none focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]" />
             </div>
-            {/* Filter — desktop only */}
             <div className="hidden md:block">
               <CustomSelect
                 value={filterStatus}
@@ -225,7 +234,6 @@ export default function RiwayatKehadiranPage() {
       <div className="flex flex-col gap-6 w-full pb-8">
         {isLoading ? (
           viewType === 'TABLE' ? (
-            /* Skeleton tabel */
             <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1020px]">
@@ -288,7 +296,6 @@ export default function RiwayatKehadiranPage() {
         ) : error ? (
           <AsdosState variant="error" message={error} />
         ) : viewType === 'TABLE' ? (
-          /* ── TABEL VIEW ── */
           filtered.length > 0 ? (
             <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
               <div className="overflow-x-auto">
@@ -359,8 +366,6 @@ export default function RiwayatKehadiranPage() {
                         </td>
                       </tr>
                     ))}
-
-                    {/* Baris kosong sampai 15 */}
                     {filtered.length < 15 && [...Array(15 - filtered.length)].map((_, i) => (
                       <tr key={`empty-${i}`} className="opacity-20">
                         <td className="px-4 py-3 text-xs text-slate-400">{filtered.length + i + 1}</td>

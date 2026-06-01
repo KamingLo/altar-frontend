@@ -89,7 +89,12 @@ export function findByDisplayLabel<T>(
 }
 
 export function pengajarDisplayName(pengajar: string): string {
-  return pengajar.split('(')[0]?.trim() ?? pengajar.trim();
+  return pengajar.replace(/\s*\(Pengganti\)\s*/gi, '').trim();
+}
+
+export function subjectDisplayName(subject: string, isPengganti?: boolean): string {
+  const cleaned = subject.replace(/\s*\((KP|Pengganti)\)\s*/gi, '').trim();
+  return isPengganti ? `${cleaned} (KP)` : cleaned;
 }
 
 export function dedupeSessions<T extends { id_sesi: string; tanggal: string; waktu: string }>(

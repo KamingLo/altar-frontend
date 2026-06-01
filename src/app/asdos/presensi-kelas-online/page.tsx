@@ -6,7 +6,8 @@ import { getMyPresensi, submitOnlineAttendance } from '@/lib/actions/presensi';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 
 import { AsdosOnlineSessionSkeleton, AsdosPageHeader, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
-import { getSubstituteSessionId, isOnlineSession } from '@/lib/presensi-mode';
+import { getSessionPartnerAsdosId, getSubstituteSessionId, isOnlineSession } from '@/lib/presensi-mode';
+import { useUserStore } from '@/store/useUserStore';
 
 function todayIso() {
   return new Date().toISOString().split('T')[0];
@@ -34,6 +35,7 @@ function isSessionPast(session: SessionFromAPI): boolean {
 
 
 export default function PresensiKelasOnlinePage() {
+  const user = useUserStore(state => state.user);
   const [step, setStep] = useState(1);
   const [sessions, setSessions] = useState<SessionFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -130,12 +132,14 @@ export default function PresensiKelasOnlinePage() {
     }
 
     setIsSubmitting(true);
+    const partnerAsdosId = getSessionPartnerAsdosId(selectedSession, user?.id_asisten);
     const res = await submitOnlineAttendance({
       id_sesi: selectedSession.id_sesi,
       waktu_mulai: waktuMulai,
       waktu_selesai: waktuSelesai,
       deskripsi_materi: materi,
       link_video: link,
+      id_asdos_rekan: partnerAsdosId,
       menggantikan: selectedSession.tipe_jadwal === 'PENGGANTI' && !!substituteSessionId,
       id_sesi_pengganti: substituteSessionId,
     });

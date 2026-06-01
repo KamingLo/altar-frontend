@@ -6,7 +6,7 @@ import { getRuanganList, getSemesterList } from '@/lib/actions/data-master';
 import type { UnifiedJadwalResponse } from '@/types/api';
 import { AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { CustomSelect } from '@/components/ui/CustomSelect';
-import { sessionDateKey, toIsoDateFromDate } from '@/lib/jadwal-utils';
+import { pengajarDisplayName, sessionDateKey, subjectDisplayName, toIsoDateFromDate } from '@/lib/jadwal-utils';
 import { JAM_OPTIONS, opsiJamFromWaktu } from '@/lib/constants/jadwal-slots';
 import { useJadwalStore } from '@/store/useJadwalStore';
 import { useUserStore } from '@/store/useUserStore';
@@ -80,15 +80,18 @@ function deriveStatus(waktu: string): ScheduleStatus {
 }
 
 function mapTimelineItems(items: UnifiedJadwalResponse[]): SessionFromAPI[] {
-  return items.map(item => ({
-    id_sesi: item.id_sesi,
-    nama_kelas: item.nama_kelas,
-    mata_kuliah: item.mata_kuliah,
-    ruangan: item.ruangan,
-    pengajar: item.pengajar,
-    waktu: `${sessionDateKey(item.tanggal)}, ${item.waktu}`,
-    tipe_jadwal: (item.tipe === 'REGULAR' || item.tipe === 'REGULER') ? 'REGULAR' : 'PENGGANTI',
-  }));
+  return items.map(item => {
+    const tipeJadwal = (item.tipe === 'REGULAR' || item.tipe === 'REGULER') ? 'REGULAR' : 'PENGGANTI';
+    return {
+      id_sesi: item.id_sesi,
+      nama_kelas: item.nama_kelas,
+      mata_kuliah: subjectDisplayName(item.mata_kuliah, tipeJadwal === 'PENGGANTI'),
+      ruangan: item.ruangan,
+      pengajar: pengajarDisplayName(item.pengajar),
+      waktu: `${sessionDateKey(item.tanggal)}, ${item.waktu}`,
+      tipe_jadwal: tipeJadwal,
+    };
+  });
 }
 
 function normalizeInstructorName(value?: string | null) {
@@ -367,7 +370,7 @@ export default function JadwalAjarPage() {
 
     fetchSchedule();
     return () => { cancelled = true; };
-  }, [startDate, endDate, selectedSemesterId, viewMode, user?.email, user?.id_asisten]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, selectedSemesterId, viewMode, user?.email, user?.id_asisten]); 
 
   const handleTableDateChange = (value: string) => {
     setTableDate(value);
@@ -466,7 +469,6 @@ export default function JadwalAjarPage() {
       ? { bg: 'bg-crimson', text: 'text-white', label: 'BERJALAN' }
       : { bg: 'bg-crimson/10', text: 'text-crimson', label: status === 'Mendatang' ? 'MENDATANG' : 'SELESAI' };
     const timePart = s.waktu.split(', ')[1] ?? s.waktu;
-    const isPengganti = s.tipe_jadwal === 'PENGGANTI';
 
     return (
       <section className="bg-white rounded-[12px] md:rounded-[32px] p-5 md:p-6 border border-slate-100 flex flex-col gap-5 w-full">
@@ -476,11 +478,6 @@ export default function JadwalAjarPage() {
               {s.mata_kuliah}
             </h2>
             <p className={`text-slate-500 font-medium ${gridMode ? 'text-[11px] md:text-xs' : 'text-sm'}`}>{s.nama_kelas || 'Kelas tidak tersedia'}</p>
-            {isPengganti && (
-              <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">
-                Pengganti
-              </span>
-            )}
           </div>
 
           <div className={`grid w-full ${gridMode ? 'grid-cols-1 gap-y-2.5 border-t border-slate-100 pt-3 md:grid-cols-2 md:gap-x-6 md:gap-y-4 md:border-t-0 md:pt-0' : 'grid-cols-2 gap-x-6 gap-y-4 md:w-[480px]'}`}>
@@ -580,7 +577,6 @@ export default function JadwalAjarPage() {
 
       <div className="mb-6 flex flex-col gap-3 md:gap-4">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 md:gap-4">
-          {/* Date picker */}
           {viewType === 'TABLE' ? (
             <div className="w-full md:w-auto">
               <p className="text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
@@ -620,8 +616,6 @@ export default function JadwalAjarPage() {
               </div>
             </div>
           )}
-
-          {/* Tab toggle */}
           <div className="flex bg-slate-100 p-0.5 rounded-xl md:w-[260px] shrink-0">
             {(['PERSONAL', 'ALL'] as const).map(mode => (
               <button
@@ -653,7 +647,6 @@ export default function JadwalAjarPage() {
           <AsdosState variant="error" message={error} />
         ) : isLoading ? (
           viewType === 'TABLE' ? (
-            /* Skeleton tabel */
             <div className="bg-white rounded-xl border border-slate-100 overflow-hidden animate-shimmer">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[500px]">
@@ -683,7 +676,6 @@ export default function JadwalAjarPage() {
             <LoadingState />
           )
         ) : viewType === 'TABLE' ? (
-          /* ── TABEL JADWAL HARIAN ── */
           timetableData && timetableData.rooms.length > 0 ? (
             <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
 
@@ -720,7 +712,6 @@ export default function JadwalAjarPage() {
                             );
                           }
                           const isRunning = deriveStatus(s.waktu) === 'Berjalan';
-                          const isPengganti = s.tipe_jadwal === 'PENGGANTI';
                           return (
                             <td key={room} className="px-2 py-2">
                               <div className={`rounded-lg px-3 py-2.5 text-left transition-all ${
@@ -736,11 +727,6 @@ export default function JadwalAjarPage() {
                                   <User className="w-2.5 h-2.5 text-slate-400 shrink-0" />
                                   <p className="text-[10px] text-slate-400 truncate">{s.pengajar || '-'}</p>
                                 </div>
-                                {isPengganti && (
-                                  <span className="mt-1.5 inline-block text-[9px] font-bold uppercase tracking-wider text-ink bg-fog px-1.5 py-0.5 rounded">
-                                    Pengganti
-                                  </span>
-                                )}
                               </div>
                             </td>
                           );
