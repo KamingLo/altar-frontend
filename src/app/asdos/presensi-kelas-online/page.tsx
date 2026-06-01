@@ -170,7 +170,7 @@ export default function PresensiKelasOnlinePage() {
         </div>
         <h2 className="text-2xl font-bold text-slate-800 mb-2">Tidak Ada Jadwal Online Hari Ini</h2>
         <p className="text-slate-500 mb-8 max-w-xs">
-          Sesi online hari ini belum tersedia, sudah berakhir, atau presensinya sudah tercatat.
+          Sesi online hari ini belum tersedia atau presensinya sudah tercatat.
         </p>
       </div>
     );

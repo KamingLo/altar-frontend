@@ -2,19 +2,31 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Check, Scan, ArrowLeft, BookOpen, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { getMyPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/actions/presensi';
+import { getSessionsByDate } from '@/lib/actions/jadwal';
 
 import Link from 'next/link';
 import { AsdosQrScanSkeleton, AsdosPageShell, AsdosPageHeader } from '@/components/dashboard/asdos/AsdosUI';
 import { isQrPresensi } from '@/lib/presensi-mode';
+
+function formatTeachingTeam(item: PresensiResponseDTO) {
+  return item.nama_asdos_rekan ? `${item.nama_asdos} & ${item.nama_asdos_rekan}` : item.nama_asdos;
+}
+
+function hasCheckout(value?: string) {
+  return !!value && value !== '' && value !== 'null' && !String(value).startsWith('0001');
+}
 
 export default function CheckOutPage() {
   const MAX_HURUF = 100;
 
   const [step, setStep] = useState(1);
   const [materi, setMateri] = useState('');
+  const [partnerMateri, setPartnerMateri] = useState<{ materi: string; nama: string } | null>(null);
+  const [activeTeachingTeam, setActiveTeachingTeam] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [activePresensi, setActivePresensi] = useState<PresensiResponseDTO | null>(null);
   const [qrToken, setQrToken] = useState('');
   const [cameraStatus, setCameraStatus] = useState<'idle' | 'requesting' | 'active' | 'denied' | 'scanning'>('idle');
@@ -32,10 +44,14 @@ export default function CheckOutPage() {
     async function fetchActivePresensi() {
       setIsLoading(true);
       try {
-        const res = await getMyPresensi();
+        const today = new Date().toISOString().split('T')[0];
+        const [res, scheduleRes] = await Promise.all([
+          getMyPresensi(),
+          getSessionsByDate(today),
+        ]);
         if (res.success && res.data) {
-          const today = new Date().toISOString().split('T')[0];
-          const active = res.data.find(p => {
+          const records = res.data;
+          const active = records.find(p => {
             if (!isQrPresensi(p)) return false;
             const checkout = p.waktu_checkout;
             const isOpen = !checkout ||
@@ -47,8 +63,37 @@ export default function CheckOutPage() {
             return presensiDate === today;
           });
           setActivePresensi(active ?? null);
+          if (active) {
+            const matchedSchedule = (scheduleRes.success ? scheduleRes.data ?? [] : []).find(session =>
+              session.id_sesi === active.id_sesi || session.id_sesi === active.id_sesi_pengganti,
+            );
+            setActiveTeachingTeam(matchedSchedule?.pengajar || formatTeachingTeam(active));
+
+            const partnerRecord = records.find(p => {
+              if (p.id_presensi === active.id_presensi) return false;
+              if (p.id_sesi !== active.id_sesi) return false;
+              if (String(p.tanggal_mengajar ?? '').split('T')[0] !== today) return false;
+              return hasCheckout(p.waktu_checkout) && !!p.deskripsi_materi?.trim();
+            });
+
+            if (partnerRecord?.deskripsi_materi?.trim()) {
+              const sharedMateri = partnerRecord.deskripsi_materi.trim();
+              setPartnerMateri({ materi: sharedMateri, nama: partnerRecord.nama_asdos || 'partner Anda' });
+              setMateri(sharedMateri);
+            } else {
+              setPartnerMateri(null);
+              setMateri('');
+            }
+          } else {
+            setActiveTeachingTeam('');
+            setPartnerMateri(null);
+            setMateri('');
+          }
         } else {
           setActivePresensi(null);
+          setActiveTeachingTeam('');
+          setPartnerMateri(null);
+          setMateri('');
         }
       } catch (error) {
         console.error('Error in fetchActivePresensi:', error);
@@ -207,16 +252,25 @@ export default function CheckOutPage() {
     if (!activePresensi) return;
 
     setIsSubmitting(true);
-    const res = await submitCheckOut({
-      id_presensi: activePresensi.id_presensi,
-      deskripsi_materi: materi,
-      qr_token: qrToken,
-    });
+    setSubmitError('');
+    try {
+      const res = await submitCheckOut({
+        id_presensi: activePresensi.id_presensi,
+        deskripsi_materi: materi,
+        qr_token: qrToken,
+      });
 
-    if (res.success) {
-      setStep(3);
+      if (res.success) {
+        setStep(3);
+        return;
+      }
+
+      setSubmitError(res.message || 'Check-out gagal dicatat. Silakan pindai ulang QR dan coba lagi.');
+    } catch {
+      setSubmitError('Check-out gagal dicatat. Silakan pindai ulang QR dan coba lagi.');
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   if (isLoading) {
@@ -452,7 +506,7 @@ export default function CheckOutPage() {
                   </h2>
                   <p className="text-sm md:text-xs text-slate-500 font-medium">{activePresensi.nama_kelas}</p>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4 md:gap-y-3 w-full md:w-auto shrink-0 md:ml-auto">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 md:gap-y-3 w-full md:w-auto shrink-0 md:ml-auto">
                   <div className="flex flex-col gap-1 md:gap-0.5 border-l-2 border-slate-100 pl-4">
                     <span className="text-[10px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
                     <span className="text-sm md:text-xs font-bold text-slate-800">
@@ -469,6 +523,10 @@ export default function CheckOutPage() {
                     <span className="text-[10px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
                     <span className="text-sm md:text-xs font-bold text-slate-800">{activePresensi.nama_ruangan}</span>
                   </div>
+                  <div className="flex flex-col gap-1 md:gap-0.5 border-l-2 border-slate-100 pl-4">
+                    <span className="text-[10px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">Asisten Dosen</span>
+                    <span className="text-sm md:text-xs font-bold text-slate-800">{activeTeachingTeam || formatTeachingTeam(activePresensi)}</span>
+                  </div>
                 </div>
               </article>
             </section>
@@ -483,22 +541,37 @@ export default function CheckOutPage() {
                 <textarea
                   value={materi}
                   onChange={e => {
+                    if (partnerMateri) return;
                     const val = e.target.value;
                     if (val.length <= MAX_HURUF) setMateri(val);
                   }}
+                  disabled={!!partnerMateri}
                   placeholder="Ketik bahasan materi yang diajarkan..."
-                  className="w-full bg-fog rounded-[14px] p-4 md:p-5 pb-8 text-sm md:text-base text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-crimson/30 transition-all resize-none h-36 md:h-48 border-0"
+                  className="w-full bg-fog rounded-[14px] p-4 md:p-5 pb-8 text-sm md:text-base text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-crimson/30 transition-all resize-none h-36 md:h-48 border-0 disabled:cursor-not-allowed disabled:text-slate-500"
                 />
                 <div className={`absolute bottom-3 right-4 text-[10px] font-medium bg-fog/80 px-1 ${materi.length >= MAX_HURUF ? 'text-crimson' : 'text-slate-400'}`}>
                   {materi.length} / {MAX_HURUF} huruf
                 </div>
               </div>
 
-              <p className="text-[10px] md:text-xs text-crimson font-medium leading-relaxed">
-                * Mohon isi bahasan materi dengan jelas untuk keperluan rekapitulasi kehadiran asisten dosen.
-              </p>
+              {partnerMateri ? (
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                  <p className="text-[11px] md:text-xs font-semibold text-emerald-700 leading-relaxed">
+                    Bahasan materi sudah diisi oleh {partnerMateri.nama}. Materi dikunci agar laporan sesi tetap konsisten.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[10px] md:text-xs text-crimson font-medium leading-relaxed">
+                  * Mohon isi bahasan materi dengan jelas. Jika mengajar bersama partner asisten dosen, pastikan bahasan materi yang diisi sama.
+                </p>
+              )}
 
               <div className="pt-2 border-t border-slate-100">
+                {submitError && (
+                  <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-[11px] md:text-xs font-semibold text-amber-700 leading-relaxed">
+                    {submitError}
+                  </div>
+                )}
                 {isConfirmOpen ? (
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>

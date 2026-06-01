@@ -2,8 +2,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarPlus, Info, Check, Trash2, XCircle, ArrowLeft, Calendar } from 'lucide-react';
 import { createSubstitution, deleteSubstitution, getMySubstitutions } from '@/lib/actions/pergantian-kelas';
-import { getRuanganList } from '@/lib/actions/data-master';
-import { getSessionsByDate } from '@/lib/actions/jadwal';
+import { getRuanganList, getSemesterList } from '@/lib/actions/data-master';
+import { getScheduleTimeline, getSessionsByDate } from '@/lib/actions/jadwal';
+import { getMyPresensi } from '@/lib/actions/presensi';
 import type { RuanganItem } from '@/types/api';
 import type { SessionFromAPI } from '@/lib/actions/jadwal';
 import { AsdosPageHeader, AsdosPageShell, AsdosPrimaryButton, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
@@ -43,6 +44,26 @@ function todayIso() {
   return new Date().toISOString().split('T')[0];
 }
 
+function parseTimeRangeMinutes(value: string) {
+  const matches = [...String(value).matchAll(/(\d{1,2})[:.](\d{2})/g)];
+  if (matches.length < 2) return null;
+  const start = Number(matches[0][1]) * 60 + Number(matches[0][2]);
+  const end = Number(matches[1][1]) * 60 + Number(matches[1][2]);
+  return { start, end };
+}
+
+function slotRange(option: number) {
+  return parseTimeRangeMinutes(SLOT_OPTIONS.find(slot => slot.value === option)?.label ?? '');
+}
+
+function overlaps(a: { start: number; end: number }, b: { start: number; end: number }) {
+  return a.start < b.end && a.end > b.start;
+}
+
+function roomLabel(room: RuanganItem) {
+  return `${room.nama_ruangan} (Lantai ${room.lantai})`;
+}
+
 export default function PengajuanKpPage() {
   const { items: history, setPage, removeItem, reset } = usePengajuanKpStore();
   const { user } = useUserStore();
@@ -75,6 +96,9 @@ export default function PengajuanKpPage() {
   const [clientToday, setClientToday] = useState('');
   const [ruanganList, setRuanganList] = useState<RuanganItem[]>([]);
   const [sessionList, setSessionList] = useState<SessionFromAPI[]>([]);
+  const [checkedInSessionIds, setCheckedInSessionIds] = useState<Set<string>>(new Set());
+  const [selectedSemesterId, setSelectedSemesterId] = useState('');
+  const [occupiedSchedules, setOccupiedSchedules] = useState<Array<{ room: string; time: string; title: string }>>([]);
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState<string | null>(null);
 
@@ -102,10 +126,15 @@ useEffect(() => {
     let cancelled = false;
     setDropdownLoading(true);
     setDropdownError(null);
-    getRuanganList(1, '', DROPDOWN_LIMIT).then((ruanganRes) => {
+    Promise.all([
+      getRuanganList(1, '', DROPDOWN_LIMIT),
+      getSemesterList(1, '', 50),
+    ]).then(([ruanganRes, semesterRes]) => {
       if (cancelled) return;
       if (!ruanganRes.success) setDropdownError(ruanganRes.message || 'Gagal memuat daftar ruangan.');
       setRuanganList(ruanganRes.success ? ruanganRes.data?.items ?? [] : []);
+      const semesters = semesterRes.success ? semesterRes.data?.items ?? [] : [];
+      setSelectedSemesterId(semesters[0]?.id ?? '');
     }).catch((e: unknown) => {
       if (cancelled) return;
       setDropdownError(e instanceof Error ? e.message : 'Gagal memuat data form.');
@@ -117,7 +146,7 @@ useEffect(() => {
     if (!originalDate) return;
     let cancelled = false;
     setDropdownError(null);
-    getSessionsByDate(originalDate).then((res) => {
+    Promise.all([getSessionsByDate(originalDate), getMyPresensi()]).then(([res, presensiRes]) => {
       if (cancelled) return;
       if (!res.success) {
         setDropdownError(res.message || 'Gagal memuat sesi pada tanggal ini.');
@@ -125,6 +154,12 @@ useEffect(() => {
         setIdSession('');
         return;
       }
+      const checkedIds = new Set<string>(
+        (presensiRes.success ? presensiRes.data ?? [] : [])
+          .filter(item => String(item.tanggal_mengajar ?? '').split('T')[0] === originalDate)
+          .flatMap(item => [item.id_sesi, item.id_sesi_pengganti].filter((value): value is string => !!value)),
+      );
+      setCheckedInSessionIds(checkedIds);
       setSessionList(res.data ?? []);
       setIdSession('');
     }).catch((e: unknown) => {
@@ -135,6 +170,36 @@ useEffect(() => {
     });
     return () => { cancelled = true; };
   }, [originalDate]);
+
+  useEffect(() => {
+    if (!substituteDate || !selectedSemesterId) {
+      setOccupiedSchedules([]);
+      return;
+    }
+
+    let cancelled = false;
+    getScheduleTimeline({
+      start_date: substituteDate,
+      end_date: substituteDate,
+      id_semester: selectedSemesterId,
+    }).then((res) => {
+      if (cancelled) return;
+      if (!res.success) {
+        setOccupiedSchedules([]);
+        return;
+      }
+
+      setOccupiedSchedules((res.data?.items ?? []).map(item => ({
+        room: item.ruangan,
+        time: item.waktu,
+        title: `${item.mata_kuliah} ${item.nama_kelas}`.trim(),
+      })));
+    }).catch(() => {
+      if (!cancelled) setOccupiedSchedules([]);
+    });
+
+    return () => { cancelled = true; };
+  }, [substituteDate, selectedSemesterId]);
 
   const handleOpenSheet = () => { setIsFormOpen(true); setSubmitError(null); };
 
@@ -155,13 +220,15 @@ useEffect(() => {
   };
 
   const handleSubmit = async () => {
+    const selectedSession = sessionList.find(session => session.id_sesi === idSession);
     setSubmitLoading(true);
     setSubmitError(null);
     try {
       const res = await createSubstitution({
         id_session: idSession,
         id_ruangan: idRuangan,
-        id_asdos1: user?.id_asisten ?? null,
+        id_asdos1: selectedSession?.id_asdos1 ?? user?.id_asisten ?? null,
+        id_asdos2: selectedSession?.id_asdos2 ?? null,
         substitute_date: substituteDate,
         original_date: originalDate,
         slot_option: slotOption,
@@ -207,6 +274,42 @@ useEffect(() => {
   const isFormValid =
     originalDate.trim() !== '' && substituteDate.trim() !== '' &&
     idSession.trim() !== '' && idRuangan.trim() !== '' && reason.trim() !== '';
+
+  const selectedSlotRange = slotRange(slotOption);
+  const selectedRoom = ruanganList.find(room => room.id === idRuangan);
+  const selectedRoomLabel = selectedRoom ? roomLabel(selectedRoom) : '';
+  const roomConflict = !!(selectedSlotRange && selectedRoomLabel && occupiedSchedules.some(item => {
+    const occupiedRange = parseTimeRangeMinutes(item.time);
+    return item.room === selectedRoomLabel && !!occupiedRange && overlaps(selectedSlotRange, occupiedRange);
+  }));
+
+  const occupiedRoomLabels = new Set(
+    selectedSlotRange
+      ? occupiedSchedules
+        .filter(item => {
+          const occupiedRange = parseTimeRangeMinutes(item.time);
+          return !!occupiedRange && overlaps(selectedSlotRange, occupiedRange);
+        })
+        .map(item => item.room)
+      : [],
+  );
+
+  const occupiedSlotOptions = new Set(
+    selectedRoomLabel
+      ? SLOT_OPTIONS
+        .filter(slot => {
+          const range = slotRange(slot.value);
+          return !!range && occupiedSchedules.some(item => {
+            const occupiedRange = parseTimeRangeMinutes(item.time);
+            return item.room === selectedRoomLabel && !!occupiedRange && overlaps(range, occupiedRange);
+          });
+        })
+        .map(slot => slot.value)
+      : [],
+  );
+
+  const selectedSessionCheckedIn = !!idSession && checkedInSessionIds.has(idSession);
+  const canSubmit = isFormValid && !roomConflict && !selectedSessionCheckedIn;
 
   const renderFormContent = () => {
     if (isSuccess) {
@@ -295,7 +398,10 @@ useEffect(() => {
                     options={sessionList.map(s => ({
                       value: s.id_sesi,
                       label: s.mata_kuliah,
-                      description: `${s.nama_kelas} · ${s.waktu.split(', ')[1] ?? s.waktu}`,
+                      description: checkedInSessionIds.has(s.id_sesi)
+                        ? `${s.nama_kelas} · sudah tercatat check-in`
+                        : `${s.nama_kelas} · ${s.waktu.split(', ')[1] ?? s.waktu}`,
+                      disabled: checkedInSessionIds.has(s.id_sesi),
                     }))}
                     placeholder="-- Pilih Sesi --"
                   />
@@ -312,7 +418,12 @@ useEffect(() => {
                   value={String(slotOption)}
                   onChange={val => setSlotOption(Number(val))}
                   triggerClassName="!rounded-[14px] !py-[15px] !border-slate-200 hover:!border-slate-300 !bg-white !font-semibold"
-                  options={SLOT_OPTIONS.map(s => ({ value: String(s.value), label: s.label }))}
+                  options={SLOT_OPTIONS.map(s => ({
+                    value: String(s.value),
+                    label: s.label,
+                    description: occupiedSlotOptions.has(s.value) ? 'Ruangan terpilih sudah terpakai' : undefined,
+                    disabled: occupiedSlotOptions.has(s.value),
+                  }))}
                   placeholder="-- Pilih --"
                 />
               </div>
@@ -328,12 +439,23 @@ useEffect(() => {
                   options={ruanganList.map(r => ({
                     value: r.id,
                     label: r.nama_ruangan,
-                    description: `Lantai ${r.lantai}`,
+                    description: occupiedRoomLabels.has(roomLabel(r))
+                      ? `Lantai ${r.lantai} · sudah terpakai`
+                      : `Lantai ${r.lantai}`,
+                    disabled: occupiedRoomLabels.has(roomLabel(r)),
                   }))}
                   placeholder="-- Pilih --"
                 />
               </div>
             </div>
+
+            {(selectedSessionCheckedIn || roomConflict) && (
+              <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700 font-semibold leading-relaxed">
+                {selectedSessionCheckedIn
+                  ? 'Sesi ini sudah tercatat check-in, sehingga tidak bisa diajukan sebagai kelas pengganti.'
+                  : 'Ruangan dan slot jam yang dipilih sudah terpakai. Silakan pilih slot atau ruangan lain.'}
+              </div>
+            )}
 
             <div>
               <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
@@ -356,7 +478,7 @@ useEffect(() => {
             <div className="pt-6 border-t border-slate-100 bg-white">
               <button
                 onClick={handleSubmit}
-                disabled={!isFormValid || submitLoading}
+                disabled={!canSubmit || submitLoading}
                 className="w-full py-[16px] rounded-[20px] bg-crimson hover:bg-[#7a1727] text-white font-bold text-[15px] active:scale-[0.98] transition-all shadow-[0_10px_25px_rgba(148,28,47,0.2)] border border-white/5 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {submitLoading ? (
@@ -459,7 +581,7 @@ useEffect(() => {
                     <CalendarPlus size={20} />
                   </div>
                   <p className="text-base md:text-lg text-slate-800 font-bold">Belum ada pengajuan.</p>
-                  <p className="text-sm text-slate-400 mt-1">Ajukan kelas pengganti menggunakan tombol di atas.</p>
+                  <p className="text-sm text-slate-400 mt-1">Anda dapat mengajukan kelas pengganti menggunakan tombol &quot;Ajukan Kelas Pengganti&quot;.</p>
                 </div>
               )}
 

@@ -8,6 +8,7 @@ export type CustomSelectOption = {
   value: string;
   label: string;
   description?: string;
+  disabled?: boolean;
 };
 
 type CustomSelectProps = {
@@ -106,6 +107,8 @@ export function CustomSelect({
   }, [open, closeDropdown]);
 
   const handleSelect = (next: string) => {
+    const option = options.find(opt => opt.value === next);
+    if (option?.disabled) return;
     onChange(next);
     closeDropdown();
   };
@@ -117,19 +120,25 @@ export function CustomSelect({
       ) : (
         filteredOptions.map(opt => {
           const active = opt.value === value;
+          const disabled = !!opt.disabled;
           return (
             <div
               key={opt.value}
               className={`w-full flex items-center justify-between px-5 py-2 transition-colors ${
-                active ? 'bg-slate-50 text-crimson font-bold' : 'text-slate-600 hover:bg-slate-50'
+                disabled
+                  ? 'text-slate-300 bg-slate-50/70 cursor-not-allowed'
+                  : active
+                    ? 'bg-slate-50 text-crimson font-bold'
+                    : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
               <button
                 type="button"
                 role="option"
                 aria-selected={active}
+                disabled={disabled}
                 onClick={() => handleSelect(opt.value)}
-                className="flex-1 text-left min-w-0 py-1"
+                className="flex-1 text-left min-w-0 py-1 disabled:cursor-not-allowed"
               >
                 <span className="block text-sm truncate">{opt.label}</span>
                 {opt.description && (

@@ -19,7 +19,7 @@ type SessionWithPresensiMode = SessionFromAPI & {
 function normalizeMode(value?: string | null): PresensiMode {
   const normalized = String(value ?? '').toLowerCase();
 
-  if (normalized.includes('link') || normalized.includes('online') || normalized.includes('sore') || normalized.includes('evening')) {
+  if (normalized.includes('link') || normalized.includes('online')) {
     return 'link';
   }
 
@@ -54,7 +54,7 @@ export function getSessionPresensiMode(session: SessionFromAPI): PresensiMode {
   const startMinutes = getSessionStartMinutes(session);
   if (startMinutes === null) return 'unknown';
 
-  return startMinutes >= 12 * 60 ? 'link' : 'qr';
+  return startMinutes > 17 * 60 + 10 ? 'link' : 'qr';
 }
 
 export function isQrSession(session: SessionFromAPI): boolean {

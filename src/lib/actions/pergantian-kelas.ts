@@ -53,7 +53,18 @@ export async function createSubstitution(data: {
   reason: string;
 }) {
   const res = await apiClient.post('/substitute-sessions', data, { auth: true });
-  return { success: res.success, message: res.message, data: res.data as SubstituteSessionDetail | undefined };
+  const errorDetail =
+    typeof res.error === 'string'
+      ? res.error
+      : res.error instanceof Error
+        ? res.error.message
+        : '';
+
+  return {
+    success: res.success,
+    message: res.success ? res.message : errorDetail || res.message,
+    data: res.data as SubstituteSessionDetail | undefined,
+  };
 }
 
 export async function deleteSubstitution(id: string) {

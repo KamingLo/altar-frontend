@@ -2,13 +2,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, Filter, Search, Table2, User, Users, X } from 'lucide-react';
 import { getMyScheduleTimeline, getScheduleTimeline, type SessionFromAPI } from '@/lib/actions/jadwal';
-import { getSemesterList } from '@/lib/actions/data-master';
+import { getRuanganList, getSemesterList } from '@/lib/actions/data-master';
 import type { UnifiedJadwalResponse } from '@/types/api';
 import { AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { sessionDateKey, toIsoDateFromDate } from '@/lib/jadwal-utils';
 import { JAM_OPTIONS, opsiJamFromWaktu } from '@/lib/constants/jadwal-slots';
 import { useJadwalStore } from '@/store/useJadwalStore';
+import { useUserStore } from '@/store/useUserStore';
 
 type ViewMode = 'PERSONAL' | 'ALL';
 type ScheduleStatus = 'Mendatang' | 'Berjalan' | 'Selesai';
@@ -90,18 +91,63 @@ function mapTimelineItems(items: UnifiedJadwalResponse[]): SessionFromAPI[] {
   }));
 }
 
+function normalizeInstructorName(value?: string | null) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/@.*$/, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function getAssistantNameCandidates(email?: string | null) {
+  const localPart = String(email ?? '').split('@')[0] ?? '';
+  const normalizedLocal = normalizeInstructorName(localPart);
+  const tokens = normalizedLocal.split(' ').filter(Boolean);
+  const nonNumericTokens = tokens.filter(token => !/^\d+$/.test(token));
+
+  return Array.from(new Set([
+    normalizedLocal,
+    tokens[0],
+    nonNumericTokens[0],
+    nonNumericTokens.join(' '),
+  ].filter(Boolean)));
+}
+
+function filterSessionsForCurrentAssistant(items: SessionFromAPI[], email?: string | null) {
+  const candidates = getAssistantNameCandidates(email);
+  if (candidates.length === 0) return [];
+
+  return items.filter(item => {
+    const instructors = String(item.pengajar ?? '')
+      .split('&')
+      .map(part => normalizeInstructorName(part))
+      .filter(Boolean);
+
+    return instructors.some(name =>
+      candidates.some(candidate =>
+        name === candidate ||
+        name.includes(candidate) ||
+        candidate.includes(name) ||
+        name.split(' ').includes(candidate),
+      ),
+    );
+  });
+}
+
 function DatePickerField({
   label,
   value,
   min,
   max,
   onChange,
+  hideLabel = false,
 }: {
   label: string;
   value: string;
   min?: string;
   max?: string;
   onChange: (value: string) => void;
+  hideLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => parseLocalDate(value));
@@ -124,7 +170,7 @@ function DatePickerField({
 
   return (
     <div className="relative">
-      <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+      <label className={`${hideLabel ? 'sr-only' : 'block'} text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1`}>
         {label}
       </label>
       <button
@@ -222,8 +268,10 @@ export default function JadwalAjarPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('ALL');
   const [sessions, setSessions] = useState<SessionFromAPI[]>([]);
+  const [rooms, setRooms] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const user = useUserStore(state => state.user);
 
   const { jadwalAjarCache, setJadwalAjarCache } = useJadwalStore();
 
@@ -231,20 +279,38 @@ export default function JadwalAjarPage() {
 
   useEffect(() => {
     let cancelled = false;
-    getSemesterList(1, '', 50).then(res => {
-      if (cancelled) return;
-      const items = res.success ? res.data?.items ?? [] : [];
-      if (items.length > 0) {
-        setSelectedSemesterId(items[0].id);
-      } else {
-        setIsLoading(false);
+    async function fetchInitialData() {
+      try {
+        const [semesterRes, roomRes] = await Promise.all([
+          getSemesterList(1, '', 50),
+          getRuanganList(1, '', 200),
+        ]);
+        if (cancelled) return;
+
+        const semesterItems = semesterRes.success ? semesterRes.data?.items ?? [] : [];
+        if (semesterItems.length > 0) {
+          setSelectedSemesterId(semesterItems[0].id);
+        } else {
+          setIsLoading(false);
+        }
+
+        if (roomRes.success) {
+          const roomItems = roomRes.data?.items ?? [];
+          setRooms(
+            roomItems
+              .map(room => `${room.nama_ruangan} (Lantai ${room.lantai})`)
+              .sort((a, b) => a.localeCompare(b, 'id-ID')),
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setError('Gagal memuat data semester atau ruangan.');
+          setIsLoading(false);
+        }
       }
-    }).catch(() => {
-      if (!cancelled) {
-        setError('Gagal memuat data semester.');
-        setIsLoading(false);
-      }
-    });
+    }
+
+    fetchInitialData();
     return () => { cancelled = true; };
   }, []);
 
@@ -252,7 +318,7 @@ export default function JadwalAjarPage() {
     if (!selectedSemesterId) return;
     let cancelled = false;
 
-    const cacheKey = `${viewMode}-${selectedSemesterId}-${startDate}-${endDate}`;
+    const cacheKey = `${user?.id_asisten ?? user?.email ?? 'guest'}-${viewMode}-${selectedSemesterId}-${startDate}-${endDate}`;
     const cached = jadwalAjarCache[cacheKey];
     if (cached) {
       setSessions(cached);
@@ -271,7 +337,19 @@ export default function JadwalAjarPage() {
 
         if (cancelled) return;
         if (res.success) {
-          const mapped = mapTimelineItems(res.data?.items || []);
+          let mapped = mapTimelineItems(res.data?.items || []);
+
+          if (viewMode === 'PERSONAL' && mapped.length === 0) {
+            const fallbackRes = await getScheduleTimeline(params);
+            if (cancelled) return;
+            if (fallbackRes.success) {
+              mapped = filterSessionsForCurrentAssistant(
+                mapTimelineItems(fallbackRes.data?.items || []),
+                user?.email,
+              );
+            }
+          }
+
           setSessions(mapped);
           setJadwalAjarCache(cacheKey, mapped);
         } else {
@@ -289,7 +367,7 @@ export default function JadwalAjarPage() {
 
     fetchSchedule();
     return () => { cancelled = true; };
-  }, [startDate, endDate, selectedSemesterId, viewMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, selectedSemesterId, viewMode, user?.email, user?.id_asisten]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTableDateChange = (value: string) => {
     setTableDate(value);
@@ -333,6 +411,22 @@ export default function JadwalAjarPage() {
     setEndDate(value);
   };
 
+  const shiftScheduleDate = (direction: -1 | 1) => {
+    if (viewType === 'TABLE') {
+      const nextDate = toIsoDateFromDate(addDays(parseLocalDate(tableDate), direction));
+      setTableDate(nextDate);
+      setStartDate(nextDate);
+      setEndDate(nextDate);
+      return;
+    }
+
+    const nextStart = toIsoDateFromDate(addDays(parseLocalDate(startDate), direction));
+    const nextEnd = toIsoDateFromDate(addDays(parseLocalDate(endDate), direction));
+    setStartDate(nextStart);
+    setEndDate(nextEnd);
+    setTableDate(nextStart);
+  };
+
   const filtered = sessions.filter(s =>
     deriveStatus(s.waktu) !== 'Selesai' &&
     (s.mata_kuliah.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -362,9 +456,9 @@ export default function JadwalAjarPage() {
       if (!lookup[slot]) lookup[slot] = {};
       lookup[slot][s.ruangan] = s;
     });
-    const rooms = Array.from(roomSet).sort();
-    return { jams: JAM_OPTIONS, rooms, lookup, daySessions };
-  }, [sessions, viewType, tableDate]);
+    const tableRooms = rooms.length > 0 ? rooms : Array.from(roomSet).sort();
+    return { jams: JAM_OPTIONS, rooms: tableRooms, lookup, daySessions };
+  }, [sessions, viewType, tableDate, rooms]);
 
   const ScheduleCard = ({ s, gridMode = false }: { s: SessionFromAPI; gridMode?: boolean }) => {
     const status = deriveStatus(s.waktu);
@@ -488,8 +582,33 @@ export default function JadwalAjarPage() {
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 md:gap-4">
           {/* Date picker */}
           {viewType === 'TABLE' ? (
-            <div className="w-full md:w-52">
-              <DatePickerField label="Tanggal" value={tableDate} onChange={handleTableDateChange} />
+            <div className="w-full md:w-auto">
+              <p className="text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                Tanggal
+              </p>
+              <div className="flex items-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => shiftScheduleDate(-1)}
+                  aria-label="Tanggal sebelumnya"
+                  className="h-[52px] w-11 shrink-0 rounded-[14px] border border-slate-200 bg-white text-slate-500 shadow-sm flex items-center justify-center active:scale-95 transition hover:bg-slate-50 hover:text-crimson"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+
+                <div className="min-w-0 flex-1 md:w-52">
+                  <DatePickerField label="Tanggal" value={tableDate} onChange={handleTableDateChange} hideLabel />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => shiftScheduleDate(1)}
+                  aria-label="Tanggal berikutnya"
+                  className="h-[52px] w-11 shrink-0 rounded-[14px] border border-slate-200 bg-white text-slate-500 shadow-sm flex items-center justify-center active:scale-95 transition hover:bg-slate-50 hover:text-crimson"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 md:flex md:gap-3">
@@ -568,7 +687,9 @@ export default function JadwalAjarPage() {
           timetableData && timetableData.rooms.length > 0 ? (
             <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
 
-              <div className="h-3 border-b border-slate-100" />
+              <div className="px-4 py-3 border-b border-slate-100 bg-white">
+                <p className="text-sm font-bold text-slate-800">{formatDisplayDate(tableDate)}</p>
+              </div>
               <div className="overflow-auto max-h-[70vh]">
                 <table className="w-full">
                   <thead className="sticky top-0 z-20">

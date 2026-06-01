@@ -83,15 +83,7 @@ function formatShortDate(dateStr: string) {
 }
 
 function getScheduleTypeLabel(schedule: SessionFromAPI) {
-  const type = schedule.tipe_jadwal === 'PENGGANTI' ? 'PENGGANTI' : 'REGULER';
-  if (type !== 'REGULER') return type;
-
-  const match = schedule.waktu.match(/(\d{1,2})[:.]/);
-  if (!match) return 'REGULER';
-
-  const hour = Number(match[1]);
-  if (Number.isNaN(hour)) return 'REGULER';
-  return hour < 12 ? 'REGULER PAGI' : 'REGULER SORE';
+  return schedule.tipe_jadwal === 'PENGGANTI' ? 'PENGGANTI' : 'REGULER';
 }
 
 function getScheduleStartMinutes(schedule: SessionFromAPI) {
@@ -392,9 +384,11 @@ export default function AsdosHome() {
               {schedule.nama_kelas}
             </p>
           </div>
-          <span className="rounded-full bg-crimson/5 px-3 py-1 text-[10px] font-extrabold text-crimson shrink-0">
-            {getScheduleTypeLabel(schedule)}
-          </span>
+          {getScheduleTypeLabel(schedule) === 'PENGGANTI' && (
+            <span className="rounded-full bg-crimson/5 px-3 py-1 text-[10px] font-extrabold text-crimson shrink-0">
+              PENGGANTI
+            </span>
+          )}
         </div>
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
           <p>
@@ -409,8 +403,12 @@ export default function AsdosHome() {
         {showActions && (
           <div className="mt-4 flex flex-wrap gap-2">
             {isQrMode ? (
-              hasCheckedIn ? (
-                <span className="inline-flex items-center justify-center rounded-xl bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 border border-emerald-100">
+              hasCheckedOut ? (
+                <span className="inline-flex items-center justify-center rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500 border border-slate-200">
+                  Presensi selesai
+                </span>
+              ) : hasCheckedIn ? (
+                <span className="inline-flex items-center justify-center rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500 border border-slate-200">
                   Sudah check-in
                 </span>
               ) : (
@@ -434,7 +432,7 @@ export default function AsdosHome() {
               </Link>
             )}
             {isQrMode && sessionPresensi && isQrPresensi(sessionPresensi) && hasCheckedIn && !hasCheckedOut && (
-              <Link href="/asdos/check-out" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 active:scale-[0.98]">
+              <Link href="/asdos/check-out" className="inline-flex items-center justify-center rounded-xl bg-crimson px-4 py-2 text-xs font-bold text-white shadow-sm shadow-crimson/20 active:scale-[0.98]">
                 Check-out
               </Link>
             )}
@@ -534,7 +532,7 @@ export default function AsdosHome() {
             {sessionsToday.length === 0 ? (
               <div className="py-16 text-center">
                 <p className="text-sm font-semibold text-slate-400">Tidak ada jadwal hari ini</p>
-                <p className="text-xs font-medium text-slate-400 mt-1">Gunakan waktu ini untuk cek riwayat atau pengajuan KP.</p>
+                <p className="text-xs font-medium text-slate-400 mt-1">Gunakan waktu ini untuk cek riwayat mengajar anda.</p>
               </div>
             ) : (
               <>
@@ -556,7 +554,7 @@ export default function AsdosHome() {
                       Sudah Lewat
                     </p>
                     <div className="space-y-3">
-                      {pastSchedules.map((schedule) => renderScheduleCard(schedule, false))}
+                      {pastSchedules.map((schedule) => renderScheduleCard(schedule, true))}
                     </div>
                   </div>
                 )}
@@ -610,6 +608,7 @@ export default function AsdosHome() {
             {recentKpItems.length === 0 ? (
               <div className="py-6 text-center text-slate-400">
                 <p className="text-sm font-semibold">Belum ada pengajuan kelas pengganti</p>
+                <p className="text-[10px] font-medium mt-1">Status pengajuan akan muncul di sini.</p>
               </div>
             ) : (
               recentKpItems.map((item) => {
@@ -638,7 +637,7 @@ export default function AsdosHome() {
                         <span>{item.time_slot || item.session?.waktu || '-'}</span>
                       </p>
                       <p className="truncate">
-                        <span className="font-bold text-slate-500">Ruang: </span>
+                        <span className="font-bold text-slate-500">Ruangan: </span>
                         <span>{item.room || item.session?.ruangan || '-'}</span>
                       </p>
                     </div>

@@ -451,8 +451,8 @@ try {
                 <span className="text-sm md:text-base font-bold text-slate-800">{s.ruangan}</span>
               </div>
               <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipe</span>
-                <span className="text-sm md:text-base font-bold text-slate-800">{s.tipe_jadwal}</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asisten Dosen</span>
+                <span className="text-sm md:text-base font-bold text-slate-800">{s.pengajar || '-'}</span>
               </div>
             </div>
 
@@ -817,7 +817,7 @@ try {
                   </div>
                   <p className="text-base md:text-lg text-slate-800 font-bold">Tidak ada sesi mengajar.</p>
                   <p className="text-sm text-slate-400 mt-1 max-w-md mx-auto leading-relaxed">
-                    Sesi QR hari ini belum tersedia, sudah melewati jam mengajar, atau sudah tercatat check-in.
+                    Sesi QR hari ini belum tersedia, belum jam untuk mengajar, atau sudah tercatat check-in.
                   </p>
                 </div>
               ) : (

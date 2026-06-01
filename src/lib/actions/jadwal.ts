@@ -11,6 +11,8 @@ export interface SessionFromAPI {
   pengajar: string;
   waktu: string;
   tipe_jadwal: 'REGULAR' | 'PENGGANTI';
+  id_asdos1?: string | null;
+  id_asdos2?: string | null;
   tipe_absensi?: string;
   tipe_presensi?: string;
   mode_presensi?: string;

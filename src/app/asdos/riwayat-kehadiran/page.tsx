@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Filter, Clock, MapPin, BookOpen, Info, Table2, LayoutList, Check } from 'lucide-react';
 import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
+import { getSessionsByDate } from '@/lib/actions/jadwal';
 import { AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
@@ -11,7 +12,7 @@ type ViewType = 'CARD' | 'TABLE';
 
 type HistoryItem = {
   id: string; subject: string; date: string; rawDate: string;
-  checkIn: string; checkOut: string; room: string;
+  checkIn: string; checkOut: string; room: string; className: string; teachingTeam: string;
   status: 'BERJALAN' | 'SELESAI'; materi: string;
   isVerified: boolean; isPaid: boolean;
 };
@@ -47,8 +48,26 @@ function formatTime(value?: string) {
   return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 }
 
-function mapPresensiToHistory(item: PresensiResponseDTO): HistoryItem {
+function formatTeachingTeam(item: PresensiResponseDTO) {
+  return item.nama_asdos_rekan ? `${item.nama_asdos} & ${item.nama_asdos_rekan}` : item.nama_asdos;
+}
+
+function getHistoryDateKey(item: PresensiResponseDTO) {
+  return String(item.tanggal_mengajar || item.waktu_checkin || '').split('T')[0];
+}
+
+function getTeachingLookupKey(date: string, sessionId?: string) {
+  return sessionId ? `${date}-${sessionId}` : '';
+}
+
+function mapPresensiToHistory(item: PresensiResponseDTO, teachingTeamBySession: Record<string, string>): HistoryItem {
   const active = isActivePresensi(item);
+  const dateKey = getHistoryDateKey(item);
+  const teachingTeam =
+    teachingTeamBySession[getTeachingLookupKey(dateKey, item.id_sesi_pengganti)] ||
+    teachingTeamBySession[getTeachingLookupKey(dateKey, item.id_sesi)] ||
+    formatTeachingTeam(item);
+
   return {
     id: item.id_presensi,
     subject: item.nama_mata_kuliah,
@@ -57,6 +76,8 @@ function mapPresensiToHistory(item: PresensiResponseDTO): HistoryItem {
     checkIn: formatTime(item.waktu_checkin),
     checkOut: active ? '--:--' : formatTime(item.waktu_checkout),
     room: item.nama_ruangan,
+    className: item.nama_kelas || '-',
+    teachingTeam,
     status: active ? 'BERJALAN' : 'SELESAI',
     materi: item.deskripsi_materi || (active ? 'Sesi sedang berlangsung. Materi belum diisi.' : '-'),
     isVerified: item.is_verified,
@@ -81,6 +102,7 @@ export default function RiwayatKehadiranPage() {
     resetVisible,
   } = useRiwayatKehadiranStore();
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
+  const [teachingTeamBySession, setTeachingTeamBySession] = useState<Record<string, string>>({});
 
   useEffect(() => {
     async function fetchHistory() {
@@ -102,13 +124,42 @@ export default function RiwayatKehadiranPage() {
   }, [fetched, setError, setItems, setLoading]);
 
   useEffect(() => {
+    async function fetchTeachingTeams() {
+      const dates = Array.from(new Set(items.map(getHistoryDateKey).filter(Boolean)));
+      if (dates.length === 0) {
+        setTeachingTeamBySession({});
+        return;
+      }
+
+      const results = await Promise.all(dates.map(async date => {
+        const res = await getSessionsByDate(date);
+        return { date, sessions: res.success ? res.data ?? [] : [] };
+      }));
+
+      const lookup: Record<string, string> = {};
+      results.forEach(({ date, sessions }) => {
+        sessions.forEach(session => {
+          if (session.pengajar) {
+            lookup[getTeachingLookupKey(date, session.id_sesi)] = session.pengajar;
+          }
+        });
+      });
+      setTeachingTeamBySession(lookup);
+    }
+
+    fetchTeachingTeams();
+  }, [items]);
+
+  useEffect(() => {
     resetVisible();
   }, [searchTerm, filterStatus, resetVisible]);
 
-  const history = items.map(mapPresensiToHistory);
+  const history = items.map(item => mapPresensiToHistory(item, teachingTeamBySession));
   const filtered = history.filter(item =>
     (item.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.room.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      item.className.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.room.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.teachingTeam.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (filterStatus === 'ALL' || item.status === filterStatus)
   );
   const displayed = filtered.slice(0, visibleCount);
@@ -177,10 +228,10 @@ export default function RiwayatKehadiranPage() {
             /* Skeleton tabel */
             <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px]">
+                <table className="w-full min-w-[1020px]">
                   <thead>
                     <tr className="bg-slate-50/70 border-b border-slate-100">
-                      {['No', 'Mata Kuliah', 'Ruangan', 'Tanggal', 'Check-In', 'Check-Out', 'Bahasan Materi', 'Verifikasi', 'Dibayar'].map(col => (
+                      {['No', 'Mata Kuliah', 'Kelas', 'Asisten Dosen', 'Ruangan', 'Tanggal', 'Check-In', 'Check-Out', 'Bahasan Materi', 'Verifikasi', 'Dibayar'].map(col => (
                         <th key={col} className="px-4 py-3 text-left">
                           <div className="h-2.5 bg-slate-100 rounded animate-pulse w-16" />
                         </th>
@@ -192,6 +243,8 @@ export default function RiwayatKehadiranPage() {
                       <tr key={i} className="border-b border-slate-50">
                         <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-4" /></td>
                         <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-32" /></td>
+                        <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-16" /></td>
+                        <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-28" /></td>
                         <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-16" /></td>
                         <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-24" /></td>
                         <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-pulse w-12" /></td>
@@ -239,11 +292,13 @@ export default function RiwayatKehadiranPage() {
           filtered.length > 0 ? (
             <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px]">
+                <table className="w-full min-w-[1020px]">
                   <thead>
                     <tr className="bg-slate-50/70 border-b border-slate-100">
                       <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider w-8">No</th>
                       <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Mata Kuliah</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Kelas</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Asisten Dosen</th>
                       <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Ruangan</th>
                       <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Tanggal</th>
                       <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Check-In</th>
@@ -262,6 +317,12 @@ export default function RiwayatKehadiranPage() {
                         <td className="px-4 py-3 text-xs text-slate-400 font-medium">{index + 1}</td>
                         <td className="px-4 py-3">
                           <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">{item.subject}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-slate-600 whitespace-nowrap">{item.className}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-slate-600 whitespace-nowrap">{item.teachingTeam}</span>
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-xs text-slate-600 whitespace-nowrap">{item.room}</span>
@@ -303,7 +364,7 @@ export default function RiwayatKehadiranPage() {
                     {filtered.length < 15 && [...Array(15 - filtered.length)].map((_, i) => (
                       <tr key={`empty-${i}`} className="opacity-20">
                         <td className="px-4 py-3 text-xs text-slate-400">{filtered.length + i + 1}</td>
-                        <td colSpan={8} className="px-4 py-3">
+                        <td colSpan={10} className="px-4 py-3">
                           <div className="h-2 bg-slate-100 rounded-full w-24" />
                         </td>
                       </tr>
@@ -313,11 +374,11 @@ export default function RiwayatKehadiranPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-white border border-slate-100 rounded-xl p-8 text-center">
+            <div className="bg-white border border-slate-100 rounded-[12px] md:rounded-[32px] p-6 md:p-8 text-center">
               <div className="mx-auto mb-4 w-12 h-12 rounded-[14px] bg-fog flex items-center justify-center text-slate-500">
                 <Clock size={20} />
               </div>
-              <p className="text-base font-bold text-slate-700">Belum ada riwayat kehadiran.</p>
+              <p className="text-base md:text-lg text-slate-800 font-bold">Belum ada riwayat kehadiran.</p>
               <p className="text-sm text-slate-400 mt-1">Riwayat akan muncul setelah Anda melakukan check-in.</p>
             </div>
           )
@@ -331,7 +392,9 @@ export default function RiwayatKehadiranPage() {
 
                 <div className="flex flex-col gap-1 w-full md:w-1/3">
                   <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 leading-snug">{item.subject}</h2>
-                  <p className="text-sm text-slate-500 font-medium">Ruang: {item.room}</p>
+                  <p className="text-sm text-slate-500 font-medium">Kelas: {item.className}</p>
+                  <p className="text-sm text-slate-500 font-medium">Ruangan: {item.room}</p>
+                  <p className="text-sm text-slate-500 font-medium">Asisten Dosen: {item.teachingTeam}</p>
                 </div>
 
                 <div className="flex flex-row gap-6 md:gap-8 w-full md:w-auto">
@@ -440,11 +503,31 @@ export default function RiwayatKehadiranPage() {
 
             <div className="mb-4">
               <div className="flex items-center gap-1.5 mb-2 ml-1">
+                <Info className="w-3 h-3 md:w-4 md:h-4 text-slate-400" />
+                <h4 className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Kelas</h4>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                {selectedItem.className}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <div className="flex items-center gap-1.5 mb-2 ml-1">
                 <MapPin className="w-3 h-3 md:w-4 md:h-4 text-slate-400" />
                 <h4 className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Lokasi / Ruangan</h4>
               </div>
               <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
                 {selectedItem.room}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <div className="flex items-center gap-1.5 mb-2 ml-1">
+                <Info className="w-3 h-3 md:w-4 md:h-4 text-slate-400" />
+                <h4 className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Asisten Dosen</h4>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                {selectedItem.teachingTeam}
               </div>
             </div>
 
