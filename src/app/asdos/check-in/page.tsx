@@ -7,8 +7,7 @@ import { getMySubstitutions, deleteSubstitution } from '@/lib/actions/pergantian
 
 import { AsdosQrScanSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 import { decodeJwtPayload } from '@/lib/auth/jwt';
-import { getSessionPartnerAsdosId, getSubstituteSessionId, isQrSession } from '@/lib/presensi-mode';
-import { useUserStore } from '@/store/useUserStore';
+import { getSubstituteSessionId, isQrSession } from '@/lib/presensi-mode';
 
 const getCurrentMinutes = () => {
   const now = new Date();
@@ -51,7 +50,6 @@ const normalizeScannedQrToken = (rawToken: string): string => {
 };
 
 export default function CheckInPage() {
-  const user = useUserStore(state => state.user);
   const [step, setStep] = useState(1);
   const [sessions, setSessions] = useState<SessionFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -366,12 +364,10 @@ export default function CheckInPage() {
   const handleConfirmCheckIn = async () => {
     if (!selectedSessionId) return;
     const substituteSessionId = getSubstituteSessionId(selectedSession);
-    const partnerAsdosId = getSessionPartnerAsdosId(selectedSession, user?.id_asisten);
     setIsSubmitting(true);
     const res = await submitCheckIn({
       id_sesi: selectedSessionId,
       qr_token: qrToken,
-      id_asdos_rekan: partnerAsdosId,
       menggantikan: selectedSession?.tipe_jadwal === 'PENGGANTI' && !!substituteSessionId,
       id_sesi_pengganti: substituteSessionId,
     });

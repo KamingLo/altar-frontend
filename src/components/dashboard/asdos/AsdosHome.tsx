@@ -366,6 +366,7 @@ export default function AsdosHome() {
     const canCheckIn = currentMinutes >= startMinutes - 10;
     const presensiMode = getSessionPresensiMode(schedule);
     const isQrMode = presensiMode === 'qr';
+    const canFillOnlineAttendance = currentMinutes >= startMinutes - 15;
 
     const sessionPresensi = presensiItems.find(p => {
       const matchDate = String(p.tanggal_mengajar).split('T')[0] === today;
@@ -423,8 +424,12 @@ export default function AsdosHome() {
                 )
               )
             ) : hasSubmittedOnline ? (
-              <span className="inline-flex items-center justify-center rounded-xl bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 border border-emerald-100">
-                Presensi online sudah tercatat
+              <span className="inline-flex items-center justify-center rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500 border border-slate-200">
+                Presensi selesai
+              </span>
+            ) : !canFillOnlineAttendance ? (
+              <span className="inline-flex items-center justify-center rounded-xl bg-crimson/40 px-4 py-2 text-xs font-bold text-white cursor-not-allowed select-none">
+                Isi Presensi Online
               </span>
             ) : (
               <Link href="/asdos/presensi-kelas-online" className="inline-flex items-center justify-center rounded-xl bg-crimson px-4 py-2 text-xs font-bold text-white shadow-sm shadow-crimson/20 active:scale-[0.98]">

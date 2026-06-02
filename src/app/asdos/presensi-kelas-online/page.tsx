@@ -6,11 +6,15 @@ import { getMyPresensi, submitOnlineAttendance } from '@/lib/actions/presensi';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 
 import { AsdosOnlineSessionSkeleton, AsdosPageHeader, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
-import { getSessionPartnerAsdosId, getSubstituteSessionId, isOnlineSession } from '@/lib/presensi-mode';
-import { useUserStore } from '@/store/useUserStore';
+import { getSubstituteSessionId, isOnlineSession } from '@/lib/presensi-mode';
 
 function todayIso() {
-  return new Date().toISOString().split('T')[0];
+  const today = new Date();
+  return [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
 function getSessionTime(session?: SessionFromAPI) {
@@ -19,23 +23,29 @@ function getSessionTime(session?: SessionFromAPI) {
   return { start, end, label: raw || '-' };
 }
 
-function isSessionPast(session: SessionFromAPI): boolean {
+function canShowForOnlineAttendance(session: SessionFromAPI): boolean {
   const [datePart, timePart] = session.waktu.split(', ');
-  if (!datePart || !timePart) return false;
-  const endTime = timePart.split(' - ')[1]?.trim();
-  if (!endTime) return false;
-  const [endH, endM] = endTime.split(':').map(Number);
-  if (isNaN(endH) || isNaN(endM)) return false;
+  if (!datePart || datePart !== todayIso()) return false;
+  if (!timePart) return true;
+
+  const startTime = timePart.split(' - ')[0]?.trim();
+  if (!startTime) return true;
+
+  const [startH, startM] = startTime.split(':').map(Number);
+  if (isNaN(startH) || isNaN(startM)) return true;
+
   const [year, month, day] = datePart.split('-').map(Number);
   if (!year || !month || !day) return false;
-  const sessionEnd = new Date(year, month - 1, day, endH, endM, 0);
-  return sessionEnd < new Date();
+
+  const availableFrom = new Date(year, month - 1, day, startH, startM, 0);
+  availableFrom.setMinutes(availableFrom.getMinutes() - 15);
+
+  return new Date() >= availableFrom;
 }
 
 
 
 export default function PresensiKelasOnlinePage() {
-  const user = useUserStore(state => state.user);
   const [step, setStep] = useState(1);
   const [sessions, setSessions] = useState<SessionFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,19 +57,21 @@ export default function PresensiKelasOnlinePage() {
   const [materi, setMateri] = useState('');
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [completedSessionIds, setCompletedSessionIds] = useState<Set<string>>(new Set());
+  const [submittedSession, setSubmittedSession] = useState<SessionFromAPI | null>(null);
 
   const MAX_MATERI = 100;
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   const onlineSessions = useMemo(() => {
     return sessions
       .filter(isOnlineSession)
-      .filter(s => !isSessionPast(s))
+      .filter(canShowForOnlineAttendance)
       .filter(s => {
         const substituteSessionId = getSubstituteSessionId(s);
         return !completedSessionIds.has(s.id_sesi) && (!substituteSessionId || !completedSessionIds.has(substituteSessionId));
       });
   }, [sessions, completedSessionIds]);
   const selectedSession = onlineSessions.find(s => s.id_sesi === selectedSessionId);
+  const successSession = submittedSession ?? selectedSession;
 
   useEffect(() => {
     async function fetchSessions() {
@@ -82,7 +94,7 @@ export default function PresensiKelasOnlinePage() {
           const substituteSessionId = getSubstituteSessionId(s);
           return (
             isOnlineSession(s) &&
-            !isSessionPast(s) &&
+            canShowForOnlineAttendance(s) &&
             !completedIds.has(s.id_sesi) &&
             (!substituteSessionId || !completedIds.has(substituteSessionId))
           );
@@ -111,6 +123,7 @@ export default function PresensiKelasOnlinePage() {
     setWaktuSelesai(firstTime.end);
     setMateri('');
     setIsConfirmOpen(false);
+    setSubmittedSession(null);
   };
 
   const handleSelectSession = (session: SessionFromAPI) => {
@@ -132,19 +145,18 @@ export default function PresensiKelasOnlinePage() {
     }
 
     setIsSubmitting(true);
-    const partnerAsdosId = getSessionPartnerAsdosId(selectedSession, user?.id_asisten);
     const res = await submitOnlineAttendance({
       id_sesi: selectedSession.id_sesi,
       waktu_mulai: waktuMulai,
       waktu_selesai: waktuSelesai,
       deskripsi_materi: materi,
       link_video: link,
-      id_asdos_rekan: partnerAsdosId,
       menggantikan: selectedSession.tipe_jadwal === 'PENGGANTI' && !!substituteSessionId,
       id_sesi_pengganti: substituteSessionId,
     });
 
     if (res.success) {
+      setSubmittedSession(selectedSession);
       setCompletedSessionIds(prev => {
         const next = new Set(prev);
         next.add(selectedSession.id_sesi);
@@ -291,7 +303,7 @@ export default function PresensiKelasOnlinePage() {
               </div>
 
               <p className="text-[10px] md:text-xs text-crimson font-medium leading-relaxed">
-                * Mohon isi tautan dan materi dengan jelas sebagai bukti presensi kehadiran asisten dosen.
+                * Mohon isi bahasan materi dengan jelas. Jika mengajar bersama partner asisten dosen, pastikan bahasan materi yang diisi sama.
               </p>
 
               <div className="pt-2 border-t border-slate-100">
@@ -339,7 +351,7 @@ export default function PresensiKelasOnlinePage() {
         </>
       )}
 
-      {step === 3 && selectedSession && (
+      {step === 3 && successSession && (
         <>
           <div className="mb-6 md:mb-8 text-center md:text-left">
             <p className="text-[11px] font-bold text-crimson tracking-[0.15em] uppercase mb-1 md:text-xs">Presensi Kelas Online</p>
@@ -362,8 +374,8 @@ export default function PresensiKelasOnlinePage() {
                 <div className="p-6 md:p-7 text-center">
                   <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-1">Detail Presensi Online</p>
                   <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-6 leading-snug">
-                    {selectedSession.mata_kuliah}
-                    <span className="block text-sm font-medium text-slate-400 mt-0.5">Online · {selectedSession.nama_kelas}</span>
+                    {successSession.mata_kuliah}
+                    <span className="block text-sm font-medium text-slate-400 mt-0.5">Online · {successSession.nama_kelas}</span>
                   </h3>
                   <div className="border-t border-slate-100 pt-5 pb-5">
                     <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-1">Dikirim Pada</p>

@@ -146,32 +146,6 @@ export default function CheckOutPage() {
     return () => stopCamera();
   }, [step, stopCamera]);
 
-  const handleAutoCheckOut = useCallback(async (token: string) => {
-    if (!activePresensi || !materi.trim()) return;
-    setIsSubmitting(true);
-    setSubmitError('');
-    try {
-      const res = await submitCheckOut({
-        id_presensi: activePresensi.id_presensi,
-        deskripsi_materi: materi,
-        qr_token: token,
-      });
-      if (res.success) {
-        setStep(3);
-        return;
-      }
-      setQrToken(token);
-      setSubmitError(res.message || 'Check-out gagal dicatat. Silakan pindai ulang QR dan coba lagi.');
-      setStep(2);
-    } catch {
-      setQrToken(token);
-      setSubmitError('Check-out gagal dicatat. Silakan pindai ulang QR dan coba lagi.');
-      setStep(2);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [activePresensi, materi]);
-
   const startDecodeLoop = useCallback(async () => {
     const jsQR = (await import('jsqr')).default;
 
@@ -196,12 +170,8 @@ export default function CheckOutPage() {
 
       if (code) {
         stopCamera();
-        if (partnerMateri && materi.trim()) {
-          handleAutoCheckOut(code.data);
-        } else {
-          setQrToken(code.data);
-          setStep(2);
-        }
+        setQrToken(code.data);
+        setStep(2);
         return;
       }
 
@@ -209,7 +179,7 @@ export default function CheckOutPage() {
     };
 
     animFrameRef.current = requestAnimationFrame(tick);
-  }, [stopCamera, partnerMateri, materi, handleAutoCheckOut]);
+  }, [stopCamera]);
 
   const startCamera = useCallback(async (deviceId?: string) => {
     setCameraStatus('requesting');
@@ -286,12 +256,8 @@ export default function CheckOutPage() {
 
       if (code) {
         setCameraStatus('idle');
-        if (partnerMateri && materi.trim()) {
-          handleAutoCheckOut(code.data);
-        } else {
-          setQrToken(code.data);
-          setStep(2);
-        }
+        setQrToken(code.data);
+        setStep(2);
       } else {
         setCameraStatus('idle');
         setScanMessage('QR Code tidak ditemukan di gambar ini. Coba gambar lain.');
@@ -305,7 +271,7 @@ export default function CheckOutPage() {
     };
 
     e.target.value = '';
-  }, [partnerMateri, materi, handleAutoCheckOut]);
+  }, []);
 
   const handleConfirmCheckOut = async () => {
     if (!activePresensi) return;
