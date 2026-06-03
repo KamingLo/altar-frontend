@@ -54,7 +54,7 @@ function useParticleCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>)
       };
 
       function buildTextTargets() {
-        const text = 'UNTAR';
+        const text = 'ALTAR';
         const cssH = Math.max(130, Math.min(canvas!.clientHeight * 0.38, 300));
         const fontPx = Math.round(cssH * 0.92);
         const sample = document.createElement('canvas');

@@ -27,6 +27,7 @@ import type { SemesterItem } from '@/types/api';
 import { usePresensiStore } from '@/store/usePresensiStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
+import { parseUTC } from '@/lib/jadwal-utils';
 
 type TabId = 'ALL' | 'PENDING' | 'VERIFIED';
 type TipeFilter = 'ALL' | 'QR' | 'LINK';
@@ -83,11 +84,6 @@ const FILTER_TIPE_OPTIONS = [
   { value: 'LINK', label: 'Link Video (Malam)' }
 ];
 
-const FILTER_BAYAR_OPTIONS = [
-  { value: 'ALL', label: 'Semua Status' },
-  { value: 'UNPAID', label: 'Belum Dibayar' },
-  { value: 'PAID', label: 'Sudah Dibayar' }
-];
 
 export default function DataPresensiPage() {
   const { presensiList, isLoading, setPresensi, verifyPresensiLocal, updatePaymentLocal, setIsLoading } = usePresensiStore();
@@ -101,7 +97,7 @@ export default function DataPresensiPage() {
   const [bulkPending, setBulkPending] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [semesters, setSemesters] = useState<SemesterItem[]>([]);
-  const [bayarFilter, setBayarFilter] = useState<'ALL' | 'PAID' | 'UNPAID'>('ALL');
+  const [bayarFilter] = useState<'ALL' | 'PAID' | 'UNPAID'>('ALL');
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [payRowPending, setPayRowPending] = useState<Set<string>>(new Set());
 
@@ -123,7 +119,8 @@ export default function DataPresensiPage() {
         }
       }
     });
-  }, []); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!semesterFilter) return;
@@ -355,8 +352,7 @@ export default function DataPresensiPage() {
   const formatTime = (timeStr?: string) => {
     if (!timeStr || timeStr === 'null' || timeStr.startsWith('0001')) return '-';
     try {
-      const date = new Date(timeStr);
-      return date.toLocaleTimeString('id-ID', {
+      return parseUTC(timeStr).toLocaleTimeString('id-ID', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false

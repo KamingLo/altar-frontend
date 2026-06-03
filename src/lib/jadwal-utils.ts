@@ -1,4 +1,11 @@
-﻿export function toIsoDate(year: number, month: number, day: number): string {
+﻿export function parseUTC(value: string): Date {
+  if (!value.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(value)) {
+    return new Date(value + 'Z');
+  }
+  return new Date(value);
+}
+
+export function toIsoDate(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 

@@ -1,10 +1,14 @@
 "use client";
 import React from 'react';
 import Link from 'next/link';
+import { Info } from 'lucide-react';
+import { AboutModal } from '@/components/ui/AboutModal';
 
 const HeroDesktop = () => {
+  const [aboutOpen, setAboutOpen] = React.useState(false);
   return (
     <div className="min-h-screen w-full flex items-center bg-canvas font-['Plus_Jakarta_Sans',sans-serif]">
+      <AboutModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -48,9 +52,18 @@ const HeroDesktop = () => {
           >
             Masuk
           </Link>
-          <p className="text-left text-[13px] text-[#8A9BAD] font-medium mt-2">
-            © Altar - Universitas Tarumanagara
-          </p>
+          <div className="flex items-center gap-4 mt-2">
+            <p className="text-[13px] text-[#8A9BAD] font-medium">
+              © Altar - Universitas Tarumanagara
+            </p>
+            <button
+              onClick={() => setAboutOpen(true)}
+              className="flex items-center gap-1.5 text-[13px] text-[#8A9BAD] font-medium hover:text-crimson transition-colors"
+            >
+              <Info size={14} />
+              Tentang
+            </button>
+          </div>
         </div>
 
       </div>
@@ -61,6 +74,7 @@ const HeroDesktop = () => {
 
 const HeroMobile = () => {
   const [isIOS, setIsIOS] = React.useState(false);
+  const [aboutOpen, setAboutOpen] = React.useState(false);
   React.useEffect(() => {
     setIsIOS(/iPhone|iPod/.test(navigator.userAgent));
   }, []);
@@ -68,6 +82,7 @@ const HeroMobile = () => {
   return (
 
     <div className="min-h-[100svh] w-full flex bg-canvas font-['Plus_Jakarta_Sans',sans-serif]">
+      <AboutModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -119,9 +134,18 @@ const HeroMobile = () => {
             >
               Masuk
             </Link>
-            <p className="text-center w-full text-[clamp(12px,3vw,14px)] text-[#8A9BAD] font-medium">
-              © Altar - Universitas Tarumanagara
-            </p>
+            <div className="flex items-center justify-center gap-4 w-full">
+              <p className="text-[clamp(12px,3vw,14px)] text-[#8A9BAD] font-medium">
+                © Altar - Universitas Tarumanagara
+              </p>
+              <button
+                onClick={() => setAboutOpen(true)}
+                className="flex items-center gap-1.5 text-[clamp(12px,3vw,14px)] text-[#8A9BAD] font-medium hover:text-crimson transition-colors"
+              >
+                <Info size={13} />
+                Tentang
+              </button>
+            </div>
           </div>
 
         </div>

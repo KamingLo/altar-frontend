@@ -8,6 +8,7 @@ import { getAllSubstitutions } from '@/lib/actions/pergantian-kelas';
 import { getAllPresensi } from '@/lib/actions/presensi';
 import type { SubstituteSessionDetail } from '@/types/api';
 import type { PresensiResponseDTO } from '@/lib/actions/presensi';
+import { parseUTC } from '@/lib/jadwal-utils';
 
 export const koordinatorMenuItems = [
   { id: 1, title: 'Data Presensi', icon: FileText, href: '/koordinator/data-presensi', desc: 'Lihat & kelola data presensi' },
@@ -31,7 +32,7 @@ function getDisplayName(email?: string | null) {
 function formatTime(value?: string) {
   if (!value || value === 'null' || String(value).startsWith('0001')) return '--:--';
   try {
-    return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    return parseUTC(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   } catch {
     return '--:--';
   }

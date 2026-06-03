@@ -1,11 +1,11 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
-import { CalendarPlus, Info, Check, Trash2, XCircle, ArrowLeft, Calendar } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { CalendarPlus, Info, Check, Trash2, XCircle, ArrowLeft, Calendar, ChevronLeft, ChevronRight, Filter, Bell } from 'lucide-react';
 import { createSubstitution, deleteSubstitution, getMySubstitutions } from '@/lib/actions/pergantian-kelas';
 import { getRuanganList, getSemesterList } from '@/lib/actions/data-master';
 import { getMyScheduleTimeline, getScheduleTimeline, getSessionsByDate } from '@/lib/actions/jadwal';
 import { getMyPresensi } from '@/lib/actions/presensi';
-import type { RuanganItem } from '@/types/api';
+import type { RuanganItem, UnifiedJadwalResponse } from '@/types/api';
 import type { SessionFromAPI } from '@/lib/actions/jadwal';
 import { AsdosPageHeader, AsdosPageShell, AsdosPrimaryButton, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { usePengajuanKpStore } from '@/store/usePengajuanKpStore';
@@ -38,6 +38,52 @@ function formatDate(iso: string) {
   const [year, month, day] = datePart.split('-').map(Number);
   const d = year && month && day ? new Date(year, month - 1, day) : new Date(iso);
   return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+function formatDayDate(iso: string) {
+  if (!iso) return '-';
+  const datePart = iso.split('T')[0];
+  const [year, month, day] = datePart.split('-').map(Number);
+  const d = year && month && day ? new Date(year, month - 1, day) : new Date(iso);
+  return d.toLocaleDateString('id-ID', { weekday: 'short', day: '2-digit', month: 'short' });
+}
+
+function weekRangeForOffset(offset: number) {
+  const today = new Date();
+  const dow = today.getDay();
+  const daysToMon = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + daysToMon + (offset * 7));
+  const saturday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 5);
+  return { start: toIsoDateFromDate(monday), end: toIsoDateFromDate(saturday) };
+}
+
+function weekDaysForOffset(offset: number) {
+  const today = new Date();
+  const dow = today.getDay();
+  const daysToMon = dow === 0 ? -6 : 1 - dow;
+  return Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + daysToMon + (offset * 7) + i);
+    return toIsoDateFromDate(d);
+  });
+}
+
+function formatLongDayDate(iso: string) {
+  if (!iso) return '-';
+  const [year, month, day] = iso.split('-').map(Number);
+  const d = year && month && day ? new Date(year, month - 1, day) : new Date(iso);
+  return d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function formatWeekRange(startIso: string, endIso: string) {
+  const [sy, sm, sd] = startIso.split('-').map(Number);
+  const [ey, em, ed] = endIso.split('-').map(Number);
+  const start = new Date(sy, sm - 1, sd);
+  const end = new Date(ey, em - 1, ed);
+  const startMonth = start.toLocaleDateString('id-ID', { month: 'long' });
+  const endMonth = end.toLocaleDateString('id-ID', { month: 'long' });
+  if (sy === ey && sm === em) return `${sd} - ${ed} ${endMonth} ${ey}`;
+  if (sy === ey) return `${sd} ${startMonth} - ${ed} ${endMonth} ${ey}`;
+  return `${sd} ${startMonth} ${sy} - ${ed} ${endMonth} ${ey}`;
 }
 
 function todayIso() {
@@ -104,16 +150,19 @@ function DatePickerField({
   min,
   onChange,
   align = 'left',
+  disableSundays = false,
 }: {
   value: string;
   min?: string;
   onChange: (value: string) => void;
   align?: 'left' | 'right';
+  disableSundays?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => value ? parseLocalDate(value) : new Date());
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (value) setViewDate(parseLocalDate(value));
   }, [value]);
 
@@ -187,7 +236,7 @@ function DatePickerField({
               {days.map(day => {
                 const iso = toIsoDateFromDate(day);
                 const selected = iso === value;
-                const disabled = minDate ? day < minDate : false;
+                const disabled = (minDate ? day < minDate : false) || (disableSundays && day.getDay() === 0);
                 return (
                   <button
                     key={iso}
@@ -233,6 +282,8 @@ export default function PengajuanKpPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
+  const [isNotifPopupOpen, setIsNotifPopupOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [targetDeleteId, setTargetDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -248,12 +299,20 @@ export default function PengajuanKpPage() {
   const [clientToday, setClientToday] = useState('');
   const [ruanganList, setRuanganList] = useState<RuanganItem[]>([]);
   const [sessionList, setSessionList] = useState<SessionFromAPI[]>([]);
-  const [checkedInSessionIds, setCheckedInSessionIds] = useState<Set<string>>(new Set());
+  const [weekSchedule, setWeekSchedule] = useState<UnifiedJadwalResponse[]>([]);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [weekLoading, setWeekLoading] = useState(false);
+  const formBoxRef = useRef<HTMLDivElement>(null);
+  const [formBoxHeight, setFormBoxHeight] = useState<number | null>(null);
+  const notifBannerRef = useRef<HTMLDivElement>(null);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | KpStatus>('ALL');
+  const [checkedInKeys, setCheckedInKeys] = useState<Set<string>>(new Set());
   const [selectedSemesterId, setSelectedSemesterId] = useState('');
   const [occupiedSchedules, setOccupiedSchedules] = useState<Array<{ room: string; time: string; title: string }>>([]);
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState<string | null>(null);
   const [coveredByOtherIds, setCoveredByOtherIds] = useState<Set<string>>(new Set());
+  const [coveredByOtherList, setCoveredByOtherList] = useState<Array<{ id_sesi: string; mata_kuliah: string; nama_kelas: string; original_date: string; substitute_date: string }>>([]);
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -262,13 +321,25 @@ export default function PengajuanKpPage() {
       const res = await getMySubstitutions();
       if (res.success && res.data) {
         setPage(1, res.data.items, res.data.total);
-        const covered = new Set(
-          res.data.items
-            .filter(item => item.status !== 'REJECTED' && item.id_asdos1 !== user?.id_asisten)
-            .map(item => item.session?.id_sesi)
-            .filter((id): id is string => !!id),
+        const coveredItems = res.data.items.filter(
+          item => item.status !== 'REJECTED' && item.id_asdos1 !== user?.id_asisten && !!item.session?.id_sesi,
         );
-        setCoveredByOtherIds(covered);
+        setCoveredByOtherIds(new Set(coveredItems.map(item => item.session!.id_sesi)));
+        const seen = new Set<string>();
+        const uniqueList: Array<{ id_sesi: string; mata_kuliah: string; nama_kelas: string; original_date: string; substitute_date: string }> = [];
+        for (const item of coveredItems) {
+          const id = item.session!.id_sesi;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          uniqueList.push({
+            id_sesi: id,
+            mata_kuliah: item.session?.mata_kuliah ?? 'Mata kuliah tidak tersedia',
+            nama_kelas: item.session?.nama_kelas ?? '',
+            original_date: item.original_date,
+            substitute_date: item.substitute_date,
+          });
+        }
+        setCoveredByOtherList(uniqueList);
       } else {
         setHistoryError(res.message || 'Gagal memuat riwayat pengajuan.');
       }
@@ -303,48 +374,70 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
-    if (!originalDate || !selectedSemesterId) return;
+    if (!isFormOpen || !selectedSemesterId) return;
     let cancelled = false;
     setDropdownError(null);
+    setWeekLoading(true);
+    const { start, end } = weekRangeForOffset(weekOffset);
     Promise.all([
-      getSessionsByDate(originalDate),
+      getMyScheduleTimeline({ start_date: start, end_date: end, id_semester: selectedSemesterId }),
       getMyPresensi(),
-      getMyScheduleTimeline({
-        start_date: originalDate,
-        end_date: originalDate,
-        id_semester: selectedSemesterId,
-      }),
-    ]).then(([res, presensiRes, semesterTimelineRes]) => {
+    ]).then(([timelineRes, presensiRes]) => {
       if (cancelled) return;
-      if (!res.success) {
-        setDropdownError(res.message || 'Gagal memuat sesi pada tanggal ini.');
-        setSessionList([]);
-        setIdSession('');
+      if (!timelineRes.success) {
+        setDropdownError(timelineRes.message || 'Gagal memuat jadwal minggu ini.');
+        setWeekSchedule([]);
         return;
       }
-      if (!semesterTimelineRes.success) {
-        setDropdownError(semesterTimelineRes.message || 'Gagal memvalidasi sesi berdasarkan semester.');
-        setSessionList([]);
-        setIdSession('');
-        return;
-      }
-      const checkedIds = new Set<string>(
+      setWeekSchedule(timelineRes.data?.items ?? []);
+      const keys = new Set<string>(
         (presensiRes.success ? presensiRes.data ?? [] : [])
-          .filter(item => String(item.tanggal_mengajar ?? '').split('T')[0] === originalDate)
-          .flatMap(item => [item.id_sesi, item.id_sesi_pengganti].filter((value): value is string => !!value)),
+          .flatMap(item => {
+            const date = String(item.tanggal_mengajar ?? '').split('T')[0];
+            if (!date) return [];
+            return [item.id_sesi, item.id_sesi_pengganti]
+              .filter((value): value is string => !!value)
+              .map(id => `${date}|${id}`);
+          }),
       );
-      const semesterSessionIds = new Set((semesterTimelineRes.data?.items ?? []).map(item => item.id_sesi));
-      setCheckedInSessionIds(checkedIds);
-      setSessionList((res.data ?? []).filter(session => semesterSessionIds.has(session.id_sesi)));
-      setIdSession('');
+      setCheckedInKeys(keys);
     }).catch((e: unknown) => {
       if (cancelled) return;
-      setDropdownError(e instanceof Error ? e.message : 'Gagal memuat sesi pada tanggal ini.');
-      setSessionList([]);
-      setIdSession('');
-    });
+      setDropdownError(e instanceof Error ? e.message : 'Gagal memuat jadwal minggu ini.');
+      setWeekSchedule([]);
+    }).finally(() => { if (!cancelled) setWeekLoading(false); });
     return () => { cancelled = true; };
-  }, [originalDate, selectedSemesterId]);
+  }, [isFormOpen, selectedSemesterId, weekOffset]);
+
+  useEffect(() => {
+    if (!isFormOpen || isMobile) {
+      setFormBoxHeight(null);
+      return;
+    }
+    const el = formBoxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const size = entry.borderBoxSize?.[0]?.blockSize;
+        setFormBoxHeight(typeof size === 'number' ? size : entry.target.getBoundingClientRect().height);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isFormOpen, isMobile]);
+
+  useEffect(() => {
+    if (!idSession || !originalDate) {
+      setSessionList([]);
+      return;
+    }
+    let cancelled = false;
+    getSessionsByDate(originalDate).then((res) => {
+      if (cancelled || !res.success) return;
+      setSessionList(res.data ?? []);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [idSession, originalDate]);
 
   useEffect(() => {
     if (!substituteDate || !selectedSemesterId) {
@@ -383,6 +476,7 @@ useEffect(() => {
     setIsFormOpen(false);
     setOriginalDate(''); setSubstituteDate(''); setIdSession('');
     setIdRuangan(''); setSlotOption(1); setReason(''); setSubmitError(null);
+    setWeekOffset(0);
   };
 
   const handleOpenDelete = (id: string) => {
@@ -452,6 +546,22 @@ useEffect(() => {
     }
   };
 
+  const filteredHistory = useMemo(
+    () => statusFilter === 'ALL' ? history : history.filter(item => item.status === statusFilter),
+    [history, statusFilter],
+  );
+
+  const weekDays = useMemo(() => {
+    const days = weekDaysForOffset(weekOffset);
+    return days.map(iso => ({
+      iso,
+      sessions: weekSchedule
+        .filter(s => s.tanggal.split('T')[0] === iso)
+        .slice()
+        .sort((a, b) => a.waktu.localeCompare(b.waktu)),
+    }));
+  }, [weekSchedule, weekOffset]);
+
   const isFormValid =
     originalDate.trim() !== '' && substituteDate.trim() !== '' &&
     idSession.trim() !== '' && idRuangan.trim() !== '' && reason.trim() !== '';
@@ -502,9 +612,137 @@ useEffect(() => {
       : [],
   );
 
-  const selectedSessionCheckedIn = !!idSession && checkedInSessionIds.has(idSession);
+  const selectedSessionCheckedIn = !!idSession && !!originalDate && checkedInKeys.has(`${originalDate}|${idSession}`);
   const sessionAlreadyCovered = !!idSession && coveredByOtherIds.has(idSession);
   const canSubmit = isFormValid && !roomConflict && !selectedSessionCheckedIn && !sessionAlreadyCovered;
+
+  const renderCoveredBanner = (ref?: React.RefObject<HTMLDivElement | null>) => {
+    if (coveredByOtherList.length === 0 || historyLoading) return null;
+    return (
+      <div
+        ref={ref}
+        className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3.5 text-sm text-blue-700"
+      >
+        <Info className="w-[18px] h-[18px] mt-0.5 shrink-0 text-blue-500" strokeWidth={2.5} />
+        <div className="flex-1">
+          <p className="font-bold">Sudah ada pengajuan dari rekan Anda</p>
+          <p className="font-medium text-blue-600/80 mt-0.5">
+            Asisten dosen lain sudah mengajukan Kelas Pengganti untuk:
+          </p>
+          <ul className="mt-1.5 space-y-1.5 font-semibold text-blue-700">
+            {coveredByOtherList.map(item => (
+              <li key={item.id_sesi} className="flex gap-2 leading-relaxed">
+                <span className="text-blue-400">•</span>
+                <span>
+                  {item.mata_kuliah}
+                  {item.nama_kelas && <span className="font-medium text-blue-600/80"> ({item.nama_kelas})</span>}
+                  <span className="block font-medium text-blue-600/80 text-[13px]">
+                    {formatDate(item.original_date)} → {formatDate(item.substitute_date)}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="font-medium text-blue-600/80 mt-1.5">
+            Anda tidak perlu mengajukan lagi untuk sesi-sesi tersebut.
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSchedulePanel = (onPick?: () => void) => (
+    <>
+      <div className="flex items-center justify-between gap-2 mb-5">
+        <h3 className="text-[10px] font-bold text-slate-400/90 tracking-widest uppercase ml-1 truncate">
+          {weekOffset === 0
+            ? 'Jadwal Minggu Ini'
+            : formatWeekRange(weekRangeForOffset(weekOffset).start, weekRangeForOffset(weekOffset).end)}
+        </h3>
+        <div className="flex items-center gap-1 shrink-0">
+          {weekOffset > 0 && (
+            <button
+              type="button"
+              onClick={() => setWeekOffset(o => Math.max(0, o - 1))}
+              aria-label="Minggu sebelumnya"
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+            >
+              <ChevronLeft size={14} strokeWidth={2.5} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setWeekOffset(o => o + 1)}
+            aria-label="Minggu berikutnya"
+            className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+          >
+            <ChevronRight size={14} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
+      {weekLoading || dropdownLoading ? (
+        <div className="flex items-center justify-center py-10">
+          <div className="w-6 h-6 border-4 border-crimson/20 border-t-crimson rounded-full animate-spin" />
+        </div>
+      ) : weekDays.every(d => d.sessions.length === 0) ? (
+        <p className="text-sm text-slate-400 italic ml-1">
+          Tidak ada jadwal pada minggu ini.
+        </p>
+      ) : (
+        <div className="space-y-5">
+          {weekDays.map(day => (
+            <div key={day.iso}>
+              <p className="text-sm font-bold text-slate-800 mb-2.5 ml-1">
+                {formatLongDayDate(day.iso)}
+              </p>
+              {day.sessions.length === 0 ? (
+                <p className="text-xs text-slate-400 italic ml-1">Tidak ada jadwal</p>
+              ) : (
+                <div className="space-y-2">
+                  {day.sessions.map(s => {
+                    const isCheckedIn = checkedInKeys.has(`${day.iso}|${s.id_sesi}`);
+                    const isCovered = coveredByOtherIds.has(s.id_sesi);
+                    const isDisabled = isCheckedIn || isCovered;
+                    const isActive = idSession === s.id_sesi;
+                    const timeOnly = s.waktu.split(', ')[1] ?? s.waktu;
+                    return (
+                      <button
+                        key={s.id_sesi}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => {
+                          setIdSession(s.id_sesi);
+                          setOriginalDate(day.iso);
+                          onPick?.();
+                        }}
+                        className={`w-full text-left rounded-xl px-3.5 py-3 border transition-all ${
+                          isActive
+                            ? 'bg-crimson/5 border-crimson/40 ring-1 ring-crimson/30 shadow-sm'
+                            : isDisabled
+                              ? 'bg-slate-50 border-slate-100 opacity-60 cursor-not-allowed'
+                              : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold text-slate-500 tracking-wide">{timeOnly}</p>
+                        <p className="text-sm font-bold text-slate-800 leading-snug mt-0.5">
+                          {s.mata_kuliah}
+                        </p>
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                          {s.nama_kelas}
+                          {isCheckedIn && <span className="ml-1 text-amber-600 font-semibold">· Check-in</span>}
+                          {isCovered && !isCheckedIn && <span className="ml-1 text-blue-600 font-semibold">· Diajukan rekan</span>}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
 
   const renderFormContent = () => {
     if (isSuccess) {
@@ -530,71 +768,59 @@ useEffect(() => {
             <div className="w-7 h-7 border-4 border-crimson/20 border-t-crimson rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="space-y-6 pt-2">
+          <div className="flex flex-col gap-6 pt-2 flex-1">
             {dropdownError && (
               <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 font-semibold">
                 ⚠️ {dropdownError}
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
-                  Tanggal Kelas Asli (yang Dibatalkan)
-                </label>
-                <DatePickerField value={originalDate} onChange={setOriginalDate} />
-              </div>
-
-              <div>
-                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
-                  Tanggal Kelas Pengganti
-                </label>
-                <DatePickerField value={substituteDate} min={clientToday} onChange={setSubstituteDate} align="right" />
-              </div>
+            <div className="md:hidden">
+              <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                Sesi yang Diganti
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsSchedulePickerOpen(true)}
+                className="w-full bg-white border border-slate-200 rounded-[14px] px-5 py-[15px] text-sm text-left font-semibold flex items-center justify-between focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+              >
+                {(() => {
+                  const picked = weekSchedule.find(s => s.id_sesi === idSession);
+                  if (!picked) {
+                    return <span className="text-slate-400">-- Pilih Sesi --</span>;
+                  }
+                  const timeOnly = picked.waktu.split(', ')[1] ?? picked.waktu;
+                  return (
+                    <span className="flex flex-col text-slate-700 leading-tight">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                        {formatDayDate(picked.tanggal)} · {timeOnly}
+                      </span>
+                      <span className="text-sm font-bold text-slate-800 mt-0.5">{picked.mata_kuliah}</span>
+                      <span className="text-xs text-slate-500 font-medium mt-0.5">{picked.nama_kelas}</span>
+                    </span>
+                  );
+                })()}
+                <Calendar size={18} className="text-slate-400 shrink-0 ml-3" />
+              </button>
             </div>
 
-            {originalDate && (
-              <div className="animate-fade-in">
-                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
-                  Sesi yang Diganti
-                </label>
-                {sessionList.length === 0 ? (
-                  <div className="w-full bg-slate-50 border border-slate-200 rounded-[14px] px-5 py-4 text-sm text-slate-400 italic">
-                    Tidak ada jadwal pada tanggal ini.
-                  </div>
-                ) : (
-                  <CustomSelect
-                    value={idSession}
-                    onChange={(value) => {
-                      setIdSession(value);
-                    }}
-                    triggerClassName="!rounded-[14px] !py-[15px] !border-slate-200 hover:!border-slate-300 !bg-white !font-semibold"
-                    options={sessionList.map(s => ({
-                      value: s.id_sesi,
-                      label: s.mata_kuliah,
-                      description: checkedInSessionIds.has(s.id_sesi)
-                        ? `${s.nama_kelas} · sudah tercatat check-in`
-                        : `${s.nama_kelas} · ${s.waktu.split(', ')[1] ?? s.waktu}`,
-                      disabled: checkedInSessionIds.has(s.id_sesi),
-                    }))}
-                    placeholder="-- Pilih Sesi --"
-                  />
-                )}
-              </div>
-            )}
+            <div>
+              <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                Tanggal Kelas Pengganti
+              </label>
+              <DatePickerField value={substituteDate} min={clientToday} onChange={setSubstituteDate} disableSundays />
+            </div>
 
-            {idSession && (
-              <div className="animate-fade-in">
-                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
-                  Partner Asisten Dosen
-                </label>
-                <div className="w-full bg-slate-50 border border-slate-200 rounded-[14px] px-5 py-4">
-                  <p className="text-sm font-bold text-slate-800">
-                    {originalPartnerId ? originalPartnerName ?? 'Partner asli' : 'Tidak ada partner pada jadwal asli'}
-                  </p>
-                </div>
+            <div>
+              <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                Partner Asisten Dosen
+              </label>
+              <div className="w-full bg-slate-50 border border-slate-200 rounded-[14px] px-5 py-4">
+                <p className="text-sm font-bold text-slate-800">
+                  {idSession && originalPartnerId ? originalPartnerName ?? 'Partner asli' : '-'}
+                </p>
               </div>
-            )}
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -680,7 +906,7 @@ useEffect(() => {
               </div>
             )}
 
-            <div className="pt-6 border-t border-slate-100 bg-white">
+            <div className="mt-auto pt-6 border-t border-slate-100 bg-white">
               <button
                 onClick={handleSubmit}
                 disabled={!canSubmit || submitLoading}
@@ -705,17 +931,53 @@ useEffect(() => {
         description={(!isMobile && isFormOpen) ? "Isi formulir untuk mengajukan kelas pengganti." : "Daftar pengajuan Kelas Pengganti Anda."}
         action={
           (!isMobile && isFormOpen) ? (
-            <button
-              onClick={handleCloseSheet}
-              disabled={submitLoading || isSuccess}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-4 md:mt-0"
-            >
-              <ArrowLeft size={16} /> Kembali
-            </button>
+            <div className="flex items-center gap-2 mt-4 md:mt-0">
+              {coveredByOtherList.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => notifBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                  aria-label="Lihat notifikasi pengajuan rekan"
+                  className="relative w-11 h-11 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
+                >
+                  <Bell size={18} />
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-crimson text-white text-[10px] font-bold flex items-center justify-center">
+                    {coveredByOtherList.length}
+                  </span>
+                </button>
+              )}
+              <button
+                onClick={handleCloseSheet}
+                disabled={submitLoading || isSuccess}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ArrowLeft size={16} /> Kembali
+              </button>
+            </div>
           ) : (
-            <AsdosPrimaryButton onClick={handleOpenSheet} icon={<CalendarPlus size={18} />} className="hidden md:flex py-3 px-6 text-[15px] mt-4 md:mt-0">
-              Ajukan Kelas Pengganti
-            </AsdosPrimaryButton>
+            <div className="flex items-center gap-2 mt-4 md:mt-0">
+              <div className="relative hidden md:block">
+                <CustomSelect
+                  variant="icon"
+                  value={statusFilter}
+                  onChange={(v) => setStatusFilter(v as 'ALL' | KpStatus)}
+                  options={[
+                    { value: 'ALL', label: 'Semua status' },
+                    { value: 'PENDING', label: 'Menunggu' },
+                    { value: 'VERIFIED', label: 'Disetujui' },
+                    { value: 'REJECTED', label: 'Ditolak' },
+                  ]}
+                  icon={<Filter size={18} />}
+                  triggerClassName="!p-3 !rounded-xl"
+                  align="right"
+                />
+                {statusFilter !== 'ALL' && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-crimson pointer-events-none" />
+                )}
+              </div>
+              <AsdosPrimaryButton onClick={handleOpenSheet} icon={<CalendarPlus size={18} />} className="hidden md:flex py-3 px-6 text-[15px]">
+                Ajukan Kelas Pengganti
+              </AsdosPrimaryButton>
+            </div>
           )
         }
       />
@@ -731,17 +993,6 @@ useEffect(() => {
           <div className={`md:w-1/2 w-full shrink-0 transition-opacity duration-300 ${(!isMobile && isFormOpen) ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
 
             <div className="flex flex-col gap-6 w-full pb-28 md:pb-8">
-              {coveredByOtherIds.size > 0 && !historyLoading && (
-                <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3.5 text-sm text-blue-700">
-                  <Info className="w-[18px] h-[18px] mt-0.5 shrink-0 text-blue-500" strokeWidth={2.5} />
-                  <div>
-                    <p className="font-bold">Sudah ada pengajuan dari rekan Anda</p>
-                    <p className="font-medium text-blue-600/80 mt-0.5">
-                      Asisten dosen lain sudah mengajukan Kelas Pengganti untuk {coveredByOtherIds.size === 1 ? 'satu sesi' : `${coveredByOtherIds.size} sesi`}. Anda tidak perlu mengajukan lagi untuk sesi-sesi tersebut.
-                    </p>
-                  </div>
-                </div>
-              )}
               {historyLoading && (
                 <div className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 border border-slate-100 flex flex-col gap-6 w-full animate-pulse">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -776,17 +1027,23 @@ useEffect(() => {
 
               {historyError && !historyLoading && <AsdosState variant="error" message={historyError} />}
 
-              {!historyLoading && !historyError && history.length === 0 && (
+              {!historyLoading && !historyError && filteredHistory.length === 0 && (
                 <div className="bg-white border border-slate-100 rounded-[12px] md:rounded-[32px] p-6 md:p-8 text-center">
                   <div className="mx-auto mb-4 w-12 h-12 rounded-[14px] bg-fog flex items-center justify-center text-slate-500">
                     <CalendarPlus size={20} />
                   </div>
-                  <p className="text-base md:text-lg text-slate-800 font-bold">Belum ada pengajuan.</p>
-                  <p className="text-sm text-slate-400 mt-1">Anda dapat mengajukan kelas pengganti menggunakan tombol &quot;Ajukan Kelas Pengganti&quot;.</p>
+                  <p className="text-base md:text-lg text-slate-800 font-bold">
+                    {statusFilter === 'ALL' ? 'Belum ada pengajuan.' : 'Tidak ada pengajuan dengan filter ini.'}
+                  </p>
+                  <p className="text-sm text-slate-400 mt-1">
+                    {statusFilter === 'ALL'
+                      ? 'Anda dapat mengajukan kelas pengganti menggunakan tombol "Ajukan Kelas Pengganti".'
+                      : 'Coba ubah filter status untuk melihat pengajuan lain.'}
+                  </p>
                 </div>
               )}
 
-              {!historyLoading && !historyError && history.map(item => {
+              {!historyLoading && !historyError && filteredHistory.map(item => {
                 const cfg = statusConfig[item.status];
                 const isPending = item.status === 'PENDING';
                 const session = item.session;
@@ -875,9 +1132,9 @@ useEffect(() => {
                 );
               })}
 
-              {!historyLoading && !historyError && history.length > 0 && (
+              {!historyLoading && !historyError && filteredHistory.length > 0 && (
                 <p className="text-xs font-medium text-slate-400 text-center mt-2">
-                  Menampilkan {history.length} pengajuan kelas pengganti.
+                  Menampilkan {filteredHistory.length} {statusFilter === 'ALL' ? 'pengajuan kelas pengganti' : `pengajuan berstatus ${statusConfig[statusFilter].label.toLowerCase()}`}.
                 </p>
               )}
             </div>
@@ -885,8 +1142,26 @@ useEffect(() => {
 
           {!isMobile && (
             <div className={`md:w-1/2 w-full shrink-0 transition-opacity duration-300 ${isFormOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-              <div className="bg-white rounded-[32px] p-6 md:p-8 border border-slate-100 max-w-2xl mx-auto flex flex-col w-full pb-8">
-                {renderFormContent()}
+              <div className="max-w-5xl mx-auto w-full">
+                <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6">
+                  <aside
+                    className="hidden md:block bg-white rounded-[12px] p-6 border border-slate-100 overflow-y-auto"
+                    style={{ height: formBoxHeight ?? undefined, maxHeight: formBoxHeight ?? 'calc(100vh - 160px)' }}
+                  >
+                    {renderSchedulePanel()}
+                  </aside>
+                  <div
+                    ref={formBoxRef}
+                    className="bg-white rounded-[12px] p-6 md:p-8 border border-slate-100 flex flex-col w-full self-start max-h-[calc(100vh-160px)] overflow-y-auto"
+                  >
+                    {renderFormContent()}
+                  </div>
+                </div>
+                {coveredByOtherList.length > 0 && (
+                  <div className="mt-6">
+                    {renderCoveredBanner(notifBannerRef)}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -894,13 +1169,28 @@ useEffect(() => {
       </div>
 
       {!isFormOpen && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 p-5 bg-transparent z-10">
-          <div className="max-w-md mx-auto">
-            <button onClick={handleOpenSheet}
-              className="w-full flex items-center justify-center gap-2 bg-crimson text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]">
-              <CalendarPlus size={18} /><span>Ajukan Kelas Pengganti</span>
+        <div className="md:hidden fixed bottom-5 right-5 z-10 flex flex-col items-end gap-3">
+          {coveredByOtherList.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsNotifPopupOpen(true)}
+              aria-label="Lihat notifikasi"
+              className="relative w-14 h-14 rounded-full bg-white border border-slate-200 shadow-lg text-slate-700 flex items-center justify-center active:scale-95 transition-all"
+            >
+              <Bell size={20} />
+              <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] px-1 rounded-full bg-crimson text-white text-[10px] font-bold flex items-center justify-center">
+                {coveredByOtherList.length}
+              </span>
             </button>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={handleOpenSheet}
+            aria-label="Ajukan Kelas Pengganti"
+            className="w-14 h-14 rounded-full bg-crimson text-white shadow-lg shadow-crimson/30 flex items-center justify-center active:scale-95 transition-all"
+          >
+            <CalendarPlus size={22} />
+          </button>
         </div>
       )}
 
@@ -913,6 +1203,30 @@ useEffect(() => {
       >
         <div className="pt-2">
           {renderFormContent()}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={isSchedulePickerOpen}
+        onClose={() => setIsSchedulePickerOpen(false)}
+        title="Pilih Sesi yang Diganti"
+        subtitle="Pilih dari jadwal mingguan Anda."
+        maxWidthClassName="max-w-xl"
+      >
+        <div className="pt-2">
+          {renderSchedulePanel(() => setIsSchedulePickerOpen(false))}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={isNotifPopupOpen}
+        onClose={() => setIsNotifPopupOpen(false)}
+        title="Notifikasi"
+        subtitle="Pengajuan dari rekan Anda."
+        maxWidthClassName="max-w-md"
+      >
+        <div className="pt-2">
+          {renderCoveredBanner()}
         </div>
       </BottomSheet>
 

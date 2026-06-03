@@ -481,6 +481,36 @@ export default function ManajemenJadwalPage() {
     [lecturerList],
   );
 
+  const conflictInfo = useMemo(() => {
+    if (!isModalOpen || !form.tanggal || !form.opsi_jam) return { ruangan: null, pengajar: null };
+
+    const sameDateAndJam = sessions.filter(s => {
+      if (s.id_sesi === editingId) return false;
+      return sessionDateKey(s.tanggal) === form.tanggal && opsiJamFromWaktu(s.waktu) === form.opsi_jam;
+    });
+
+    if (sameDateAndJam.length === 0) return { ruangan: null, pengajar: null };
+
+    const selectedRuangan = form.id_ruangan ? ruanganList.find(r => r.id === form.id_ruangan) : null;
+    const ruanganConflict = selectedRuangan
+      ? (sameDateAndJam.find(s => s.ruangan.toLowerCase() === selectedRuangan.nama_ruangan.toLowerCase()) ?? null)
+      : null;
+
+    const selectedAsdos1 = form.id_asdos1 ? asdosList.find(a => a.id_asdos === form.id_asdos1) : null;
+    const selectedAsdos2 = form.id_asdos2 ? asdosList.find(a => a.id_asdos === form.id_asdos2) : null;
+    const selectedDosen = form.id_dosen ? lecturerList.find(l => l.id === form.id_dosen) : null;
+
+    const pengajarConflict = sameDateAndJam.find(s => {
+      const names = pengajarDisplayName(s.pengajar).toLowerCase().split(' & ').map(n => n.trim());
+      if (selectedAsdos1 && names.includes(selectedAsdos1.username.toLowerCase())) return true;
+      if (selectedAsdos2 && names.includes(selectedAsdos2.username.toLowerCase())) return true;
+      if (selectedDosen && names.some(n => n.includes(selectedDosen.nama.toLowerCase()))) return true;
+      return false;
+    }) ?? null;
+
+    return { ruangan: ruanganConflict, pengajar: pengajarConflict };
+  }, [isModalOpen, form, sessions, ruanganList, asdosList, lecturerList, editingId]);
+
   const handleStartDateChange = (value: string) => {
     if (!value) return;
     setStartDate(value);
@@ -1639,6 +1669,14 @@ export default function ManajemenJadwalPage() {
                           openMasterDelete('ruangan', item);
                         }}
                       />
+                      {conflictInfo.ruangan && (
+                        <div className="flex items-start gap-1.5 mt-1.5 px-1">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                          <p className="text-[11px] text-amber-600 font-semibold leading-snug">
+                            Ruangan sudah dipakai: {conflictInfo.ruangan.mata_kuliah} — {conflictInfo.ruangan.nama_kelas}
+                          </p>
+                        </div>
+                      )}
                     </FieldCRUD>
 
                     <Field label="Tanggal Sesi">
@@ -1671,6 +1709,14 @@ export default function ManajemenJadwalPage() {
                           onChange={v => setForm(f => ({ ...f, opsi_jam: Number(v) }))}
                           options={JAM_SELECT_OPTIONS}
                         />
+                        {(conflictInfo.ruangan || conflictInfo.pengajar) && (
+                          <div className="flex items-start gap-1.5 mt-1.5 px-1">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-amber-600 font-semibold leading-snug">
+                              Ada konflik jadwal di slot jam ini
+                            </p>
+                          </div>
+                        )}
                       </Field>
                     </div>
                     <Field label="Tipe Pengajar">
@@ -1719,6 +1765,14 @@ export default function ManajemenJadwalPage() {
                             openMasterDelete('lecturer', item);
                           }}
                         />
+                        {conflictInfo.pengajar && (
+                          <div className="flex items-start gap-1.5 mt-1.5 px-1">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-amber-600 font-semibold leading-snug">
+                              Dosen sudah mengajar: {conflictInfo.pengajar.mata_kuliah} — {conflictInfo.pengajar.nama_kelas}
+                            </p>
+                          </div>
+                        )}
                       </FieldCRUD>
                     ) : (
                       <>
@@ -1734,6 +1788,14 @@ export default function ManajemenJadwalPage() {
                             placeholder="Pilih Asisten Dosen 1"
                             icon={<Users className="w-4 h-4" />}
                           />
+                          {conflictInfo.pengajar && (
+                            <div className="flex items-start gap-1.5 mt-1.5 px-1">
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                              <p className="text-[11px] text-amber-600 font-semibold leading-snug">
+                                Asdos sudah mengajar: {conflictInfo.pengajar.mata_kuliah} — {conflictInfo.pengajar.nama_kelas}
+                              </p>
+                            </div>
+                          )}
                         </Field>
 
                         <Field label="Asisten Dosen 2">
@@ -1748,6 +1810,14 @@ export default function ManajemenJadwalPage() {
                             placeholder="Opsional"
                             icon={<Users className="w-4 h-4" />}
                           />
+                          {conflictInfo.pengajar && (
+                            <div className="flex items-start gap-1.5 mt-1.5 px-1">
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                              <p className="text-[11px] text-amber-600 font-semibold leading-snug">
+                                Asdos sudah mengajar: {conflictInfo.pengajar.mata_kuliah} — {conflictInfo.pengajar.nama_kelas}
+                              </p>
+                            </div>
+                          )}
                         </Field>
                       </>
                     )}

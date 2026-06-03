@@ -7,6 +7,7 @@ import { getSessionsByDate } from '@/lib/actions/jadwal';
 import Link from 'next/link';
 import { AsdosQrScanSkeleton, AsdosPageShell, AsdosPageHeader } from '@/components/dashboard/asdos/AsdosUI';
 import { isQrPresensi } from '@/lib/presensi-mode';
+import { parseUTC } from '@/lib/jadwal-utils';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 
 function formatTeachingTeam(item: PresensiResponseDTO) {
@@ -550,7 +551,7 @@ export default function CheckOutPage() {
                   <div className="flex flex-col gap-1 md:gap-0.5 border-l-2 border-slate-100 pl-4">
                     <span className="text-[10px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-in</span>
                     <span className="text-sm md:text-xs font-bold text-slate-800">
-                      {new Date(activePresensi.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
+                      {parseUTC(activePresensi.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
                     </span>
                   </div>
                   <div className="flex flex-col gap-1 md:gap-0.5 border-l-2 border-slate-100 pl-4">
@@ -701,7 +702,7 @@ export default function CheckOutPage() {
                     <div className="flex-1">
                       <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase mb-1">Check-in</p>
                       <p className="text-base md:text-lg font-extrabold text-slate-600">
-                        {new Date(activePresensi.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
+                        {parseUTC(activePresensi.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
                       </p>
                     </div>
                     <div className="w-px bg-slate-100" />

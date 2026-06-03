@@ -64,7 +64,7 @@ export default function ManajemenAsdosPage() {
   );
 
   const [togglePending, setTogglePending] = useState<Set<string>>(new Set());
-  const [showInactive, setShowInactive] = useState(false);
+  const [showInactive] = useState(false);
 
   const isFirstTabChange = useRef(true);
   const loadedTabsRef = useRef<Set<TabId>>(new Set());

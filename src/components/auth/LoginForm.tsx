@@ -2,9 +2,10 @@
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Info } from 'lucide-react';
 import { useAuthForm } from '@/hooks/auth/useLoginForm';
 import React, { useEffect } from 'react';
+import { AboutModal } from '@/components/ui/AboutModal';
 
 export default function LoginForm() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function LoginForm() {
   const [isExiting, setIsExiting] = React.useState(false);
   const [isEntering, setIsEntering] = React.useState(true);
   const [isIOS] = React.useState(() => /iPhone|iPod/.test(navigator.userAgent));
+  const [aboutOpen, setAboutOpen] = React.useState(false);
 
   const handleBackToHome = () => {
     setIsExiting(true);
@@ -192,6 +194,14 @@ export default function LoginForm() {
             <Image src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width={18} height={18} />
             Lanjutkan dengan Google
           </button>
+          <button
+            type="button"
+            onClick={() => setAboutOpen(true)}
+            className="w-full flex items-center justify-center gap-1.5 text-[13px] text-[#94A3B8] font-medium pt-2 hover:text-[#941C2F] transition-colors"
+          >
+            <Info size={14} />
+            Tentang aplikasi ini
+          </button>
         </div>
       </div>
 
@@ -271,6 +281,7 @@ export default function LoginForm() {
         }
       `}</style>
 
+      <AboutModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
       {renderToasts()}
 
       <div className={`hidden lg:flex min-h-screen w-full items-center font-['Plus_Jakarta_Sans',sans-serif] ${currentBg}`}>

@@ -7,7 +7,7 @@ import { AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashbo
 import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { BottomSheet } from '@/components/ui/BottomSheet';
-import { pengajarDisplayName, subjectDisplayName } from '@/lib/jadwal-utils';
+import { pengajarDisplayName, subjectDisplayName, parseUTC } from '@/lib/jadwal-utils';
 
 type ViewType = 'CARD' | 'TABLE';
 
@@ -51,7 +51,7 @@ function formatDateCompact(value: string) {
 
 function formatTime(value?: string) {
   if (!value || value === 'null' || String(value).startsWith('0001')) return '--:--';
-  return new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  return parseUTC(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatTeachingTeam(item: PresensiResponseDTO) {

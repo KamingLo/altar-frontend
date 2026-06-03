@@ -153,7 +153,9 @@ function DatePickerField({
   hideLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const [viewDate, setViewDate] = useState(() => parseLocalDate(value));
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
   const minDate = min ? parseLocalDate(min) : null;
   const maxDate = max ? parseLocalDate(max) : null;
   const monthStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
@@ -171,14 +173,23 @@ function DatePickerField({
     setOpen(false);
   };
 
+  const handleOpen = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setAlignRight(rect.left + 280 > window.innerWidth - 8);
+    }
+    setOpen(true);
+  };
+
   return (
     <div className="relative">
       <label className={`${hideLabel ? 'sr-only' : 'block'} text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1`}>
         {label}
       </label>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         className="w-full h-[52px] bg-white border border-slate-200 rounded-[14px] px-5 text-sm text-slate-700 focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300 transition-all font-semibold flex items-center justify-between"
       >
         <span>{formatInputDate(value)}</span>
@@ -193,7 +204,7 @@ function DatePickerField({
             aria-label="Tutup kalender"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 bg-white border border-slate-100 rounded-[20px] p-4 shadow-xl">
+          <div className={`absolute top-[calc(100%+8px)] z-40 w-[280px] bg-white border border-slate-100 rounded-[20px] p-4 shadow-xl ${alignRight ? 'right-0' : 'left-0'}`}>
             <div className="flex items-center justify-between mb-4">
               <button
                 type="button"
@@ -370,7 +381,8 @@ export default function JadwalAjarPage() {
 
     fetchSchedule();
     return () => { cancelled = true; };
-  }, [startDate, endDate, selectedSemesterId, viewMode, user?.email, user?.id_asisten]); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, selectedSemesterId, viewMode, user?.email, user?.id_asisten]);
 
   const handleTableDateChange = (value: string) => {
     setTableDate(value);
