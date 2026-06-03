@@ -157,6 +157,16 @@ export async function createUser(data: { username: string; email: string }) {
   return { success: res.success, message: res.message };
 }
 
+export async function updateUser(id: string, data: { username: string; email: string }) {
+  const res = await apiClient.patch(`/users/${id}`, data, { auth: true });
+  return { success: res.success, message: res.message };
+}
+
+export async function deleteUser(id: string) {
+  const res = await apiClient.delete(`/users/${id}`, { auth: true });
+  return { success: res.success, message: res.message };
+}
+
 export async function assignKoor(data: { user_id: string; nip: string }) {
   const res = await apiClient.post('/koor', data, { auth: true });
   return { success: res.success, message: res.message };

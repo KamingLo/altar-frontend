@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   getAsdosList, getKoorList, getUserList, getAsdosDetail,
   createUser, assignKoor, assignAsdos,
-  updateAsdos, updateKoor,
+  updateAsdos, updateKoor, updateUser, deleteUser,
   activateAsdos, deactivateAsdos, activateKoor, deactivateKoor,
 } from '@/lib/actions/manajemen';
 
@@ -15,6 +15,7 @@ import { AsdosPageShell, AsdosPageHeader, AsdosState, AsdosListSkeleton, AsdosPr
 
 type TabId = 'asdos' | 'koordinator' | 'user';
 type AddStep = 'role_search' | 'create_user' | 'role_data';
+type ModalType = 'add' | 'edit' | 'delete';
 type AddRole = 'asdos' | 'koordinator';
 type DisplayItem = { id: string; username: string; identifier: string; deactivated_at?: string | null };
 type ModalForm = {
@@ -26,6 +27,7 @@ type ModalForm = {
 };
 
 const EditIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>;
+const TrashIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
 const PhoneIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>;
 const UserIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
 
@@ -49,7 +51,7 @@ export default function ManajemenAsdosPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
-  const [modalType, setModalType] = useState<'add' | 'edit'>('add');
+  const [modalType, setModalType] = useState<ModalType>('add');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedUsername, setSelectedUsername] = useState('');
   const [formError, setFormError] = useState('');
@@ -182,6 +184,27 @@ export default function ManajemenAsdosPage() {
     } finally {
       setTogglePending(prev => { const s = new Set(prev); s.delete(item.id); return s; });
     }
+  };
+
+  const handleOpenDeleteConfirm = (item: DisplayItem) => {
+    setModalType('delete');
+    setSelectedId(item.id);
+    setSelectedUsername(item.username);
+    setFormError('');
+    setIsClosing(false);
+    setSheetDragY(0);
+    setIsModalOpen(true);
+    setTimeout(() => setIsModalVisible(true), 10);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedId) return;
+    setIsSubmitting(true);
+    const res = await deleteUser(selectedId);
+    setIsSubmitting(false);
+    if (!res.success) { setFormError(res.message || 'Gagal menghapus user.'); return; }
+    handleCloseModal();
+    loadTabData('user', searchQuery, 1, false, false);
   };
 
   const handleOpenModal = async (type: 'add' | 'edit' = 'add', item?: DisplayItem) => {
@@ -317,7 +340,19 @@ export default function ManajemenAsdosPage() {
     if (modalType === 'add') return;
     if (!selectedId) return;
     setFormError('');
-    const { nim, nip, phone_number } = modalForm;
+    const { username, nim, nip, phone_number } = modalForm;
+
+    if (activeTab === 'user') {
+      if (!username.trim()) { setFormError('Nama wajib diisi.'); return; }
+      if (!modalForm.email.trim()) { setFormError('Email wajib diisi.'); return; }
+      setIsSubmitting(true);
+      const res = await updateUser(selectedId, { username: username.trim(), email: modalForm.email.trim() });
+      setIsSubmitting(false);
+      if (!res.success) { setFormError(res.message || 'Gagal memperbarui data.'); return; }
+      handleCloseModal();
+      loadTabData('user', searchQuery, 1, false, false);
+      return;
+    }
 
     if (activeTab === 'asdos' && !nim.trim()) { setFormError('NIM wajib diisi.'); return; }
     if (activeTab === 'koordinator' && !nip.trim()) { setFormError('NIP wajib diisi.'); return; }
@@ -429,7 +464,7 @@ export default function ManajemenAsdosPage() {
                 </div>
               </div>
 
-              {activeTab !== 'user' && (
+              {activeTab !== 'user' ? (
                 <div className="flex items-center gap-0.5 shrink-0 text-slate-300 md:text-slate-400">
                   <button
                     onClick={() => handleToggleActive(item)}
@@ -461,6 +496,25 @@ export default function ManajemenAsdosPage() {
                     aria-label="Edit data"
                   >
                     <EditIcon />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-0.5 shrink-0 text-slate-300 md:text-slate-400">
+                  <button
+                    onClick={() => handleOpenModal('edit', item)}
+                    className="p-2.5 hover:text-emerald-600 rounded-xl transition-colors"
+                    aria-label="Edit nama"
+                    title="Edit nama"
+                  >
+                    <EditIcon />
+                  </button>
+                  <button
+                    onClick={() => handleOpenDeleteConfirm(item)}
+                    className="p-2.5 hover:text-crimson rounded-xl transition-colors"
+                    aria-label="Hapus user"
+                    title="Hapus user"
+                  >
+                    <TrashIcon />
                   </button>
                 </div>
               )}
@@ -517,22 +571,106 @@ export default function ManajemenAsdosPage() {
             className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out ${isModalVisible && !isClosing ? 'opacity-100' : 'opacity-0'}`}
             onClick={handleCloseModal}
           />
-          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none">
-            <div
-              className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto${isMd ? ` transition-all duration-300 ${isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}` : ''}`}
-              style={!isMd ? {
-                transform: (!isModalVisible || isClosing) ? 'translateY(100%)' : `translateY(${sheetDragY}px)`,
-                transition: (!isModalVisible || isClosing || sheetDragY === 0) ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
-              } : undefined}
-            >
-              <div
-                className="w-full flex md:hidden items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none"
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
-                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+
+          {modalType === 'delete' ? (
+            <>
+              {/* Desktop: centered modal seperti popup keluar */}
+              <div className="hidden lg:flex fixed inset-0 z-50 items-center justify-center">
+                <div className={`bg-white rounded-[1.5rem] shadow-2xl w-full max-w-sm mx-4 overflow-hidden transition-all duration-300 ${isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                  <div className="p-7 pb-5">
+                    <h2 className="text-[20px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">Hapus User?</h2>
+                    <p className="text-sm text-slate-500 text-center leading-relaxed mb-3">
+                      Akun <span className="font-bold text-slate-700">{selectedUsername}</span> akan dihapus secara permanen dan tidak dapat dikembalikan.
+                    </p>
+                    <p className="text-xs text-crimson bg-rose-50 border border-rose-200 rounded-xl px-3 py-2.5 text-center leading-relaxed">
+                      Penghapusan dapat merusak data yang sudah ada. Pastikan ini akun baru yang datanya masih sedikit.
+                    </p>
+                    {formError && <p className="text-xs font-medium text-red-600 text-center mt-3">{formError}</p>}
+                  </div>
+                  <div className="px-6 pb-6 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleCloseModal}
+                      className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 active:scale-[0.98] transition-all"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteUser}
+                      disabled={isSubmitting}
+                      className="flex-1 py-3 rounded-xl bg-crimson text-white font-bold text-sm shadow-md shadow-crimson/20 hover:bg-[#7a1727] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isSubmitting ? 'Menghapus...' : 'Ya, Hapus'}
+                    </button>
+                  </div>
+                </div>
               </div>
+
+              {/* Mobile: bottom sheet */}
+              <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
+                <div
+                  className="w-full max-w-md bg-white rounded-t-[28px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden pointer-events-auto"
+                  style={{
+                    transform: (!isModalVisible || isClosing) ? 'translateY(100%)' : `translateY(${sheetDragY}px)`,
+                    transition: (!isModalVisible || isClosing || sheetDragY === 0) ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
+                  }}
+                >
+                  <div
+                    className="w-full flex items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  >
+                    <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+                  </div>
+                  <div className="px-6 pt-4 pb-8">
+                    <h2 className="text-[22px] font-extrabold text-[#1F2937] text-center leading-7 mb-2">Hapus User?</h2>
+                    <p className="text-sm text-slate-500 text-center leading-relaxed mb-3">
+                      Akun <span className="font-bold text-slate-700">{selectedUsername}</span> akan dihapus secara permanen dan tidak dapat dikembalikan.
+                    </p>
+                    <p className="text-xs text-crimson bg-rose-50 border border-rose-200 rounded-xl px-3 py-2.5 text-center leading-relaxed mb-6">
+                      Penghapusan dapat merusak data yang sudah ada. Pastikan ini akun baru yang datanya masih sedikit.
+                    </p>
+                    {formError && <p className="text-xs font-medium text-red-600 text-center mb-4">{formError}</p>}
+                    <div className="flex flex-col gap-3">
+                      <button
+                        type="button"
+                        onClick={handleDeleteUser}
+                        disabled={isSubmitting}
+                        className="w-full py-4 rounded-xl bg-crimson text-white font-bold text-[15px] active:scale-[0.98] transition-all shadow-md shadow-crimson/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {isSubmitting ? 'Menghapus...' : 'Ya, Hapus'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCloseModal}
+                        className="w-full py-4 rounded-xl bg-slate-100 text-slate-600 font-bold text-[15px] active:scale-[0.98] transition-all"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none">
+              <div
+                className={`w-full max-w-md bg-white rounded-t-[28px] md:rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh] overflow-hidden pointer-events-auto${isMd ? ` transition-all duration-300 ${isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}` : ''}`}
+                style={!isMd ? {
+                  transform: (!isModalVisible || isClosing) ? 'translateY(100%)' : `translateY(${sheetDragY}px)`,
+                  transition: (!isModalVisible || isClosing || sheetDragY === 0) ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
+                } : undefined}
+              >
+                <div
+                  className="w-full flex md:hidden items-center justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none"
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+                </div>
 
               {modalType === 'edit' ? (
                 <>
@@ -542,6 +680,32 @@ export default function ManajemenAsdosPage() {
                       <p className="text-sm text-slate-500 mt-1 font-medium">Perbarui data {selectedUsername}.</p>
                     </div>
                     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+                      {activeTab === 'user' && (
+                        <>
+                          <div>
+                            <label className="block text-[13px] font-bold text-[#1F2937] mb-1.5 ml-1">Nama Lengkap</label>
+                            <input
+                              type="text"
+                              value={modalForm.username}
+                              onChange={(e) => setModalForm(prev => ({ ...prev, username: e.target.value }))}
+                              className="w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
+                              placeholder="Masukkan nama lengkap"
+                              autoComplete="off"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[13px] font-bold text-[#1F2937] mb-1.5 ml-1">Email</label>
+                            <input
+                              type="email"
+                              value={modalForm.email}
+                              onChange={(e) => setModalForm(prev => ({ ...prev, email: e.target.value }))}
+                              className="w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
+                              placeholder="contoh@email.com"
+                              autoComplete="off"
+                            />
+                          </div>
+                        </>
+                      )}
                       {activeTab === 'asdos' && (
                         <>
                           <div>
@@ -854,8 +1018,9 @@ export default function ManajemenAsdosPage() {
                   </div>
                 </>
               )}
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
 
