@@ -1,0 +1,22 @@
+services:
+  altar-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BACKEND_URL: ${BACKEND_URL:-https://api.altar.web.id}
+    image: altar-frontend:latest
+    container_name: altar-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - BACKEND_URL=${BACKEND_URL:-https://api.altar.web.id}
+    # Uncomment baris di bawah kalau ada service backend di docker compose yang sama
+    # networks:
+    #   - altar-network
+
+# networks:
+#   altar-network:
+#     driver: bridge
