@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Info } from 'lucide-react';
 import { useAuthForm } from '@/hooks/auth/useLoginForm';
 import React, { useEffect } from 'react';
@@ -9,6 +9,8 @@ import { AboutModal } from '@/components/ui/AboutModal';
 
 export default function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlMessage = searchParams.get('message');
   const {
     view,
     formData,
@@ -20,7 +22,7 @@ export default function LoginForm() {
     handleManualLogin,
     handleGoogleLogin,
     handleForgotPassword
-  } = useAuthForm();
+  } = useAuthForm(urlMessage);
 
   const showErrorToast = !!errorMessage;
   const showSuccessToast = !!successMessage;

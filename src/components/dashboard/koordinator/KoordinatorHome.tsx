@@ -158,11 +158,11 @@ export default function KoordinatorHome() {
         </p>
       </div>
 
-      <div className="grid grid-cols-5 lg:hidden gap-y-6 gap-x-2 mb-8 w-full animate-fade-up" style={{ animationDelay: '0.05s' }}>
+      <div className="flex flex-wrap justify-between lg:hidden gap-y-6 mb-8 w-full animate-fade-up" style={{ animationDelay: '0.05s' }}>
         {koordinatorMenuItems.map((item) => {
           const Icon = item.icon;
           return (
-            <Link key={item.id} href={item.href} className="flex flex-col items-center group">
+            <Link key={item.id} href={item.href} className="flex flex-col items-center group w-16">
               <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] text-crimson group-hover:scale-105 group-active:scale-95 transition-all mb-3">
                 <Icon size={24} strokeWidth={2} />
               </div>

@@ -391,10 +391,10 @@ export default function AsdosHome() {
             </span>
           )}
         </div>
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
+        <div className="mt-4 flex flex-col gap-1.5 text-xs text-slate-700">
           <p>
             <span className="font-bold text-slate-500">Waktu: </span>
-            <span className="font-semibold">{schedule.waktu}</span>
+            <span className="font-semibold">{schedule.waktu.split(', ').pop() ?? schedule.waktu}</span>
           </p>
           <p className="truncate">
             <span className="font-bold text-slate-500">Ruangan: </span>
@@ -543,7 +543,7 @@ export default function AsdosHome() {
               <>
                 <div>
                   {currentSchedules.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                       {currentSchedules.map((schedule) => renderScheduleCard(schedule, true))}
                     </div>
                   ) : (
@@ -558,7 +558,7 @@ export default function AsdosHome() {
                     <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-3 px-1">
                       Sudah Lewat
                     </p>
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                       {pastSchedules.map((schedule) => renderScheduleCard(schedule, true))}
                     </div>
                   </div>

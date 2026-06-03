@@ -489,10 +489,12 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       }
 
       
+      type DeviceOrientationEventiOS = typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> };
+      const DOEiOS = DeviceOrientationEvent as DeviceOrientationEventiOS;
+
       if (
         typeof window !== 'undefined' &&
-        
-        !(typeof DeviceOrientationEvent !== 'undefined' && typeof (DeviceOrientationEvent as any).requestPermission === 'function')
+        typeof DOEiOS.requestPermission !== 'function'
       ) {
         window.addEventListener('deviceorientation', onDeviceOrientation);
       }
@@ -504,14 +506,8 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         lastY = e.clientY;
         try { canvas!.setPointerCapture(e.pointerId); } catch {}
 
-        
-        if (
-          typeof DeviceOrientationEvent !== 'undefined' &&
-          
-          typeof (DeviceOrientationEvent as any).requestPermission === 'function'
-        ) {
-          
-          (DeviceOrientationEvent as any).requestPermission()
+        if (typeof DOEiOS.requestPermission === 'function') {
+          DOEiOS.requestPermission()
             .then((state: string) => {
               if (state === 'granted') {
                 window.addEventListener('deviceorientation', onDeviceOrientation);
@@ -607,12 +603,12 @@ function NotFoundGuest() {
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
 
-      <canvas ref={cubeCanvasRef} className="absolute inset-0 w-full h-full lg:hidden touch-none" style={{ zIndex: 1 }} />
+      <canvas ref={cubeCanvasRef} className="absolute top-0 left-0 right-0 h-[52%] lg:hidden touch-none" style={{ zIndex: 1 }} />
       <canvas ref={canvasRef} className="absolute inset-0 hidden w-full h-full lg:block" style={{ zIndex: 1 }} />
       <div className="absolute inset-0 pointer-events-none" style={gridStyle} />
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6" style={{ zIndex: 3 }}>
-        <div className="h-[clamp(180px,34vh,320px)] lg:h-[clamp(240px,52vh,420px)] w-full" />
+        <div className="h-[52%] lg:h-[clamp(240px,52vh,420px)] w-full" />
 
         <h1 className="text-[clamp(22px,3vw,40px)] font-extrabold text-slate-800 text-center leading-tight max-w-[18ch] mt-4">
           Halaman ini <span className="text-crimson">tidak tersedia</span>
@@ -863,14 +859,14 @@ function NotFoundAuth() {
         <main className="relative flex-1 h-screen flex flex-col overflow-hidden">
 
 
-          <canvas ref={cubeCanvasRef} className="absolute inset-0 w-full h-full lg:hidden touch-none" style={{ zIndex: 1 }} />
+          <canvas ref={cubeCanvasRef} className="absolute top-0 left-0 right-0 h-[52%] lg:hidden touch-none" style={{ zIndex: 1 }} />
           <canvas ref={canvasRef} className="absolute inset-0 hidden w-full h-full lg:block" style={{ zIndex: 1 }} />
 
           <div className="absolute inset-0 pointer-events-none" style={gridStyle} />
 
 
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6" style={{ zIndex: 3 }}>
-            <div className="h-[clamp(180px,34vh,320px)] lg:h-[clamp(240px,52vh,420px)] w-full" />
+            <div className="h-[52%] lg:h-[clamp(240px,52vh,420px)] w-full" />
 
             <h1 className={`text-[clamp(22px,3vw,40px)] font-extrabold text-center leading-tight max-w-[18ch] mt-4 ${headingCls}`}>
               Halaman ini <span className="text-crimson">tidak tersedia</span>

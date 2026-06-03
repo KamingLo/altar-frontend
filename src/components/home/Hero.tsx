@@ -134,18 +134,16 @@ const HeroMobile = () => {
             >
               Masuk
             </Link>
-            <div className="flex items-center justify-center gap-4 w-full">
-              <p className="text-[clamp(12px,3vw,14px)] text-[#8A9BAD] font-medium">
-                © Altar - Universitas Tarumanagara
-              </p>
-              <button
-                onClick={() => setAboutOpen(true)}
-                className="flex items-center gap-1.5 text-[clamp(12px,3vw,14px)] text-[#8A9BAD] font-medium hover:text-crimson transition-colors"
-              >
-                <Info size={13} />
-                Tentang
-              </button>
-            </div>
+            <p className="text-[clamp(12px,3vw,14px)] text-[#8A9BAD] font-medium">
+              © Altar - Universitas Tarumanagara
+            </p>
+            <button
+              onClick={() => setAboutOpen(true)}
+              className="flex items-center gap-1.5 text-[clamp(12px,3vw,14px)] text-[#8A9BAD] font-medium hover:text-crimson transition-colors mt-1"
+            >
+              <Info size={13} />
+              Tentang
+            </button>
           </div>
 
         </div>

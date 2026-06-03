@@ -54,8 +54,7 @@ export function getSessionPresensiMode(session: SessionFromAPI): PresensiMode {
   const startMinutes = getSessionStartMinutes(session);
   if (startMinutes === null) return 'unknown';
 
-  // DEMO: semua sesi tanpa mode eksplisit dianggap online — revert ke `startMinutes > 17 * 60 + 10 ? 'link' : 'qr'` sebelum production
-  return 'link';
+  return startMinutes > 17 * 60 + 10 ? 'link' : 'qr';
 }
 
 export function isQrSession(session: SessionFromAPI): boolean {

@@ -8,11 +8,11 @@ import { forgotPassword } from '@/lib/actions/auth/forgot-password';
 import { getSession } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
 
-export const useAuthForm = () => {
+export const useAuthForm = (initialError?: string | null) => {
   const [view, setView] = useState<'login' | 'forgot'>('login');
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(initialError ?? null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const router = useRouter();

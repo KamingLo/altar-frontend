@@ -63,7 +63,6 @@ export default function PresensiKelasOnlinePage() {
   const onlineSessions = useMemo(() => {
     return sessions
       .filter(isOnlineSession)
-      .filter(canShowForOnlineAttendance)
       .filter(s => {
         const substituteSessionId = getSubstituteSessionId(s);
         return !completedSessionIds.has(s.id_sesi) && (!substituteSessionId || !completedSessionIds.has(substituteSessionId));
@@ -215,6 +214,7 @@ export default function PresensiKelasOnlinePage() {
                         <div className="flex flex-col gap-1 min-w-0">
                           <h3 className="text-xl md:text-2xl font-bold text-slate-900 leading-snug mb-1">{s.mata_kuliah}</h3>
                           <p className="text-sm text-slate-500 font-medium">{s.nama_kelas}</p>
+                          {/* NON-DEMO: {!isAvailable && <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Aktif pada {time.start}</p>} */}
                           {s.tipe_jadwal === 'PENGGANTI' && (
                             <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">Pengganti</span>
                           )}
@@ -223,7 +223,7 @@ export default function PresensiKelasOnlinePage() {
                           <Check size={14} strokeWidth={3} className={isSel ? 'text-white' : 'text-slate-300'} />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full md:w-[480px]">
+                      <div className="grid grid-cols-3 gap-x-6 gap-y-4 w-full md:w-[480px]">
                         <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
                           <span className="text-sm md:text-base font-bold text-slate-800">{time.label}</span>
