@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────
 # Stage 1: Install dependencies
 # ─────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN npm ci --frozen-lockfile
 # ─────────────────────────────────────────────
 # Stage 2: Build the Next.js app
 # ─────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -27,7 +27,7 @@ RUN npm run build
 # ─────────────────────────────────────────────
 # Stage 3: Production runner (image minimal)
 # ─────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 
 WORKDIR /app
 
