@@ -14,7 +14,7 @@ import {
   Filter,
   Banknote,
 } from 'lucide-react';
-import { toast } from 'sonner';
+
 import {
   getAllPresensi,
   verifyPresensi,
@@ -148,13 +148,11 @@ export default function DataPresensiPage() {
       } else {
         if (!silent) {
           setPresensi([]);
-          toast.error(res.message || 'Gagal memuat data presensi.');
         }
       }
     } catch {
       if (!silent) {
         setPresensi([]);
-        toast.error('Terjadi kesalahan saat menghubungkan ke server.');
       }
     } finally {
       if (!silent) {
@@ -201,14 +199,10 @@ export default function DataPresensiPage() {
     updatePaymentLocal(ids, isPaid);
     try {
       const res = await updatePaymentStatus(ids, isPaid);
-      if (res.success) {
-        toast.success(isPaid ? `${ids.length} presensi ditandai lunas.` : `${ids.length} presensi ditandai belum lunas.`);
-      } else {
-        toast.error(res.message || 'Gagal memperbarui status pembayaran.');
+      if (!res.success) {
         fetchPresensi(true);
       }
     } catch {
-      toast.error('Gagal memproses pembaruan pembayaran.');
       fetchPresensi(true);
     } finally {
       setBulkPending(false);
@@ -224,18 +218,10 @@ export default function DataPresensiPage() {
       verifyPresensiLocal(id, action);
       try {
         const res = await verifyPresensi(id, action);
-        if (res.success) {
-          toast.success(
-            action
-              ? `Presensi asisten ${item.nama_asdos} berhasil diverifikasi!`
-              : `Verifikasi presensi asisten ${item.nama_asdos} berhasil dibatalkan.`
-          );
-        } else {
-          toast.error(res.message || 'Gagal memperbarui status presensi.');
+        if (!res.success) {
           await fetchPresensi(true);
         }
       } catch {
-        toast.error('Gagal memproses verifikasi presensi.');
         await fetchPresensi(true);
       }
     });
@@ -248,11 +234,9 @@ export default function DataPresensiPage() {
     try {
       const res = await verifyPresensi(id, newVal);
       if (!res.success) {
-        toast.error(res.message || 'Gagal memperbarui verifikasi.');
         await fetchPresensi(true);
       }
     } catch {
-      toast.error('Gagal memproses verifikasi.');
       await fetchPresensi(true);
     } finally {
       setPayRowPending(prev => { const s = new Set(prev); s.delete(key); return s; });
@@ -266,11 +250,9 @@ export default function DataPresensiPage() {
     try {
       const res = await updatePaymentStatus([id], newVal);
       if (!res.success) {
-        toast.error(res.message || 'Gagal memperbarui pembayaran.');
         await fetchPresensi(true);
       }
     } catch {
-      toast.error('Gagal memproses pembayaran.');
       await fetchPresensi(true);
     } finally {
       setPayRowPending(prev => { const s = new Set(prev); s.delete(key); return s; });

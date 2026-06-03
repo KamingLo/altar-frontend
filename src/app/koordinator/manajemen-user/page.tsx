@@ -6,7 +6,7 @@ import {
   updateAsdos, updateKoor,
   activateAsdos, deactivateAsdos, activateKoor, deactivateKoor,
 } from '@/lib/actions/manajemen';
-import { toast } from 'sonner';
+
 import type { UserListItem } from '@/lib/actions/manajemen';
 import { useManajemenStore } from '@/store/useManajemenStore';
 import Image from 'next/image';
@@ -173,13 +173,12 @@ export default function ManajemenAsdosPage() {
         ? isActive ? await deactivateAsdos(item.id) : await activateAsdos(item.id)
         : isActive ? await deactivateKoor(item.id) : await activateKoor(item.id);
       if (res.success) {
-        toast.success(isActive ? `${item.username} berhasil dinonaktifkan.` : `${item.username} berhasil diaktifkan.`);
         loadTabData(activeTab, searchQuery, 1, false, showInactive);
       } else {
-        toast.error(res.message || 'Gagal mengubah status.');
+        loadTabData(activeTab, searchQuery, 1, false, showInactive);
       }
     } catch {
-      toast.error('Terjadi kesalahan.');
+      // error silent
     } finally {
       setTogglePending(prev => { const s = new Set(prev); s.delete(item.id); return s; });
     }

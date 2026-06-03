@@ -1,7 +1,6 @@
-﻿'use client';
+'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { Check, ArrowLeft, BookOpen, Send, Loader2, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
 import { getMyPresensi, submitOnlineAttendance } from '@/lib/actions/presensi';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 
@@ -139,7 +138,6 @@ export default function PresensiKelasOnlinePage() {
 
     const substituteSessionId = getSubstituteSessionId(selectedSession);
     if (completedSessionIds.has(selectedSession.id_sesi) || (substituteSessionId && completedSessionIds.has(substituteSessionId))) {
-      toast.error('Presensi untuk sesi ini sudah tercatat.');
       setStep(1);
       return;
     }
@@ -165,7 +163,7 @@ export default function PresensiKelasOnlinePage() {
       });
       setStep(3);
     } else {
-      toast.error(res.message || 'Gagal mengirim presensi online.');
+      // error silent — biarkan state tidak berubah
     }
     setIsSubmitting(false);
   };

@@ -323,7 +323,6 @@ export default function ManajemenJadwalPage() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const today = useMemo(() => new Date(), []);
   const [startDate, setStartDate] = useState(() => toIsoDateFromDate(today));
@@ -394,10 +393,6 @@ export default function ManajemenJadwalPage() {
 
   const initialSemesterLoaded = useRef(false);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' = 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  }, []);
 
   const maxEndDate = useMemo(() => toIsoDateFromDate(addDays(parseLocalDate(startDate), 6)), [startDate]);
 
@@ -550,13 +545,11 @@ export default function ManajemenJadwalPage() {
     } else {
       setSessions([]);
       setFetchError(res.message || 'Gagal memuat sesi jadwal.');
-      if (!redirectIfSessionExpired(res.message)) {
-        showToast(res.message);
-      }
+      redirectIfSessionExpired(res.message);
     }
     setLoading(false);
     setIsInitialLoad(false);
-  }, [selectedSemesterId, startDate, endDate, showToast]);
+  }, [selectedSemesterId, startDate, endDate]);
 
   const sortSemestersByNewest = (items: SemesterItem[]) => {
     return [...items].sort((a, b) => {
@@ -586,7 +579,6 @@ export default function ManajemenJadwalPage() {
     setDropdownLoading(false);
     if (!res.success) {
       if (redirectIfSessionExpired(res.message)) return null;
-      showToast(res.message);
       return null;
     }
     setKelasList(res.data.kelasList);
@@ -595,7 +587,7 @@ export default function ManajemenJadwalPage() {
     setAsdosList(res.data.asdosList);
     setLecturerList(res.data.lecturerList);
     return res.data;
-  }, [showToast]);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -612,12 +604,10 @@ export default function ManajemenJadwalPage() {
         }
       } else {
         setIsInitialLoad(false);
-        if (!res.success && !redirectIfSessionExpired(res.message)) {
-          showToast(res.message);
-        }
+        if (!res.success) redirectIfSessionExpired(res.message);
       }
     })();
-  }, [showToast, loadDropdownData]);
+  }, [loadDropdownData]);
 
   useEffect(() => {
     if (!selectedSemesterId) {
@@ -636,10 +626,10 @@ export default function ManajemenJadwalPage() {
       return sorted;
     }
     if (!redirectIfSessionExpired(res.message)) {
-      showToast(res.message || 'Gagal memuat daftar semester.');
+      // error silent
     }
     return null;
-  }, [showToast]);
+  }, []);
 
   const handleDeleteSemesterOpen = (semesterId: string) => {
     if (!semesterId) return;
@@ -668,7 +658,6 @@ export default function ManajemenJadwalPage() {
       const res = await fetch(`/api/semesters/${deleteSemesterTargetId}`, { method: 'DELETE' }).then(r => r.json());
       setIsDeleteSemesterSubmitting(false);
       if (res.success) {
-        showToast("Semester berhasil dihapus.", "success");
         const wasSelected = selectedSemesterId === deleteSemesterTargetId;
         handleCloseDeleteSemester();
         const refreshed = await refreshSemesters();
@@ -676,12 +665,10 @@ export default function ManajemenJadwalPage() {
           const next = refreshed?.find(s => s.id !== deleteSemesterTargetId);
           setSelectedSemesterId(next?.id ?? "");
         }
-      } else {
-        showToast(res.message || "Gagal menghapus semester.");
       }
     } catch {
       setIsDeleteSemesterSubmitting(false);
-      showToast("Terjadi kesalahan saat menghapus semester.");
+      // error silent
     }
   };
 
@@ -728,7 +715,6 @@ export default function ManajemenJadwalPage() {
 
   const openMasterEdit = (resource: MasterResource, item: MasterItem | null) => {
     if (!item) {
-      showToast('Pilih item terlebih dahulu untuk diedit.');
       return;
     }
     setMasterModal({ open: true, mode: 'edit', resource, initialData: item });
@@ -736,7 +722,6 @@ export default function ManajemenJadwalPage() {
 
   const openMasterDelete = (resource: MasterResource, item: MasterItem | null) => {
     if (!item) {
-      showToast('Pilih item terlebih dahulu untuk dihapus.');
       return;
     }
     setMasterModal({ open: true, mode: 'delete', resource, initialData: item });
@@ -759,7 +744,7 @@ export default function ManajemenJadwalPage() {
       asdos: 'Asisten Dosen',
     };
     const actionLabel = action === 'created' ? 'dibuat' : action === 'updated' ? 'diperbarui' : 'dihapus';
-    showToast(`${labelMap[resource]} berhasil ${actionLabel}.`, 'success');
+    void actionLabel;
 
     if (resource === 'semester') {
       const refreshed = await refreshSemesters();
@@ -908,9 +893,7 @@ export default function ManajemenJadwalPage() {
         setInstructorType('ASDOS');
       }
       if (!filled.id_kelas || !filled.id_mk || !filled.id_ruangan) {
-        showToast(
-          'Beberapa data tidak ditemukan di daftar. Pilih ulang kelas, mata kuliah, atau ruangan sebelum menyimpan.',
-        );
+        // beberapa data tidak ditemukan, user perlu pilih ulang
       }
     }
   };
@@ -928,22 +911,10 @@ export default function ManajemenJadwalPage() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedSemesterId) {
-      showToast('Pilih semester terlebih dahulu.');
-      return;
-    }
-    if (!form.tanggal) {
-      showToast('Tanggal sesi wajib diisi.');
-      return;
-    }
-    if (!form.id_kelas || !form.id_mk || !form.id_ruangan) {
-      showToast('Kelas, mata kuliah, dan ruangan wajib diisi.');
-      return;
-    }
-    if (modalType === 'edit' && !editingId) {
-      showToast('Sesi tidak valid untuk diedit.');
-      return;
-    }
+    if (!selectedSemesterId) { return; }
+    if (!form.tanggal) { return; }
+    if (!form.id_kelas || !form.id_mk || !form.id_ruangan) { return; }
+    if (modalType === 'edit' && !editingId) { return; }
 
     setIsSubmitting(true);
     const payload = buildPayload();
@@ -959,12 +930,8 @@ export default function ManajemenJadwalPage() {
 
     if (!res.success) {
       if (redirectIfSessionExpired(res.message)) return;
-      const resError = (res as Record<string, unknown>).error;
-      const detail = typeof resError === 'string' ? ` (${resError})` : '';
-      showToast((res.message || 'Gagal menyimpan sesi.') + detail);
       return;
     }
-    showToast(res.message || 'Sesi berhasil disimpan.', 'success');
     handleCloseModal();
     await refreshSessions();
   };
@@ -1033,10 +1000,8 @@ export default function ManajemenJadwalPage() {
     setIsDeleteSubmitting(false);
     if (!res.success) {
       if (redirectIfSessionExpired(res.message)) return;
-      showToast(res.message || 'Gagal menghapus sesi.');
       return;
     }
-    showToast(res.message || 'Sesi berhasil dihapus.', 'success');
     handleCloseDelete();
     await refreshSessions();
   };
@@ -2063,22 +2028,6 @@ export default function ManajemenJadwalPage() {
         onSuccess={handleMasterSuccess}
       />
 
-      <div className="fixed top-6 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4">
-        <div
-          className={`
-            max-w-md w-full flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border transition-all duration-500
-            ${toast ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-12 opacity-0 scale-95'}
-            ${toast?.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-rose-50 border-rose-100 text-rose-800'}
-          `}
-        >
-          {toast?.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
-          )}
-          <p className="text-sm font-bold leading-tight">{toast?.message}</p>
-        </div>
-      </div>
     </AsdosPageShell>
   );
 }

@@ -492,7 +492,7 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       if (
         typeof window !== 'undefined' &&
         
-        !(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function')
+        !(typeof DeviceOrientationEvent !== 'undefined' && typeof (DeviceOrientationEvent as any).requestPermission === 'function')
       ) {
         window.addEventListener('deviceorientation', onDeviceOrientation);
       }
@@ -508,10 +508,10 @@ function useCubeCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         if (
           typeof DeviceOrientationEvent !== 'undefined' &&
           
-          typeof DeviceOrientationEvent.requestPermission === 'function'
+          typeof (DeviceOrientationEvent as any).requestPermission === 'function'
         ) {
           
-          DeviceOrientationEvent.requestPermission()
+          (DeviceOrientationEvent as any).requestPermission()
             .then((state: string) => {
               if (state === 'granted') {
                 window.addEventListener('deviceorientation', onDeviceOrientation);

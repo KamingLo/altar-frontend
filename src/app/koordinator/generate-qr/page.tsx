@@ -74,7 +74,6 @@ export default function GenerateQrPage() {
   const [exitPin, setExitPin] = useState('');
   const [exitError, setExitError] = useState('');
 
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isKioskActionLoading, setIsKioskActionLoading] = useState(false);
 
@@ -152,11 +151,6 @@ export default function GenerateQrPage() {
     );
   }, [formatDisplayDate]);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
-    if (type === 'success') return;
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  }, []);
 
   const loadSemestersData = useCallback(async () => {
     setIsSessionsLoading(true);
@@ -227,11 +221,9 @@ export default function GenerateQrPage() {
       if (res.success && res.data?.qr_token) {
         setQrToken(res.data.qr_token);
         setCountdown(REFRESH_INTERVAL_SEC);
-      } else {
-        showToast(res.message || 'Gagal menyegarkan kode QR.', 'error');
       }
     });
-  }, [showToast]);
+  }, []);
 
   useEffect(() => {
     if (mode === 'KIOSK') {
@@ -376,7 +368,6 @@ export default function GenerateQrPage() {
 
       if (pinNotConfigured) {
         openPinModal('SET');
-        showToast('PIN belum dikonfigurasi. Silakan buat PIN baru 4-6 digit.', 'success');
       } else {
         openPinModal('VERIFY_CHANGE');
       }
@@ -416,7 +407,6 @@ export default function GenerateQrPage() {
       }
       const res = await setKioskPIN(newPin);
       if (res.success) {
-        showToast('PIN Kiosk berhasil dikonfigurasi!', 'success');
         transitionPinMode('VERIFY_ENTER');
       } else {
         setPinError(res.message || 'Gagal menyimpan PIN baru.');
@@ -436,17 +426,11 @@ export default function GenerateQrPage() {
           setMode('KIOSK');
           setCountdown(REFRESH_INTERVAL_SEC);
           closePinModal();
-          showToast('Kiosk Mode Berhasil Diaktifkan!', 'success');
         } else {
           setPinError(qrRes.message || 'Gagal memuat token QR.');
         }
       } else {
-        if (res.message && res.message.toLowerCase().includes('not set')) {
-          transitionPinMode('SET');
-          showToast('PIN belum diatur, silakan buat baru 4-6 digit.', 'error');
-        } else {
-          setPinError(res.message || 'PIN yang dimasukkan salah.');
-        }
+        setPinError(res.message || 'PIN yang dimasukkan salah.');
       }
     } else if (pinMode === 'VERIFY_CHANGE') {
       if (enteredPin.length < 4 || enteredPin.length > 6) {
@@ -463,7 +447,7 @@ export default function GenerateQrPage() {
       }
     }
     setIsSubmitting(false);
-  }, [pinMode, isConfirmStep, newPin, confirmPin, enteredPin, showToast, transitionPinMode, closePinModal]);
+  }, [pinMode, isConfirmStep, newPin, confirmPin, enteredPin, transitionPinMode, closePinModal]);
 
   const handleExitKiosk = useCallback(async () => {
     setExitError('');
@@ -480,7 +464,6 @@ export default function GenerateQrPage() {
         setMode('NORMAL');
         setQrToken('');
         closeExitModal();
-        showToast('Keluar dari Kiosk Mode.', 'success');
       } else {
         setExitError(resDeact.message || 'Gagal menonaktifkan Kiosk.');
       }
@@ -488,7 +471,7 @@ export default function GenerateQrPage() {
       setExitError('PIN Salah! Akses keluar ditolak.');
     }
     setIsSubmitting(false);
-  }, [exitPin, showToast, closeExitModal]);
+  }, [exitPin, closeExitModal]);
 
   const handleNumpadPress = useCallback((num: string, type: 'EXIT' | 'PIN') => {
     if (type === 'EXIT') {
@@ -1214,22 +1197,6 @@ export default function GenerateQrPage() {
         </>
       )}
 
-      <div className="fixed top-6 left-0 right-0 z-[1005] flex justify-center pointer-events-none px-4">
-        <div
-          className={`
-            max-w-md w-full flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border transition-all duration-500
-            ${toast ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-12 opacity-0 scale-95'}
-            ${toast?.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-rose-50 border-rose-100 text-rose-800'}
-          `}
-        >
-          {toast?.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
-          )}
-          <p className="text-sm font-bold leading-tight">{toast?.message}</p>
-        </div>
-      </div>
 
     </div>
   );

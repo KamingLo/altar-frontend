@@ -11,7 +11,7 @@ import {
   Loader2,
   Filter
 } from 'lucide-react';
-import { toast } from 'sonner';
+
 import {
   getAllSubstitutions,
   updateSubstitutionStatus
@@ -51,13 +51,11 @@ export default function ManajemenKpPage() {
         hasLoadedRef.current = true;
       } else if (!silent) {
         setSubstitutions([]);
-        toast.error(res.message || 'Gagal memuat data pengajuan.');
         hasLoadedRef.current = true;
       }
     } catch {
       if (!silent) {
         setSubstitutions([]);
-        toast.error('Terjadi kesalahan saat menghubungi server.');
       }
     } finally {
       if (!silent) {
@@ -85,14 +83,10 @@ export default function ManajemenKpPage() {
     updateStatusLocal(req.id, 'VERIFIED', null);
     try {
       const res = await updateSubstitutionStatus(req.id, { status: 'VERIFIED', coordinator_reason: null });
-      if (res.success) {
-        toast.success('Pengajuan kuliah pengganti berhasil disetujui!');
-      } else {
-        toast.error(res.message || 'Gagal memperbarui status pengajuan.');
+      if (!res.success) {
         fetchRequests(true);
       }
     } catch {
-      toast.error('Gagal memperbarui status pengajuan.');
       fetchRequests(true);
     } finally {
       setApprovePending(prev => { const s = new Set(prev); s.delete(req.id); return s; });
@@ -127,20 +121,11 @@ export default function ManajemenKpPage() {
       });
 
       if (res.success) {
-        toast.success(
-          action === 'VERIFIED'
-            ? 'Pengajuan kuliah pengganti berhasil disetujui!'
-            : 'Pengajuan kuliah pengganti telah ditolak.'
-        );
         closeModal();
       } else {
-        toast.error(res.message || 'Gagal memperbarui status pengajuan.');
-
         fetchRequests(true);
       }
     } catch {
-      toast.error('Gagal memperbarui status pengajuan.');
-
       fetchRequests(true);
     } finally {
       setIsSubmitting(false);
