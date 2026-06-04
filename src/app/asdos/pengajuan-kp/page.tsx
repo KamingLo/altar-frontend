@@ -551,16 +551,22 @@ useEffect(() => {
     [history, statusFilter],
   );
 
+  const myWeekSchedule = useMemo(() => {
+    const myUsername = user?.username?.toLowerCase();
+    if (!myUsername) return weekSchedule;
+    return weekSchedule.filter(s => s.pengajar.toLowerCase().includes(myUsername));
+  }, [weekSchedule, user?.username]);
+
   const weekDays = useMemo(() => {
     const days = weekDaysForOffset(weekOffset);
     return days.map(iso => ({
       iso,
-      sessions: weekSchedule
+      sessions: myWeekSchedule
         .filter(s => s.tanggal.split('T')[0] === iso)
         .slice()
         .sort((a, b) => a.waktu.localeCompare(b.waktu)),
     }));
-  }, [weekSchedule, weekOffset]);
+  }, [myWeekSchedule, weekOffset]);
 
   const isFormValid =
     originalDate.trim() !== '' && substituteDate.trim() !== '' &&
@@ -727,8 +733,11 @@ useEffect(() => {
                         <p className="text-sm font-bold text-slate-800 leading-snug mt-0.5">
                           {s.mata_kuliah}
                         </p>
-                        <p className="text-xs text-slate-500 font-medium mt-0.5">
-                          {s.nama_kelas}
+                        <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                          {s.ruangan}
+                        </p>
+                        <p className="text-xs text-slate-400 font-medium mt-0.5">
+                          {s.nama_kelas} <span className="text-[10px] text-slate-400/90 font-normal">· {s.pengajar}</span>
                           {isCheckedIn && <span className="ml-1 text-amber-600 font-semibold">· Check-in</span>}
                           {isCovered && !isCheckedIn && <span className="ml-1 text-blue-600 font-semibold">· Diajukan rekan</span>}
                         </p>
@@ -785,7 +794,7 @@ useEffect(() => {
                 className="w-full bg-white border border-slate-200 rounded-[14px] px-5 py-[15px] text-sm text-left font-semibold flex items-center justify-between focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
               >
                 {(() => {
-                  const picked = weekSchedule.find(s => s.id_sesi === idSession);
+                  const picked = myWeekSchedule.find(s => s.id_sesi === idSession);
                   if (!picked) {
                     return <span className="text-slate-400">-- Pilih Sesi --</span>;
                   }

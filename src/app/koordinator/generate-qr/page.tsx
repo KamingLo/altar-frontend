@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef, useMemo, startTransition } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, startTransition } from 'react';
 import Image from 'next/image';
 import {
   CalendarDays,
@@ -10,11 +10,8 @@ import {
   MonitorDot,
   RefreshCw,
   X,
-  CheckCircle2,
   AlertCircle,
-  ChevronRight,
   ArrowRight,
-  ShieldCheck,
   Loader2,
   Download
 } from 'lucide-react';
@@ -80,7 +77,6 @@ export default function GenerateQrPage() {
   const [timeStr, setTimeStr] = useState('');
   const [dateStr, setDateStr] = useState('');
 
-  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const formatDisplayDate = useCallback((raw: string) => {
     if (!raw) return '-';
@@ -228,27 +224,20 @@ export default function GenerateQrPage() {
   useEffect(() => {
     if (mode === 'KIOSK') {
       refreshQRToken();
-      countdownIntervalRef.current = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) {
-            refreshQRToken();
-            return REFRESH_INTERVAL_SEC;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-        countdownIntervalRef.current = null;
-      }
     }
-    return () => {
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-      }
-    };
-  }, [mode, refreshQRToken]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== 'KIOSK' || countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown(c => Math.max(0, c - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [mode, countdown]);
+
+  const handleManualRefresh = useCallback(async () => {
+    await refreshQRToken();
+    setCountdown(REFRESH_INTERVAL_SEC);
+  }, [refreshQRToken]);
 
   const downloadQRCode = async () => {
     if (!qrToken) return;
@@ -426,6 +415,7 @@ export default function GenerateQrPage() {
           setMode('KIOSK');
           setCountdown(REFRESH_INTERVAL_SEC);
           closePinModal();
+          document.documentElement.requestFullscreen?.().catch(() => {});
         } else {
           setPinError(qrRes.message || 'Gagal memuat token QR.');
         }
@@ -464,6 +454,7 @@ export default function GenerateQrPage() {
         setMode('NORMAL');
         setQrToken('');
         closeExitModal();
+        document.exitFullscreen?.().catch(() => {});
       } else {
         setExitError(resDeact.message || 'Gagal menonaktifkan Kiosk.');
       }
@@ -618,7 +609,7 @@ export default function GenerateQrPage() {
           <div className="space-y-8 relative z-10">
 
             <div className="w-full">
-              <div className="bg-white rounded-2xl md:rounded-[2rem] p-6 md:p-8 shadow-sm border border-slate-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+              <div className="bg-white rounded-2xl md:rounded-[2rem] p-6 md:p-8 shadow-sm border border-slate-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
                 <div className="flex items-center gap-4 flex-1">
                   <div className="w-12 h-12 rounded-2xl bg-rose-50 text-crimson flex items-center justify-center shrink-0">
                     <MonitorDot className="w-6 h-6 animate-pulse" />
@@ -629,7 +620,7 @@ export default function GenerateQrPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 shrink-0 w-full lg:w-auto">
+                <div className="flex flex-col sm:flex-row gap-3 shrink-0 w-full md:w-auto self-end xl:self-auto">
                   <button
                     type="button"
                     onClick={handleActivateKioskClick}
@@ -694,7 +685,7 @@ export default function GenerateQrPage() {
                 </div>
               ) : (
 
-                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:max-h-[calc(100dvh-22rem)] md:overflow-y-auto md:pr-1 md:[&::-webkit-scrollbar]:w-1.5 md:[&::-webkit-scrollbar-thumb]:rounded-full md:[&::-webkit-scrollbar-thumb]:bg-slate-300/80">
+                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                   {todaySessions.map(s => {
                     return (
                       <SessionCard key={s.id_sesi} s={s} />
@@ -785,44 +776,84 @@ export default function GenerateQrPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 lg:flex-1 lg:min-h-0 h-auto mt-6 md:mt-8 mb-4 items-stretch">
 
-              <div className="lg:col-span-7 bg-white border border-slate-100 rounded-[1.75rem] p-5 shadow-sm lg:rounded-[2.5rem] lg:p-8 flex flex-col items-center justify-center relative overflow-hidden text-slate-800">
+              <div className="lg:col-span-7 bg-white border border-slate-100 rounded-[1.75rem] p-4 shadow-sm lg:rounded-[2.5rem] lg:p-6 xl:p-8 flex flex-col items-center justify-center relative overflow-hidden text-slate-800">
 
-                <div className="flex flex-col items-center max-w-sm w-full">
-                  <h2 className="text-lg md:text-xl font-extrabold text-slate-800 text-center tracking-tight">SCAN QR CHECK-IN</h2>
-                  <p className="text-xs text-slate-400 mt-1 mb-6 md:mb-8 text-center font-medium">Buka aplikasi asisten dosen Anda dan scan kode QR ini</p>
+                <div className="flex flex-col items-center max-w-sm w-full lg:flex-row lg:max-w-full lg:items-center lg:gap-8 xl:flex-col xl:items-center xl:max-w-sm">
 
-                  <div className="bg-white p-4 sm:p-5 lg:p-7 rounded-[2rem] lg:rounded-[3rem] shadow-[0_12px_30px_rgba(15,23,42,0.08)] lg:shadow-lg border border-slate-100 lg:border-slate-150 flex items-center justify-center aspect-square max-w-[280px] sm:max-w-[320px] w-full relative">
-                    {qrToken ? (
-                      <Image
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrToken)}`}
-                        alt="QR Code"
-                        width={300}
-                        height={300}
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center gap-3">
-                        <Loader2 className="w-8 h-8 text-crimson animate-spin" />
-                        <p className="text-xs font-semibold text-slate-400">Generating secure token...</p>
-                      </div>
+                  <div className="flex flex-col items-center w-full lg:items-start lg:w-auto lg:order-1 xl:items-center xl:w-full xl:order-none">
+                    <h2 className="text-base xl:text-xl font-extrabold text-slate-800 text-center lg:text-left xl:text-center tracking-tight">SCAN QR CHECK-IN</h2>
+                    <p className="text-xs text-slate-400 mt-1 mb-3 lg:mb-6 xl:mb-8 text-center lg:text-left xl:text-center font-medium">Buka aplikasi asisten dosen Anda dan scan kode QR ini</p>
+
+                    {qrToken && (
+                      <button
+                        type="button"
+                        onClick={downloadQRCode}
+                        className="mb-4 lg:mb-0 xl:mb-0 flex items-center gap-2 px-4 py-2 rounded-xl bg-crimson text-white hover:bg-[#7a1728] active:scale-95 transition-all text-xs font-bold shadow-sm shadow-crimson/10 hidden lg:flex xl:hidden"
+                      >
+                        <Download className="w-4 h-4" />
+                        Unduh Gambar QR
+                      </button>
                     )}
+
+                    <div className="w-full mt-3 hidden lg:flex xl:hidden items-center justify-between">
+                      <span className="text-[10px] font-bold tracking-wider text-slate-400">SEKALI PAKAI</span>
+                      <span className={`text-[10px] font-bold tracking-wider ${countdown === 0 ? 'text-crimson' : 'text-slate-400'}`}>
+                        {countdown === 0 ? 'KEDALUWARSA' : `${countdown}s`}
+                      </span>
+                    </div>
                   </div>
 
-                  {qrToken && (
-                    <button
-                      type="button"
-                      onClick={downloadQRCode}
-                      className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-crimson text-white hover:bg-[#7a1728] active:scale-95 transition-all text-xs font-bold shadow-sm shadow-crimson/10"
-                    >
-                      <Download className="w-4 h-4" />
-                      Unduh Gambar QR
-                    </button>
-                  )}
+                  <div className="flex flex-col items-center lg:order-2 lg:shrink-0 lg:ml-auto xl:order-none xl:shrink xl:ml-0">
+                    <div className="bg-white p-3 lg:p-5 xl:p-7 rounded-[1.5rem] lg:rounded-[2.5rem] xl:rounded-[3rem] shadow-[0_12px_30px_rgba(15,23,42,0.08)] lg:shadow-lg border border-slate-100 flex items-center justify-center aspect-square max-w-[250px] lg:max-w-[280px] xl:max-w-[340px] w-full relative overflow-hidden">
+                      {qrToken ? (
+                        <>
+                          <Image
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrToken)}`}
+                            alt="QR Code"
+                            width={300}
+                            height={300}
+                            className={`w-full h-full object-contain transition-all duration-300 ${countdown === 0 ? 'opacity-20 blur-sm' : ''}`}
+                          />
+                          {countdown === 0 && (
+                            <button
+                              type="button"
+                              onClick={handleManualRefresh}
+                              className="absolute inset-0 flex flex-col items-center justify-center gap-2 hover:bg-white/10 transition-colors cursor-pointer"
+                            >
+                              <RefreshCw className="w-8 h-8 text-crimson" />
+                              <span className="text-xs font-extrabold text-crimson tracking-wide">Perbarui QR</span>
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center gap-3">
+                          <Loader2 className="w-8 h-8 text-crimson animate-spin" />
+                          <p className="text-xs font-semibold text-slate-400">Generating...</p>
+                        </div>
+                      )}
+                    </div>
 
-                  <div className="w-full mt-6 md:mt-8 space-y-2">
-                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 tracking-wider">
-                      <span>SEKALI PAKAI (AUTO-REFRESH)</span>
-                      <span>{countdown} DETIK</span>
+                    {qrToken && (
+                      <button
+                        type="button"
+                        onClick={downloadQRCode}
+                        className="mt-3 xl:mt-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-crimson text-white hover:bg-[#7a1728] active:scale-95 transition-all text-xs font-bold shadow-sm shadow-crimson/10 lg:hidden xl:flex"
+                      >
+                        <Download className="w-4 h-4" />
+                        Unduh Gambar QR
+                      </button>
+                    )}
+                    <div className="w-full mt-3 flex items-center justify-between lg:hidden">
+                      <span className="text-[10px] font-bold tracking-wider text-slate-400">SEKALI PAKAI</span>
+                      <span className={`text-[10px] font-bold tracking-wider ${countdown === 0 ? 'text-crimson' : 'text-slate-400'}`}>
+                        {countdown === 0 ? 'KEDALUWARSA' : `${countdown}s`}
+                      </span>
+                    </div>
+                    <div className="w-full mt-4 hidden xl:flex xl:items-center xl:justify-between">
+                      <span className="text-[10px] font-bold tracking-wider text-slate-400">SEKALI PAKAI</span>
+                      <span className={`text-[10px] font-bold tracking-wider ${countdown === 0 ? 'text-crimson' : 'text-slate-400'}`}>
+                        {countdown === 0 ? 'KEDALUWARSA' : `${countdown}s`}
+                      </span>
                     </div>
                   </div>
 
@@ -901,30 +932,19 @@ export default function GenerateQrPage() {
                   Kiosk Mode mengunci perangkat Anda menjadi layar stasiun presensi mandiri asisten dosen di kelas:
                 </p>
 
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4.5 space-y-3.5">
-                  <div className="flex gap-3">
-                    <ShieldCheck className="w-[18px] h-[18px] text-emerald-600 shrink-0 mt-0.5" />
-                    <p className="text-xs text-slate-600 font-semibold leading-relaxed">
-                      <strong className="text-slate-800 font-bold block mb-0.5">Layar Penuh Terkunci</strong>
-                      Mengamankan laptop Anda dari akses lain selama sesi presensi berjalan.
-                    </p>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <RefreshCw className="w-[18px] h-[18px] text-crimson shrink-0 mt-0.5 animate-spin-slow" />
-                    <p className="text-xs text-slate-600 font-semibold leading-relaxed">
-                      <strong className="text-slate-800 font-bold block mb-0.5">QR Code Dinamis</strong>
-                      Token QR otomatis disegarkan tiap 4 menit untuk mencegah kecurangan/titip absen.
-                    </p>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Lock className="w-[18px] h-[18px] text-blue-600 shrink-0 mt-0.5" />
-                    <p className="text-xs text-slate-600 font-semibold leading-relaxed">
-                      <strong className="text-slate-800 font-bold block mb-0.5">Proteksi Keluar PIN</strong>
-                      Keluar dari mode stasiun presensi Kiosk membutuhkan PIN keamanan 4-6 digit Koordinator.
-                    </p>
-                  </div>
+                <div className="space-y-3.5">
+                  {[
+                    { title: 'Layar Penuh Terkunci', desc: 'Mengamankan laptop Anda dari akses lain selama sesi presensi berjalan.' },
+                    { title: 'QR Code Sekali Pakai', desc: 'Token QR bersifat sekali pakai. Setelah kedaluwarsa, tap tombol perbarui untuk generate QR baru.' },
+                    { title: 'Proteksi Keluar PIN', desc: 'Keluar dari mode stasiun presensi Kiosk membutuhkan PIN keamanan 4-6 digit Koordinator.' },
+                  ].map(({ title, desc }) => (
+                    <div key={title} className="flex gap-2.5 items-start">
+                      <span className="w-1.5 h-1.5 rounded-full bg-crimson shrink-0 mt-1.5" />
+                      <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+                        <strong className="text-slate-800 font-bold">{title}.</strong> {desc}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -942,7 +962,7 @@ export default function GenerateQrPage() {
                   onClick={() => closeExplanationModal(true)}
                   className="flex-1 py-3.5 rounded-2xl bg-crimson text-white hover:bg-[#7a1728] font-bold text-sm shadow-md shadow-crimson/15 transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
-                  Saya Setuju <ChevronRight className="w-4 h-4" />
+                  Oke
                 </button>
               </div>
 

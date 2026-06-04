@@ -9,11 +9,13 @@ import {
   Search,
   Inbox,
   Loader2,
-  Video,
   ExternalLink,
   Filter,
   Banknote,
+  Download,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 import {
   getAllPresensi,
@@ -85,6 +87,29 @@ const FILTER_TIPE_OPTIONS = [
 ];
 
 
+function formatDate(dateStr: string) {
+  if (!dateStr || dateStr === 'null' || dateStr.startsWith('0001')) return '-';
+  try {
+    return new Date(dateStr).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  } catch { return dateStr; }
+}
+
+function formatDateCompact(dateStr: string) {
+  if (!dateStr || dateStr === 'null' || dateStr.startsWith('0001')) return '-';
+  try {
+    return new Date(dateStr).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch { return dateStr; }
+}
+
+function formatTime(timeStr?: string) {
+  if (!timeStr || timeStr === 'null' || timeStr.startsWith('0001')) return '-';
+  try {
+    return parseUTC(timeStr).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+  } catch { return timeStr; }
+}
+
+const colWidths = [{ wch: 4 }, { wch: 28 }, { wch: 10 }, { wch: 18 }, { wch: 8 }, { wch: 8 }, { wch: 35 }, { wch: 20 }, { wch: 14 }, { wch: 12 }];
+
 export default function DataPresensiPage() {
   const { presensiList, isLoading, setPresensi, verifyPresensiLocal, updatePaymentLocal, setIsLoading } = usePresensiStore();
 
@@ -104,7 +129,9 @@ export default function DataPresensiPage() {
   const [paySearchInput, setPaySearchInput] = useState('');
   const [selectedAsdosName, setSelectedAsdosName] = useState<string | null>(null);
   const [payDropdownOpen, setPayDropdownOpen] = useState(false);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const paySearchRef = useRef<HTMLDivElement>(null);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
   const [sessionStartMap, setSessionStartMap] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -282,6 +309,9 @@ export default function DataPresensiPage() {
       if (paySearchRef.current && !paySearchRef.current.contains(e.target as Node)) {
         setPayDropdownOpen(false);
       }
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target as Node)) {
+        setDownloadMenuOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -307,42 +337,209 @@ export default function DataPresensiPage() {
     return list.sort((a, b) => a.tanggal_mengajar.localeCompare(b.tanggal_mengajar));
   }, [presensiList, selectedAsdosName, bayarFilter]);
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr || dateStr === 'null' || dateStr.startsWith('0001')) return '-';
+  const handleMonthVerify = useCallback(async (items: PresensiResponseDTO[], verify: boolean) => {
+    const key = `month-verify-${items[0]?.id_presensi}`;
+    setPayRowPending(prev => new Set(prev).add(key));
+    items.forEach(item => verifyPresensiLocal(item.id_presensi, verify));
     try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('id-ID', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      });
+      await Promise.all(items.map(item => verifyPresensi(item.id_presensi, verify)));
     } catch {
-      return dateStr;
+      await fetchPresensi(true);
+    } finally {
+      setPayRowPending(prev => { const s = new Set(prev); s.delete(key); return s; });
     }
+  }, [verifyPresensiLocal, fetchPresensi]);
+
+  const handleMonthPay = useCallback(async (items: PresensiResponseDTO[], pay: boolean) => {
+    const ids = items.map(i => i.id_presensi);
+    const key = `month-pay-${ids[0]}`;
+    setPayRowPending(prev => new Set(prev).add(key));
+    updatePaymentLocal(ids, pay);
+    try {
+      const res = await updatePaymentStatus(ids, pay);
+      if (!res.success) await fetchPresensi(true);
+    } catch {
+      await fetchPresensi(true);
+    } finally {
+      setPayRowPending(prev => { const s = new Set(prev); s.delete(key); return s; });
+    }
+  }, [updatePaymentLocal, fetchPresensi]);
+
+  const buildSheetData = (items: PresensiResponseDTO[]) => {
+    const groups: { key: string; label: string; items: PresensiResponseDTO[] }[] = [];
+    for (const item of items) {
+      const date = new Date(item.tanggal_mengajar);
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      const label = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+      const existing = groups.find(g => g.key === key);
+      if (existing) existing.items.push(item);
+      else groups.push({ key, label, items: [item] });
+    }
+    const header = ['No', 'Nama Pelajaran', 'Kelas', 'Tgl Perkuliahan', 'Mulai', 'Selesai', 'Bahasan Materi', 'Pengajar Rekan', 'Verifikasi', 'Pembayaran'];
+    const sheetData: (string | number)[][] = [header];
+    let rowNum = 0;
+    for (const { label, items: groupItems } of groups) {
+      sheetData.push([label, '', '', '', '', '', '', '', '', '']);
+      for (const item of groupItems) {
+        rowNum++;
+        sheetData.push([
+          rowNum,
+          item.nama_mata_kuliah || '-',
+          item.nama_kelas || '-',
+          formatDateCompact(item.tanggal_mengajar),
+          formatTime(item.waktu_checkin),
+          item.tipe_absensi === 'link' ? 'Online' : formatTime(item.waktu_checkout),
+          item.deskripsi_materi || '-',
+          item.nama_asdos_rekan || '-',
+          item.is_verified ? 'Terverifikasi' : 'Pending',
+          item.is_paid ? 'Lunas' : 'Belum Lunas',
+        ]);
+      }
+    }
+    return sheetData;
   };
 
-  const formatDateCompact = (dateStr: string) => {
-    if (!dateStr || dateStr === 'null' || dateStr.startsWith('0001')) return '-';
-    try {
-      return new Date(dateStr).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
-  };
+  const handleDownloadExcel = useCallback(() => {
+    if (!payTableData || !selectedAsdosName) return;
+    const sheetData = buildSheetData(payTableData);
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    ws['!cols'] = colWidths;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, selectedAsdosName.slice(0, 31));
+    const date = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
+    XLSX.writeFile(wb, `Presensi_${selectedAsdosName}_${date}.xlsx`);
+  }, [payTableData, selectedAsdosName]);
 
-  const formatTime = (timeStr?: string) => {
-    if (!timeStr || timeStr === 'null' || timeStr.startsWith('0001')) return '-';
-    try {
-      return parseUTC(timeStr).toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
-    } catch {
-      return timeStr;
+  const handleDownloadAllExcel = useCallback(async () => {
+    if (!presensiList.length) return;
+
+    const NUM_COLS = 10;
+    const header = ['No', 'Nama Pelajaran', 'Kelas', 'Tgl Perkuliahan', 'Mulai', 'Selesai', 'Bahasan Materi', 'Pengajar Rekan', 'Verifikasi', 'Pembayaran'];
+    const colWidthsEx = [4, 28, 10, 18, 8, 8, 35, 20, 14, 12];
+    const boxBorder: Partial<ExcelJS.Borders> = {
+      top:    { style: 'medium' },
+      bottom: { style: 'medium' },
+      left:   { style: 'medium' },
+      right:  { style: 'medium' },
+    };
+
+    const asdosMap = new Map<string, PresensiResponseDTO[]>();
+    for (const item of presensiList) {
+      const name = (item.nama_asdos || '').trim();
+      if (!name) continue;
+      if (!asdosMap.has(name)) asdosMap.set(name, []);
+      asdosMap.get(name)!.push(item);
     }
-  };
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Semua Asdos');
+    colWidthsEx.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+    let currentRow = 1;
+
+    asdosMap.forEach((items, name) => {
+      const blockStart = currentRow;
+
+      ws.getRow(currentRow).getCell(1).value = name;
+      ws.getRow(currentRow).getCell(1).font = { bold: true };
+      currentRow++;
+
+      header.forEach((h, i) => {
+        const cell = ws.getRow(currentRow).getCell(i + 1);
+        cell.value = h;
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      });
+      currentRow++;
+
+      const groups: { key: string; label: string; items: PresensiResponseDTO[] }[] = [];
+      const sorted = [...items].sort((a, b) => a.tanggal_mengajar.localeCompare(b.tanggal_mengajar));
+      for (const item of sorted) {
+        const d = new Date(item.tanggal_mengajar);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        const label = d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        const existing = groups.find(g => g.key === key);
+        if (existing) existing.items.push(item);
+        else groups.push({ key, label, items: [item] });
+      }
+
+      let rowNum = 0;
+      for (const { label, items: groupItems } of groups) {
+        const mCell = ws.getRow(currentRow).getCell(1);
+        mCell.value = label;
+        mCell.font = { bold: true, color: { argb: 'FF64748B' } };
+        mCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+        currentRow++;
+
+        for (const item of groupItems) {
+          rowNum++;
+          const row = ws.getRow(currentRow);
+          const values = [
+            rowNum,
+            item.nama_mata_kuliah || '-',
+            item.nama_kelas || '-',
+            formatDateCompact(item.tanggal_mengajar),
+            formatTime(item.waktu_checkin),
+            item.tipe_absensi === 'link' ? 'Online' : formatTime(item.waktu_checkout),
+            item.deskripsi_materi || '-',
+            item.nama_asdos_rekan || '-',
+            item.is_verified ? 'Terverifikasi' : 'Pending',
+            item.is_paid ? 'Lunas' : 'Belum Lunas',
+          ];
+          values.forEach((v, i) => { row.getCell(i + 1).value = v; });
+          currentRow++;
+        }
+      }
+
+      const blockEnd = currentRow - 1;
+
+      for (let r = blockStart; r <= blockEnd; r++) {
+        for (let c = 1; c <= NUM_COLS; c++) {
+          const cell = ws.getRow(r).getCell(c);
+          const border: Partial<ExcelJS.Borders> = {};
+          if (r === blockStart) border.top = boxBorder.top;
+          if (r === blockEnd)   border.bottom = boxBorder.bottom;
+          if (c === 1)          border.left = boxBorder.left;
+          if (c === NUM_COLS)   border.right = boxBorder.right;
+          if (Object.keys(border).length) cell.border = { ...cell.border, ...border };
+        }
+      }
+
+      currentRow += 2;
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const date = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
+    a.href = url;
+    a.download = `Presensi_Semua_Asdos_${date}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [presensiList]);
+
+  const handleDownloadSplitExcel = useCallback(() => {
+    if (!presensiList.length) return;
+    const asdosMap = new Map<string, PresensiResponseDTO[]>();
+    for (const item of presensiList) {
+      const name = (item.nama_asdos || '').trim();
+      if (!name) continue;
+      if (!asdosMap.has(name)) asdosMap.set(name, []);
+      asdosMap.get(name)!.push(item);
+    }
+    const wb = XLSX.utils.book_new();
+    asdosMap.forEach((items, name) => {
+      const sorted = [...items].sort((a, b) => a.tanggal_mengajar.localeCompare(b.tanggal_mengajar));
+      const sheetData = buildSheetData(sorted);
+      const ws = XLSX.utils.aoa_to_sheet(sheetData);
+      ws['!cols'] = colWidths;
+      XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
+    });
+    const date = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
+    XLSX.writeFile(wb, `Presensi_Semua_Asdos_${date}.xlsx`);
+  }, [presensiList]);
+
 
   return (
     <AsdosPageShell scrollTopBottom="bottom-24">
@@ -483,7 +680,49 @@ export default function DataPresensiPage() {
                 </div>
               </div>
             ) : (
-              <div ref={paySearchRef} className="flex-1 md:flex-initial w-full md:w-[220px] md:shrink-0 relative">
+              <>
+                <div ref={downloadMenuRef} className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setDownloadMenuOpen(prev => !prev)}
+                    className="flex items-center gap-2 py-3.5 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="hidden md:inline">Excel</span>
+                  </button>
+                  {downloadMenuOpen && (
+                    <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden min-w-[180px]">
+                      <button
+                        type="button"
+                        disabled={!payTableData || payTableData.length === 0}
+                        onClick={() => { handleDownloadExcel(); setDownloadMenuOpen(false); }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        Asdos Ini
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!presensiList.length}
+                        onClick={() => { void handleDownloadAllExcel(); setDownloadMenuOpen(false); }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        Semua Asdos (Gabung)
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!presensiList.length}
+                        onClick={() => { handleDownloadSplitExcel(); setDownloadMenuOpen(false); }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        Semua Asdos (Pisah)
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div ref={paySearchRef} className="flex-1 md:flex-initial w-full md:w-[220px] md:shrink-0 relative">
                 <div className="relative w-full">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
                     <Search className="w-5 h-5 text-slate-400" />
@@ -541,6 +780,7 @@ export default function DataPresensiPage() {
                   </div>
                 )}
               </div>
+              </>
             )}
 
             {pageTab === 'VERIFY' && (
@@ -652,9 +892,26 @@ export default function DataPresensiPage() {
                                         <h2 className="font-bold text-slate-900 leading-snug line-clamp-2 text-sm">
                                           {item.nama_mata_kuliah}
                                         </h2>
-                                        <p className="text-slate-500 font-medium text-[11px] mt-0.5 truncate">
-                                          {item.nama_kelas || '-'}
-                                        </p>
+                                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                          <p className="text-slate-500 font-medium text-[11px] truncate">
+                                            {item.nama_kelas || '-'}
+                                          </p>
+                                          {item.menggantikan && (
+                                            <span className="text-[8px] font-extrabold text-crimson border border-crimson/30 px-1.5 py-0.5 rounded uppercase shrink-0">
+                                              KP
+                                            </span>
+                                          )}
+                                          {isLate && (
+                                            <span className="text-[8px] font-extrabold text-amber-600 border border-amber-400 px-1.5 py-0.5 rounded uppercase shrink-0">
+                                              Terlambat Checkin
+                                            </span>
+                                          )}
+                                          {isCheckoutEmpty && (
+                                            <span className="text-[8px] font-extrabold text-crimson border border-crimson/40 px-1.5 py-0.5 rounded uppercase shrink-0">
+                                              Tidak Checkout
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
 
@@ -670,25 +927,13 @@ export default function DataPresensiPage() {
                                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
                                           <span className="text-[11px] font-bold text-slate-800 truncate" title={item.nama_ruangan || '-'}>
                                             {item.nama_ruangan || '-'}
-                                            {item.menggantikan && (
-                                              <span className="text-[8px] font-extrabold text-crimson bg-rose-50 border border-rose-100 px-1 py-0.2 rounded uppercase ml-1">
-                                                Ganti
-                                              </span>
-                                            )}
                                           </span>
                                         </div>
                                         <div className="flex flex-col gap-0.5">
                                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-In</span>
-                                          <div className="flex items-center gap-1 flex-wrap">
-                                            <span className="text-[11px] font-bold text-slate-800">
-                                              {(!item.waktu_checkin || item.waktu_checkin === '' || item.waktu_checkin === 'null' || String(item.waktu_checkin).startsWith('0001')) ? '-' : formatTime(item.waktu_checkin)}
-                                            </span>
-                                            {isLate && (
-                                              <span className="text-[8px] font-extrabold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase">
-                                                Terlambat
-                                              </span>
-                                            )}
-                                          </div>
+                                          <span className="text-[11px] font-bold text-slate-800">
+                                            {(!item.waktu_checkin || item.waktu_checkin === '' || item.waktu_checkin === 'null' || String(item.waktu_checkin).startsWith('0001')) ? '-' : formatTime(item.waktu_checkin)}
+                                          </span>
                                         </div>
                                         <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-1.5">
                                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-Out</span>
@@ -703,16 +948,12 @@ export default function DataPresensiPage() {
                                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Asisten Dosen</span>
                                       <div className="flex items-center gap-2 min-w-0">
                                         <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                        <span className="text-xs font-semibold text-slate-700 truncate" title={item.nama_asdos}>
-                                          {item.nama_asdos}
+                                        <span className="text-xs font-semibold text-slate-700 truncate">
+                                          {item.nama_asdos_rekan
+                                            ? `${item.nama_asdos} dan ${item.nama_asdos_rekan}`
+                                            : item.nama_asdos}
                                         </span>
                                       </div>
-                                      {item.nama_asdos_rekan && (
-                                        <div className="flex items-center gap-2 min-w-0 mt-1 pl-5">
-                                          <span className="text-[9px] text-slate-400 font-medium">Rekan:</span>
-                                          <span className="text-xs text-slate-500 font-medium truncate">{item.nama_asdos_rekan}</span>
-                                        </div>
-                                      )}
                                     </div>
 
                                     {item.deskripsi_materi ? (
@@ -731,18 +972,11 @@ export default function DataPresensiPage() {
                                         href={videoUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-rose-200 bg-rose-50/30 text-rose-600 hover:bg-rose-50 text-[11px] font-bold transition-all mt-1 active:scale-98"
+                                        className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-slate-900 bg-slate-900 text-white hover:bg-white hover:text-slate-900 text-[11px] font-bold transition-all duration-200 mt-1 active:scale-[0.98]"
                                       >
-                                        <Video className="w-3.5 h-3.5" />
                                         <span>Buka Rekaman Video</span>
-                                        <ExternalLink className="w-3 h-3 text-rose-400 shrink-0" />
+                                        <ExternalLink className="w-3 h-3 shrink-0" />
                                       </a>
-                                    )}
-
-                                    {isCheckoutEmpty && (
-                                      <p className="text-xs font-bold text-crimson mt-2 mb-2 text-center w-full">
-                                        Tidak melakukan checkout
-                                      </p>
                                     )}
 
                                     <div className="pt-3 border-t border-slate-100 flex gap-2 mt-auto">
@@ -779,7 +1013,7 @@ export default function DataPresensiPage() {
                                         <button
                                           type="button"
                                           onClick={() => setConfirmingId(item.id_presensi)}
-                                          className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                                          className="w-full h-10 rounded-xl border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-extrabold text-xs transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                                         >
                                           <span>Verfikasi</span>
                                         </button>
@@ -813,7 +1047,6 @@ export default function DataPresensiPage() {
             }`}
           >
             {isLoading ? (
-              /* Skeleton loading berbentuk tabel */
               <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
                   <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
                     <div className="space-y-1.5">
@@ -854,15 +1087,12 @@ export default function DataPresensiPage() {
             ) : (
               <div className="space-y-4">
                 {payTableData === null ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
-                      <Search className="w-6 h-6 text-slate-400" />
-                    </div>
-                    <p className="text-sm font-bold text-slate-600 mb-1">Pilih asisten dosen</p>
-                    <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
-                      Ketik dan pilih nama dari dropdown untuk melihat data kehadiran.
-                    </p>
-                  </div>
+                  <AsdosState
+                    icon={<Search size={24} />}
+                    title="Pilih Asisten Dosen"
+                    message="Ketik dan pilih nama dari dropdown untuk melihat data kehadiran."
+                    className="mt-2"
+                  />
                 ) : payTableData.length === 0 ? (
                   <AsdosState
                     icon={<Inbox size={24} />}
@@ -871,7 +1101,6 @@ export default function DataPresensiPage() {
                     className="mt-2"
                   />
                 ) : (
-              /* Tabel presensi asisten dosen */
               <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[900px]">
@@ -885,22 +1114,81 @@ export default function DataPresensiPage() {
                         <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Selesai</th>
                         <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Link Video</th>
                         <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider min-w-[160px]">Bahasan Materi</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Pengajar</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Partner</th>
                         <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-24">Verifikasi</th>
                         <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-24">Pembayaran</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {payTableData.map((item, index) => {
-                        const verifyKey = `verify-${item.id_presensi}`;
-                        const payKey = `pay-${item.id_presensi}`;
-                        const verifyPending = payRowPending.has(verifyKey);
-                        const payPending = payRowPending.has(payKey);
-                        const isOnline = item.tipe_absensi === 'link';
-                        const isLate = isCheckInLate(item.waktu_checkin, sessionStartMap.get(item.id_sesi));
+                      {(() => {
+                        const groups: { key: string; label: string; items: PresensiResponseDTO[] }[] = [];
+                        for (const item of payTableData) {
+                          const date = new Date(item.tanggal_mengajar);
+                          const key = `${date.getFullYear()}-${date.getMonth()}`;
+                          const label = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                          const existing = groups.find(g => g.key === key);
+                          if (existing) existing.items.push(item);
+                          else groups.push({ key, label, items: [item] });
+                        }
+                        let rowNum = 0;
                         return (
-                          <tr key={item.id_presensi} className="hover:bg-slate-50/40 transition-colors">
-                            <td className="px-4 py-3 text-xs text-slate-400 font-medium">{index + 1}</td>
+                          <>
+                            {groups.map(({ key, label, items }) => {
+                              const allVerified = items.every(i => i.is_verified);
+                              const allPaid = items.every(i => i.is_paid);
+                              const verifyMonthKey = `month-verify-${items[0]?.id_presensi}`;
+                              const payMonthKey = `month-pay-${items[0]?.id_presensi}`;
+                              const verifyMonthPending = payRowPending.has(verifyMonthKey);
+                              const payMonthPending = payRowPending.has(payMonthKey);
+                              return (
+                              <React.Fragment key={key}>
+                                <tr className="bg-slate-50 border-y border-slate-100">
+                                  <td colSpan={11} className="px-4 py-2">
+                                    <div className="flex items-center justify-between gap-4">
+                                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <button
+                                          type="button"
+                                          disabled={verifyMonthPending}
+                                          onClick={() => handleMonthVerify(items, !allVerified)}
+                                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 disabled:opacity-50 ${
+                                            allVerified
+                                              ? 'border-emerald-500 text-emerald-600 bg-white hover:bg-emerald-50'
+                                              : 'border-slate-300 text-slate-500 bg-white hover:border-emerald-400 hover:text-emerald-600'
+                                          }`}
+                                        >
+                                          {verifyMonthPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                          {allVerified ? 'Batalkan Verifikasi' : 'Verifikasi Semua'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={payMonthPending}
+                                          onClick={() => handleMonthPay(items, !allPaid)}
+                                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                                            allPaid
+                                              ? 'border-emerald-500 text-emerald-600 bg-white hover:bg-emerald-50'
+                                              : 'border-slate-300 text-slate-500 bg-white hover:border-emerald-400 hover:text-emerald-600'
+                                          }`}
+                                        >
+                                          {payMonthPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Banknote className="w-3 h-3" />}
+                                          {allPaid ? 'Batalkan Pembayaran' : 'Bayar Semua'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                                {items.map((item) => {
+                                  rowNum++;
+                                  const verifyKey = `verify-${item.id_presensi}`;
+                                  const payKey = `pay-${item.id_presensi}`;
+                                  const verifyPending = payRowPending.has(verifyKey);
+                                  const payPending = payRowPending.has(payKey);
+                                  const isOnline = item.tipe_absensi === 'link';
+                                  const isLate = isCheckInLate(item.waktu_checkin, sessionStartMap.get(item.id_sesi));
+                                  const currentNum = rowNum;
+                                  return (
+                                  <tr key={item.id_presensi} className="hover:bg-slate-50/40 transition-colors">
+                                    <td className="px-4 py-3 text-xs text-slate-400 font-medium">{currentNum}</td>
                             <td className="px-4 py-3">
                               <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">
                                 {item.nama_mata_kuliah || '-'}
@@ -916,7 +1204,7 @@ export default function DataPresensiPage() {
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkin)}</span>
                                 {isLate && (
-                                  <span className="text-[8px] font-extrabold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                                  <span className="text-[8px] font-extrabold text-amber-600 border border-amber-400 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
                                     Terlambat
                                   </span>
                                 )}
@@ -924,7 +1212,7 @@ export default function DataPresensiPage() {
                             </td>
                             <td className="px-4 py-3">
                               {isOnline ? (
-                                <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full whitespace-nowrap">Online</span>
+                                <span className="text-[8px] font-extrabold text-crimson border border-crimson/40 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">Online</span>
                               ) : (
                                 <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkout)}</span>
                               )}
@@ -968,12 +1256,12 @@ export default function DataPresensiPage() {
                                   onClick={() => handleRowVerify(item.id_presensi, !item.is_verified)}
                                   className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all active:scale-90 cursor-pointer ${
                                       item.is_verified
-                                        ? 'bg-emerald-600 border-emerald-600 shadow-sm'
-                                        : 'border-slate-300 bg-white hover:border-emerald-600'
+                                        ? 'bg-white border-emerald-500'
+                                        : 'border-slate-300 bg-white hover:border-emerald-500'
                                   }`}
                                   title={item.is_verified ? 'Batalkan verifikasi' : 'Verifikasi'}
                                 >
-                                  {item.is_verified && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                  {item.is_verified && <Check className="w-3 h-3 text-emerald-500" strokeWidth={3} />}
                                 </button>
                               )}
                             </td>
@@ -985,32 +1273,34 @@ export default function DataPresensiPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleRowPay(item.id_presensi, !item.is_paid)}
-                                  disabled={!item.is_verified}
-                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all active:scale-90 ${
-                                    !item.is_verified
-                                      ? 'border-slate-200 bg-slate-50 opacity-30 cursor-not-allowed'
-                                      : item.is_paid
-                                      ? 'bg-emerald-600 border-emerald-600 shadow-sm cursor-pointer'
-                                      : 'border-slate-300 bg-white hover:border-emerald-600 cursor-pointer'
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all active:scale-90 cursor-pointer ${
+                                    item.is_paid
+                                      ? 'bg-emerald-600 border-emerald-600 shadow-sm'
+                                      : 'border-slate-300 bg-white hover:border-emerald-600'
                                   }`}
-                                  title={!item.is_verified ? 'Verifikasi dahulu sebelum bayar' : item.is_paid ? 'Batalkan pembayaran' : 'Tandai lunas'}
+                                  title={item.is_paid ? 'Batalkan pembayaran' : 'Tandai lunas'}
                                 >
                                   {item.is_paid && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                                 </button>
                               )}
                             </td>
-                          </tr>
+                                  </tr>
+                                  );
+                                })}
+                              </React.Fragment>
+                              );
+                            })}
+                            {payTableData.length < 15 && [...Array(15 - payTableData.length)].map((_, i) => (
+                              <tr key={`empty-${i}`} className="opacity-20">
+                                <td className="px-4 py-3 text-xs text-slate-400">{payTableData.length + i + 1}</td>
+                                <td colSpan={10} className="px-4 py-3">
+                                  <div className="h-2 bg-slate-100 rounded-full w-24" />
+                                </td>
+                              </tr>
+                            ))}
+                          </>
                         );
-                      })}
-
-                      {payTableData.length < 15 && [...Array(15 - payTableData.length)].map((_, i) => (
-                        <tr key={`empty-${i}`} className="opacity-20">
-                          <td className="px-4 py-3 text-xs text-slate-400">{payTableData.length + i + 1}</td>
-                          <td colSpan={9} className="px-4 py-3">
-                            <div className="h-2 bg-slate-100 rounded-full w-24" />
-                          </td>
-                        </tr>
-                      ))}
+                      })()}
                     </tbody>
                   </table>
                 </div>

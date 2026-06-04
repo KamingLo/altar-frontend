@@ -20,17 +20,24 @@ const getSessionStartMinutes = (waktu: string): number | null => {
   return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
 };
 
+const getSessionEndMinutes = (waktu: string): number | null => {
+  const match = waktu.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  return parseInt(match[3], 10) * 60 + parseInt(match[4], 10);
+};
+
+const isSessionEnded = (session: SessionFromAPI, nowMinutes = getCurrentMinutes()): boolean => {
+  const endMinutes = getSessionEndMinutes(session.waktu);
+  if (endMinutes === null) return false;
+  return nowMinutes >= endMinutes;
+};
+
 const canShowForCheckIn = (session: SessionFromAPI, nowMinutes = getCurrentMinutes()): boolean => {
   const startMinutes = getSessionStartMinutes(session.waktu);
   if (startMinutes === null) return true;
   return nowMinutes >= startMinutes - 15;
 };
 
-const isLateCheckInSession = (session: SessionFromAPI, nowMinutes = getCurrentMinutes()): boolean => {
-  const startMinutes = getSessionStartMinutes(session.waktu);
-  if (startMinutes === null) return false;
-  return nowMinutes > startMinutes + 30;
-};
 
 const normalizeScannedQrToken = (rawToken: string): string => {
   const token = rawToken.trim();
@@ -137,8 +144,11 @@ export default function CheckInPage() {
         .filter(s => !completedSessionIds.has(s.id_sesi));
       const fetchedSessions = availableSessions
         .filter(isQrSession)
-        .filter(s => canShowForCheckIn(s))
-        .sort((a, b) => Number(isLateCheckInSession(a)) - Number(isLateCheckInSession(b)));
+        .sort((a, b) => {
+          const aStart = getSessionStartMinutes(a.waktu) ?? 0;
+          const bStart = getSessionStartMinutes(b.waktu) ?? 0;
+          return aStart - bStart;
+        });
       setSessions(fetchedSessions);
 
       const { sessionId } = parseAndValidateQrToken(token);
@@ -152,7 +162,12 @@ export default function CheckInPage() {
         ? availableSessions.find(s => s.id_sesi === sessionId && isQrSession(s) && !canShowForCheckIn(s))
         : null;
 
-      if (matchedSession) {
+      const currentMinutes = getCurrentMinutes();
+      const isMatchedSessionDisabled = matchedSession
+        ? isSessionEnded(matchedSession, currentMinutes) || !canShowForCheckIn(matchedSession, currentMinutes)
+        : false;
+
+      if (matchedSession && !isMatchedSessionDisabled) {
         setSelectedSessionId(matchedSession.id_sesi);
 
         setStep(2);
@@ -169,8 +184,14 @@ export default function CheckInPage() {
           setScanMessage('Sesi ini menggunakan presensi online, bukan QR. Silakan gunakan menu Presensi Kelas Online.');
         } else if (matchedUpcomingQrSession) {
           setScanMessage('Sesi QR ini belum masuk waktu check-in. Silakan coba lagi mendekati jam mengajar.');
+        } else if (matchedSession && isSessionEnded(matchedSession, currentMinutes)) {
+          setScanMessage('Sesi ini sudah selesai dan tidak dapat dilakukan check-in.');
         }
-        if (fetchedSessions.length > 0) {
+        
+        const firstActive = fetchedSessions.find(s => !isSessionEnded(s, currentMinutes) && canShowForCheckIn(s, currentMinutes));
+        if (firstActive) {
+          setSelectedSessionId(firstActive.id_sesi);
+        } else if (fetchedSessions.length > 0) {
           setSelectedSessionId(fetchedSessions[0].id_sesi);
         }
         setStep(2);
@@ -338,8 +359,8 @@ export default function CheckInPage() {
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   const selectedSession = sessions.find(s => s.id_sesi === selectedSessionId);
   const currentMinutes = getCurrentMinutes();
-  const normalSessions = sessions.filter(s => !isLateCheckInSession(s, currentMinutes));
-  const lateSessions = sessions.filter(s => isLateCheckInSession(s, currentMinutes));
+  const activeSessions = sessions.filter(s => !isSessionEnded(s, currentMinutes) && canShowForCheckIn(s, currentMinutes));
+  const disabledSessions = sessions.filter(s => isSessionEnded(s, currentMinutes) || !canShowForCheckIn(s, currentMinutes));
 
   const handleCloseSheet = () => {
     setIsSheetClosing(true);
@@ -400,7 +421,7 @@ try {
     setIsInlineConfirmOpen(false);
   };
 
-  const renderSessionOption = (s: SessionFromAPI, isLate = false) => {
+  const renderSessionOption = (s: SessionFromAPI, disabled = false) => {
     const isSel = selectedSessionId === s.id_sesi;
     const datePart = s.waktu.split(', ')[0] ?? '-';
     const timePart = s.waktu.split(', ')[1] ?? s.waktu;
@@ -408,13 +429,13 @@ try {
     return (
       <React.Fragment key={s.id_sesi}>
         <section
-          onClick={() => handleSelectSession(s.id_sesi)}
-          className={`bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 border transition-all cursor-pointer active:scale-[0.99] flex flex-col gap-6 w-full ${
-            isSel
-              ? 'border-crimson shadow-[0_10px_25px_rgba(148,28,47,0.12)]'
-              : isLate
-                ? 'border-amber-100 hover:border-amber-200 bg-amber-50/30'
-                : 'border-slate-100 hover:border-slate-200'
+          onClick={disabled ? undefined : () => handleSelectSession(s.id_sesi)}
+          className={`bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 border transition-all flex flex-col gap-6 w-full ${
+            disabled
+              ? 'border-slate-100 opacity-50 cursor-not-allowed select-none'
+              : isSel
+                ? 'border-crimson shadow-[0_10px_25px_rgba(148,28,47,0.12)] cursor-pointer active:scale-[0.99]'
+                : 'border-slate-100 hover:border-slate-200 cursor-pointer active:scale-[0.99]'
           }`}
         >
           <article className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -423,11 +444,6 @@ try {
                 <h3 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 leading-snug line-clamp-2">
                   {s.mata_kuliah}
                 </h3>
-                {isLate && (
-                  <span className="mb-1 px-2.5 py-1 rounded-xl text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-100 uppercase">
-                    Terlambat
-                  </span>
-                )}
               </div>
               <p className="text-sm text-slate-500 font-medium">{s.nama_kelas || 'Kelas tidak tersedia'}</p>
               {s.tipe_jadwal === 'PENGGANTI' && (
@@ -461,16 +477,9 @@ try {
             </div>
           </article>
 
-          {isLate && (
-            <div className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 text-left">
-              <p className="text-[11px] md:text-xs font-semibold text-amber-700 leading-relaxed">
-                Sesi ini sudah melewati batas untuk check-in, namun masih dapat dicatat hari ini.
-              </p>
-            </div>
-          )}
         </section>
 
-        {isSel && (
+        {isSel && !disabled && (
           <div className="-mt-1 mb-2">
             {isInlineConfirmOpen ? (
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -664,6 +673,7 @@ try {
                   <ImageIcon size={17} />
                   Pindai dari File
                 </button>
+
               </div>
               {cameras.length > 1 && cameraStatus === 'active' && (
                 <select
@@ -759,6 +769,7 @@ try {
                   <ImageIcon size={17} />
                   Pindai dari File Gambar
                 </button>
+
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -806,7 +817,6 @@ try {
           <div>
             <div className="flex justify-between items-center mb-4 md:mb-6 px-1">
               <h4 className="text-[11px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Sesi Tersedia Hari Ini</h4>
-              <span className="bg-crimson/10 text-crimson text-[10px] md:text-xs font-bold px-2.5 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg">{sessions.length} Sesi</span>
             </div>
 
             <div className="space-y-4 md:space-y-6 mb-8 md:mb-10">
@@ -822,36 +832,8 @@ try {
                 </div>
               ) : (
                 <>
-                  {normalSessions.length > 0 && (
-                    <div className="space-y-4 md:space-y-6">
-                      <div className="flex items-center justify-between px-1">
-                        <p className="text-[10px] md:text-xs font-extrabold text-slate-400 tracking-widest uppercase">
-                          Siap Check-in
-                        </p>
-                        <span className="text-[10px] font-bold text-slate-400">{normalSessions.length} sesi</span>
-                      </div>
-                      {normalSessions.map(s => renderSessionOption(s))}
-                    </div>
-                  )}
-
-                  {lateSessions.length > 0 && (
-                    <div className="space-y-4 md:space-y-6">
-                      <div className="flex items-center justify-between px-1 pt-2">
-                        <div>
-                          <p className="text-[10px] md:text-xs font-extrabold text-amber-700 tracking-widest uppercase">
-                            Terlambat Check-in
-                          </p>
-                          <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                            Sesi di bawah masih dapat dicatat selama hari ini.
-                          </p>
-                        </div>
-                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full">
-                          {lateSessions.length} sesi
-                        </span>
-                      </div>
-                      {lateSessions.map(s => renderSessionOption(s, true))}
-                    </div>
-                  )}
+                  {activeSessions.map(s => renderSessionOption(s))}
+                  {disabledSessions.map(s => renderSessionOption(s, true))}
                 </>
               )}
             </div>

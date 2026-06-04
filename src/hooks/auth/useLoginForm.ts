@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginUser } from '@/lib/actions/auth/login';
 import { initiateGoogleAuth } from '@/lib/actions/auth/oauth';
@@ -14,6 +14,12 @@ export const useAuthForm = (initialError?: string | null) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(initialError ?? null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialError) {
+      setErrorMessage(initialError);
+    }
+  }, [initialError]);
 
   const router = useRouter();
   const setUser = useUserStore((state) => state.setUser);

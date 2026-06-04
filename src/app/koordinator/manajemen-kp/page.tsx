@@ -369,7 +369,11 @@ export default function ManajemenKpPage() {
                       </div>
                       <div className="flex items-center gap-2 min-w-0">
                         <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="text-xs font-semibold text-slate-700 truncate" title={req.substitute_teacher}>{penggantiName}</span>
+                        <span className="text-xs font-semibold text-slate-700 truncate">
+                          {req.substitute_teacher_2
+                            ? `${penggantiName} dan ${req.substitute_teacher_2}`
+                            : penggantiName}
+                        </span>
                       </div>
                     </div>
 
@@ -465,14 +469,10 @@ export default function ManajemenKpPage() {
 
           <div className="fixed inset-0 z-[10001] flex items-center justify-center pointer-events-none p-4">
             <div
-              className={`
-                w-full max-w-md bg-white rounded-[2.2rem] shadow-2xl p-7 pointer-events-auto border border-slate-100 flex flex-col relative overflow-hidden transition-all duration-300
-                ${isModalVisible && !isClosing ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
-              `}
+              className={`w-full max-w-md bg-white rounded-[2.2rem] shadow-2xl p-7 pointer-events-auto border border-slate-100 flex flex-col relative overflow-hidden transition-all duration-300 ${isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
             >
 
               <div className="mb-5">
-                <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase block mb-1">Konfirmasi Penolakan</span>
                 <h3 className="text-xl font-black text-slate-800 leading-tight">Tolak Kuliah Pengganti?</h3>
               </div>
               <div className="mb-5">

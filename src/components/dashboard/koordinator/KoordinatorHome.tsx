@@ -6,6 +6,8 @@ import { useUserStore } from '@/store/useUserStore';
 import { FileText, QrCode, Users, CalendarSync, CalendarDays } from 'lucide-react';
 import { getAllSubstitutions } from '@/lib/actions/pergantian-kelas';
 import { getAllPresensi } from '@/lib/actions/presensi';
+import { getSemesterList } from '@/lib/actions/data-master';
+import { getAllSessions } from '@/lib/actions/jadwal';
 import type { SubstituteSessionDetail } from '@/types/api';
 import type { PresensiResponseDTO } from '@/lib/actions/presensi';
 import { parseUTC } from '@/lib/jadwal-utils';
@@ -66,21 +68,60 @@ export default function KoordinatorHome() {
   const { markSeen, setPendingCount } = useNotificationStore();
   const user = useUserStore((state) => state.user);
   const [kpItems, setKpItems] = useState<SubstituteSessionDetail[]>([]);
+  const [allKpItems, setAllKpItems] = useState<SubstituteSessionDetail[]>([]);
   const [allPresensiItems, setAllPresensiItems] = useState<PresensiResponseDTO[]>([]);
+  const [todaySessionsCount, setTodaySessionsCount] = useState<number | null>(null);
+  const [todayFilledCount, setTodayFilledCount] = useState<number | null>(null);
   const [notifLoaded, setNotifLoaded] = useState(false);
+
+  const pendingKpCount = useMemo(() => allKpItems.filter(kp => kp.status === 'PENDING').length, [allKpItems]);
+  const verifiedKpCount = useMemo(() => allKpItems.filter(kp => kp.status === 'VERIFIED' || kp.status === 'REJECTED').length, [allKpItems]);
+
+  const unverifiedPresensiCount = useMemo(() => allPresensiItems.filter(p => !p.is_verified).length, [allPresensiItems]);
+  const verifiedPresensiCount = useMemo(() => allPresensiItems.filter(p => p.is_verified).length, [allPresensiItems]);
 
   useEffect(() => {
     async function fetchData() {
-      const [kpRes, allPresensiRes] = await Promise.all([
-        getAllSubstitutions('PENDING'),
+      const [kpRes, allPresensiRes, semesterRes] = await Promise.all([
+        getAllSubstitutions(), 
         getAllPresensi(),
+        getSemesterList(1, '', 10),
       ]);
       const kpData = kpRes.success && kpRes.data?.items ? kpRes.data.items : [];
       const allPresensiData = allPresensiRes.success && allPresensiRes.data ? allPresensiRes.data : [];
+      
+      const pendingKps = kpData.filter((kp) => kp.status === 'PENDING');
       const unverifiedCount = allPresensiData.filter((p) => !p.is_verified).length;
-      setKpItems(kpData);
+      
+      setKpItems(pendingKps);
+      setAllKpItems(kpData);
       setAllPresensiItems(allPresensiData);
-      setPendingCount(kpData.length + unverifiedCount);
+      setPendingCount(pendingKps.length + unverifiedCount);
+
+      const semesters = semesterRes.success && semesterRes.data?.items ? semesterRes.data.items : [];
+      const activeSemesterId = semesters[0]?.id;
+      if (activeSemesterId) {
+        const today = new Date().toISOString().split('T')[0];
+        const sessionsRes = await getAllSessions({
+          id_semester: activeSemesterId,
+          start_date: today,
+          end_date: today,
+        });
+        const todaySessions = sessionsRes.success && sessionsRes.data?.items ? sessionsRes.data.items : [];
+        setTodaySessionsCount(todaySessions.length);
+
+        const filled = todaySessions.filter(session => 
+          allPresensiData.some(p => 
+            p.id_sesi === session.id_sesi && 
+            (p.tanggal_mengajar?.startsWith(today) || p.waktu_checkin?.startsWith(today))
+          )
+        ).length;
+        setTodayFilledCount(filled);
+      } else {
+        setTodaySessionsCount(0);
+        setTodayFilledCount(0);
+      }
+
       markSeen();
       setNotifLoaded(true);
     }
@@ -147,18 +188,109 @@ export default function KoordinatorHome() {
     <div className="max-w-6xl mx-auto px-1.5 sm:px-2 md:px-0 pb-10 md:pb-12">
 
       <div className="mb-6 md:mb-8 animate-fade-up">
-        <p className="text-[11px] font-bold text-crimson tracking-[0.15em] uppercase mb-1 md:text-xs">
-          Dashboard Koordinator
-        </p>
-        <h1 className="text-[24px] md:text-[30px] font-extrabold text-slate-900 leading-tight">
-          Halo, {displayName}
-        </h1>
-        <p className="text-xs md:text-sm text-slate-500 mt-2 max-w-2xl">
-          Pantau pengajuan kelas pengganti dan aktivitas presensi asisten dosen dalam satu ringkasan.
-        </p>
+        <div className="flex items-end justify-between gap-6">
+          <div>
+            <p className="text-[11px] font-bold text-crimson tracking-[0.15em] uppercase mb-1 md:text-xs">
+              Dashboard Koordinator
+            </p>
+            <h1 className="text-[24px] md:text-[30px] font-extrabold text-slate-900 leading-tight">
+              Halo, {displayName}
+            </h1>
+            <p className="text-xs md:text-sm text-slate-500 mt-2 max-w-2xl">
+              Pantau pengajuan kelas pengganti dan aktivitas presensi asisten dosen dalam satu ringkasan.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-wrap justify-between lg:hidden gap-y-6 mb-8 w-full animate-fade-up" style={{ animationDelay: '0.05s' }}>
+      <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6 md:mb-8 max-w-3xl animate-fade-up" style={{ animationDelay: '0.05s' }}>
+        <Link
+          href="/koordinator/manajemen-kp"
+          className="bg-white rounded-xl md:rounded-2xl border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.015)] p-2.5 md:p-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)] active:scale-[0.98] transition-all duration-200 block text-left md:text-center"
+        >
+          <div className="mb-2 md:mb-3">
+            <span className="text-[9px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider block truncate">
+              <span className="hidden md:inline">Kelas Pengganti</span>
+              <span className="inline md:hidden">Kls Pengganti</span>
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-1 md:gap-4 divide-x divide-slate-100">
+            <div className="text-left md:text-center">
+              <p className="text-base md:text-xl font-extrabold text-slate-900 leading-none">
+                {notifLoaded ? pendingKpCount : '—'}
+              </p>
+              <p className="text-[8px] md:text-[10px] font-medium text-slate-500 mt-1 leading-none">
+                <span className="block md:inline">Belum</span> <span className="block md:inline">Verif</span>
+              </p>
+            </div>
+            <div className="pl-1.5 md:pl-0 text-left md:text-center">
+              <p className="text-base md:text-xl font-extrabold text-slate-900 leading-none">
+                {notifLoaded ? verifiedKpCount : '—'}
+              </p>
+              <p className="text-[8px] md:text-[10px] font-medium text-slate-500 mt-1 leading-none">
+                Terverif
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          href="/koordinator/data-presensi"
+          className="bg-white rounded-xl md:rounded-2xl border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.015)] p-2.5 md:p-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)] active:scale-[0.98] transition-all duration-200 block text-left md:text-center"
+        >
+          <div className="mb-2 md:mb-3">
+            <span className="text-[9px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider block truncate">
+              <span className="hidden md:inline">Kehadiran Asdos</span>
+              <span className="inline md:hidden">Presensi Asdos</span>
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-1 md:gap-4 divide-x divide-slate-100">
+            <div className="text-left md:text-center">
+              <p className="text-base md:text-xl font-extrabold text-slate-900 leading-none">
+                {notifLoaded ? unverifiedPresensiCount : '—'}
+              </p>
+              <p className="text-[8px] md:text-[10px] font-medium text-slate-500 mt-1 leading-none">
+                <span className="block md:inline">Perlu</span> <span className="block md:inline">Verif</span>
+              </p>
+            </div>
+            <div className="pl-1.5 md:pl-0 text-left md:text-center">
+              <p className="text-base md:text-xl font-extrabold text-slate-900 leading-none">
+                {notifLoaded ? verifiedPresensiCount : '—'}
+              </p>
+              <p className="text-[8px] md:text-[10px] font-medium text-slate-500 mt-1 leading-none">
+                Terverif
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          href="/koordinator/manajemen-jadwal"
+          className="bg-white rounded-xl md:rounded-2xl border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.015)] p-2.5 md:p-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)] active:scale-[0.98] transition-all duration-200 block text-left md:text-center"
+        >
+          <div className="mb-2 md:mb-3">
+            <span className="text-[9px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider block truncate">
+              Jadwal Hari Ini
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-1 md:gap-4 divide-x divide-slate-100">
+            <div className="text-left md:text-center">
+              <p className="text-base md:text-xl font-extrabold text-slate-900 leading-none">
+                {notifLoaded && todaySessionsCount !== null ? todaySessionsCount : '—'}
+              </p>
+              <p className="text-[8px] md:text-[10px] font-medium text-slate-500 mt-1 leading-none">Terjadwal</p>
+            </div>
+            <div className="pl-1.5 md:pl-0 text-left md:text-center">
+              <p className="text-base md:text-xl font-extrabold text-slate-900 leading-none">
+                {notifLoaded && todayFilledCount !== null ? todayFilledCount : '—'}
+              </p>
+              <p className="text-[8px] md:text-[10px] font-medium text-slate-500 mt-1 leading-none">Terisi</p>
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      <div className="flex flex-wrap justify-between lg:hidden gap-y-6 mb-6 w-full animate-fade-up" style={{ animationDelay: '0.05s' }}>
         {koordinatorMenuItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -174,13 +306,15 @@ export default function KoordinatorHome() {
         })}
       </div>
 
+
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-8">
 
-        <div className="animate-fade-up" style={{ animationDelay: '0.1s' }}>
+        <div className="animate-fade-up flex flex-col" style={{ animationDelay: '0.1s' }}>
           <div className="flex items-center mb-4 lg:mb-6 px-1">
             <h3 className="font-bold text-lg lg:text-xl text-slate-800">Notifikasi Masuk</h3>
           </div>
-          <div className="space-y-4">
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 content-start">
             {!notifLoaded ? (
               [1, 2].map((i) => (
                 <div key={i} className="bg-white p-4 lg:p-5 rounded-2xl animate-pulse flex gap-4 items-start">
@@ -193,7 +327,7 @@ export default function KoordinatorHome() {
                 </div>
               ))
             ) : kpItems.length === 0 && unverifiedPresensi.length === 0 ? (
-              <div className="bg-white p-6 rounded-2xl lg:rounded-3xl shadow-sm border border-slate-100 text-center text-slate-500">
+              <div className="lg:col-span-2 bg-white rounded-2xl lg:rounded-3xl shadow-sm border border-slate-100 text-center text-slate-500 flex-1 flex items-center justify-center min-h-[140px] lg:min-h-0 py-10">
                 <p className="text-sm font-semibold">Tidak ada notifikasi masuk</p>
               </div>
             ) : (
@@ -249,14 +383,14 @@ export default function KoordinatorHome() {
           </div>
         </div>
 
-        <div className="animate-fade-up" style={{ animationDelay: '0.15s' }}>
+        <div className="animate-fade-up flex flex-col" style={{ animationDelay: '0.15s' }}>
           <div className="flex justify-between items-center mb-4 lg:mb-6 px-1">
             <h3 className="font-bold text-lg lg:text-xl text-slate-800">Aktivitas Asisten Dosen</h3>
             <Link href="/koordinator/data-presensi" className="text-xs lg:text-sm font-semibold text-crimson active:scale-95 transition">
               Lihat Semua
             </Link>
           </div>
-          <div className="bg-white rounded-2xl lg:rounded-[2rem] shadow-sm border border-slate-100 p-4 lg:p-6">
+          <div className="bg-white rounded-2xl lg:rounded-3xl shadow-sm border border-slate-100 p-4 lg:p-6 flex-1 flex flex-col min-h-[140px] lg:min-h-0">
             {!notifLoaded ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
@@ -270,7 +404,7 @@ export default function KoordinatorHome() {
                 ))}
               </div>
             ) : activities.length === 0 ? (
-              <div className="py-10 text-center text-slate-500">
+              <div className="flex-1 flex items-center justify-center text-center text-slate-500">
                 <p className="text-sm font-semibold">Tidak ada aktivitas presensi terbaru</p>
               </div>
             ) : (

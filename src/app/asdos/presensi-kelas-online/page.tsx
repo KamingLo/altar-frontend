@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { Check, ArrowLeft, BookOpen, Send, Loader2, AlertCircle } from 'lucide-react';
-import { getMyPresensi, submitOnlineAttendance } from '@/lib/actions/presensi';
+import { getMyPresensi, submitOnlineAttendance, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 
 import { AsdosOnlineSessionSkeleton, AsdosPageHeader, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 import { getSubstituteSessionId, isOnlineSession } from '@/lib/presensi-mode';
+import { useAuth } from '@/hooks/dashboard/useAuth';
 
 function todayIso() {
   const today = new Date();
@@ -45,6 +46,7 @@ function canShowForOnlineAttendance(session: SessionFromAPI): boolean {
 
 
 export default function PresensiKelasOnlinePage() {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [sessions, setSessions] = useState<SessionFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,6 +59,7 @@ export default function PresensiKelasOnlinePage() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [completedSessionIds, setCompletedSessionIds] = useState<Set<string>>(new Set());
   const [submittedSession, setSubmittedSession] = useState<SessionFromAPI | null>(null);
+  const [myPresensi, setMyPresensi] = useState<PresensiResponseDTO[]>([]);
 
   const MAX_MATERI = 100;
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -71,7 +74,20 @@ export default function PresensiKelasOnlinePage() {
   const selectedSession = onlineSessions.find(s => s.id_sesi === selectedSessionId);
   const successSession = submittedSession ?? selectedSession;
 
+  const partnerPresensi = useMemo(() => {
+    if (!selectedSession || !user) return null;
+    const substituteSessionId = getSubstituteSessionId(selectedSession);
+    const today = todayIso();
+    return myPresensi.find(p => {
+      const isSameSession = p.id_sesi === selectedSession.id_sesi || (substituteSessionId && p.id_sesi_pengganti === substituteSessionId);
+      const isToday = p.tanggal_mengajar?.slice(0, 10) === today;
+      const isPartner = p.nama_asdos !== user.username;
+      return isSameSession && isToday && isPartner;
+    }) || null;
+  }, [selectedSession, user, myPresensi]);
+
   useEffect(() => {
+    if (!user) return;
     async function fetchSessions() {
       setIsLoading(true);
       const today = todayIso();
@@ -79,9 +95,12 @@ export default function PresensiKelasOnlinePage() {
         getSessionsByDate(today),
         getMyPresensi(),
       ]);
+      const rawPresensi = presensiRes.success ? presensiRes.data ?? [] : [];
+      setMyPresensi(rawPresensi);
+
       const completedIds = new Set<string>(
-        (presensiRes.success ? presensiRes.data ?? [] : [])
-          .filter(p => p.tanggal_mengajar?.slice(0, 10) === today)
+        rawPresensi
+          .filter(p => p.tanggal_mengajar?.slice(0, 10) === today && p.nama_asdos === user?.username)
           .flatMap(p => [p.id_sesi, p.id_sesi_pengganti].filter((v): v is string => !!v))
       );
       setCompletedSessionIds(completedIds);
@@ -109,7 +128,19 @@ export default function PresensiKelasOnlinePage() {
       setIsLoading(false);
     }
     fetchSessions();
-  }, []);
+  }, [user]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (partnerPresensi) {
+      setLink(partnerPresensi.link_video || '');
+      setMateri(partnerPresensi.deskripsi_materi || '');
+    } else {
+      setLink('');
+      setMateri('');
+    }
+  }, [partnerPresensi]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleReset = () => {
     const firstSession = onlineSessions[0];
@@ -161,8 +192,6 @@ export default function PresensiKelasOnlinePage() {
         return next;
       });
       setStep(3);
-    } else {
-      // error silent — biarkan state tidak berubah
     }
     setIsSubmitting(false);
   };
@@ -199,7 +228,6 @@ export default function PresensiKelasOnlinePage() {
           <div>
             <div className="flex justify-between items-center mb-4 md:mb-6 px-1">
               <h4 className="text-[11px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Sesi Tersedia Hari Ini</h4>
-              <span className="bg-crimson/10 text-crimson text-[10px] md:text-xs font-bold px-2.5 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg">{onlineSessions.length} Sesi</span>
             </div>
             <div className="space-y-4 mb-6 md:mb-8">
               {onlineSessions.map(s => {
@@ -214,7 +242,6 @@ export default function PresensiKelasOnlinePage() {
                         <div className="flex flex-col gap-1 min-w-0">
                           <h3 className="text-xl md:text-2xl font-bold text-slate-900 leading-snug mb-1">{s.mata_kuliah}</h3>
                           <p className="text-sm text-slate-500 font-medium">{s.nama_kelas}</p>
-                          {/* NON-DEMO: {!isAvailable && <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Aktif pada {time.start}</p>} */}
                           {s.tipe_jadwal === 'PENGGANTI' && (
                             <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">Pengganti</span>
                           )}
@@ -282,8 +309,8 @@ export default function PresensiKelasOnlinePage() {
 
           <div className="flex flex-col gap-6">
             <section className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col gap-5 w-full">
-              <input type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="Masukkan link Teams / rekaman..."
-                className="w-full bg-fog rounded-[14px] p-4 md:p-5 text-sm md:text-base text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-crimson/30 transition-all border-0" />
+              <input type="url" value={link} onChange={e => setLink(e.target.value)} disabled={!!partnerPresensi} placeholder="Masukkan link Teams / rekaman..."
+                className={`w-full bg-fog rounded-[14px] p-4 md:p-5 text-sm md:text-base text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-crimson/30 transition-all border-0 ${partnerPresensi ? 'cursor-not-allowed opacity-80' : ''}`} />
 
               <div>
                 <div className="flex items-center gap-2 mb-3">
@@ -291,18 +318,27 @@ export default function PresensiKelasOnlinePage() {
                   <span className="text-sm md:text-base font-bold text-slate-800">Bahasan Materi</span>
                 </div>
                 <div className="relative">
-                  <textarea value={materi} onChange={e => { if (e.target.value.length <= MAX_MATERI) setMateri(e.target.value); }}
+                  <textarea value={materi} onChange={e => { if (partnerPresensi) return; if (e.target.value.length <= MAX_MATERI) setMateri(e.target.value); }}
+                    disabled={!!partnerPresensi}
                     placeholder="Ketik detail bahasan materi hari ini..."
-                    className="w-full bg-fog rounded-[14px] p-4 md:p-5 pb-8 text-sm md:text-base text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-crimson/30 transition-all resize-none h-36 md:h-48 border-0" />
+                    className={`w-full bg-fog rounded-[14px] p-4 md:p-5 pb-8 text-sm md:text-base text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-crimson/30 transition-all resize-none h-36 md:h-48 border-0 ${partnerPresensi ? 'cursor-not-allowed opacity-80' : ''}`} />
                   <div className={`absolute bottom-3 right-4 text-[10px] font-medium bg-fog/80 px-1 ${materi.length >= MAX_MATERI ? 'text-crimson' : 'text-slate-400'}`}>
                     {materi.length} / {MAX_MATERI} huruf
                   </div>
                 </div>
               </div>
 
-              <p className="text-[10px] md:text-xs text-crimson font-medium leading-relaxed">
-                * Mohon isi bahasan materi dengan jelas. Jika mengajar bersama partner asisten dosen, pastikan bahasan materi yang diisi sama.
-              </p>
+              {partnerPresensi ? (
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                  <p className="text-[11px] md:text-xs font-semibold text-emerald-700 leading-relaxed">
+                    Link kelas dan bahasan materi sudah diisi oleh partner Anda ({partnerPresensi.nama_asdos}). Form dikunci agar laporan tetap konsisten.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[10px] md:text-xs text-crimson font-medium leading-relaxed">
+                  * Mohon isi bahasan materi dengan jelas. Jika mengajar bersama partner asisten dosen, pastikan bahasan materi yang diisi sama.
+                </p>
+              )}
 
               <div className="pt-2 border-t border-slate-100">
                 {isConfirmOpen ? (

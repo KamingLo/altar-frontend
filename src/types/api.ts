@@ -16,6 +16,7 @@ export type UserRole = 'asdos' | 'koordinator';
 export interface UserData {
   id: string;
   email: string;
+  username: string;
   id_asisten?: string | null;
   id_koordinator?: string | null;
 }
@@ -33,6 +34,7 @@ export interface SubstituteSessionDetail {
   id_asdos1: string | null;
   id_asdos2: string | null;
   substitute_teacher: string;
+  substitute_teacher_2?: string | null;
   session?: {
     id_sesi: string;
     nama_kelas: string;

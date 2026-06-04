@@ -426,21 +426,7 @@ export default function JadwalAjarPage() {
     setEndDate(value);
   };
 
-  const shiftScheduleDate = (direction: -1 | 1) => {
-    if (viewType === 'TABLE') {
-      const nextDate = toIsoDateFromDate(addDays(parseLocalDate(tableDate), direction));
-      setTableDate(nextDate);
-      setStartDate(nextDate);
-      setEndDate(nextDate);
-      return;
-    }
 
-    const nextStart = toIsoDateFromDate(addDays(parseLocalDate(startDate), direction));
-    const nextEnd = toIsoDateFromDate(addDays(parseLocalDate(endDate), direction));
-    setStartDate(nextStart);
-    setEndDate(nextEnd);
-    setTableDate(nextStart);
-  };
 
   const filtered = sessions.filter(s =>
     deriveStatus(s.waktu) !== 'Selesai' &&
@@ -476,10 +462,6 @@ export default function JadwalAjarPage() {
   }, [sessions, viewType, tableDate, rooms]);
 
   const ScheduleCard = ({ s, gridMode = false }: { s: SessionFromAPI; gridMode?: boolean }) => {
-    const status = deriveStatus(s.waktu);
-    const cfg = status === 'Berjalan'
-      ? { bg: 'bg-crimson', text: 'text-white', label: 'BERJALAN' }
-      : { bg: 'bg-crimson/10', text: 'text-crimson', label: status === 'Mendatang' ? 'MENDATANG' : 'SELESAI' };
     const timePart = s.waktu.split(', ')[1] ?? s.waktu;
 
     return (
@@ -510,10 +492,6 @@ export default function JadwalAjarPage() {
               <span className={`font-bold text-slate-800 ${gridMode ? 'text-xs md:text-xs' : 'text-sm md:text-base'}`}>{s.pengajar || '-'}</span>
             </div>
           </div>
-
-          <span className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap self-start ${cfg.bg} ${cfg.text}`}>
-            {cfg.label}
-          </span>
         </article>
       </section>
     );
@@ -590,33 +568,8 @@ export default function JadwalAjarPage() {
       <div className="mb-6 flex flex-col gap-3 md:gap-4">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 md:gap-4">
           {viewType === 'TABLE' ? (
-            <div className="w-full md:w-auto">
-              <p className="text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
-                Tanggal
-              </p>
-              <div className="flex items-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => shiftScheduleDate(-1)}
-                  aria-label="Tanggal sebelumnya"
-                  className="h-[52px] w-11 shrink-0 rounded-[14px] border border-slate-200 bg-white text-slate-500 shadow-sm flex items-center justify-center active:scale-95 transition hover:bg-slate-50 hover:text-crimson"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-
-                <div className="min-w-0 flex-1 md:w-52">
-                  <DatePickerField label="Tanggal" value={tableDate} onChange={handleTableDateChange} hideLabel />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => shiftScheduleDate(1)}
-                  aria-label="Tanggal berikutnya"
-                  className="h-[52px] w-11 shrink-0 rounded-[14px] border border-slate-200 bg-white text-slate-500 shadow-sm flex items-center justify-center active:scale-95 transition hover:bg-slate-50 hover:text-crimson"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
+            <div className="w-full md:w-52">
+              <DatePickerField label="Tanggal" value={tableDate} onChange={handleTableDateChange} />
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 md:flex md:gap-3">

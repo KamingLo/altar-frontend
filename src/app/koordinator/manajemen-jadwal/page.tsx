@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertCircle,
   Calendar,
   CalendarDays,
-  CheckCircle2,
   Filter,
   LayoutList,
+  Maximize2,
   Pencil,
   Plus,
   Search,
@@ -15,6 +16,7 @@ import {
   Trash2,
   User,
   Users,
+  X,
 } from 'lucide-react';
 import {
   buatSesi,
@@ -331,6 +333,7 @@ export default function ManajemenJadwalPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipe, setFilterTipe] = useState<TipeFilter>('ALL');
   const [viewType, setViewType] = useState<'CARD' | 'TABLE'>('CARD');
+  const [isTableExpanded, setIsTableExpanded] = useState(false);
   const [tableDate, setTableDate] = useState(() => toIsoDateFromDate(today));
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -625,9 +628,6 @@ export default function ManajemenJadwalPage() {
       setSemesters(sorted);
       return sorted;
     }
-    if (!redirectIfSessionExpired(res.message)) {
-      // error silent
-    }
     return null;
   }, []);
 
@@ -668,7 +668,6 @@ export default function ManajemenJadwalPage() {
       }
     } catch {
       setIsDeleteSemesterSubmitting(false);
-      // error silent
     }
   };
 
@@ -735,14 +734,6 @@ export default function ManajemenJadwalPage() {
     item: MasterItem | null,
   ) => {
     const resource = masterModal.resource;
-    const labelMap: Record<MasterResource, string> = {
-      kelas: 'Kelas',
-      mk: 'Mata Kuliah',
-      ruangan: 'Ruangan',
-      lecturer: 'Dosen',
-      semester: 'Semester',
-      asdos: 'Asisten Dosen',
-    };
     const actionLabel = action === 'created' ? 'dibuat' : action === 'updated' ? 'diperbarui' : 'dihapus';
     void actionLabel;
 
@@ -891,9 +882,6 @@ export default function ManajemenJadwalPage() {
         setInstructorType('DOSEN');
       } else {
         setInstructorType('ASDOS');
-      }
-      if (!filled.id_kelas || !filled.id_mk || !filled.id_ruangan) {
-        // beberapa data tidak ditemukan, user perlu pilih ulang
       }
     }
   };
@@ -1167,21 +1155,32 @@ export default function ManajemenJadwalPage() {
             </div>
 
             <div className="flex gap-2 w-full md:ml-auto md:w-auto md:max-w-[480px] items-center">
-              <div className="hidden md:flex bg-slate-100 p-0.5 rounded-xl shrink-0">
-                {([
-                  { type: 'CARD' as const, icon: <LayoutList size={15} />, label: 'Kartu' },
-                  { type: 'TABLE' as const, icon: <Table2 size={15} />, label: 'Tabel' },
-                ]).map(({ type, icon, label }) => (
+              <div className="hidden md:flex items-center gap-2 shrink-0">
+                <div className="flex bg-slate-100 p-0.5 rounded-xl">
+                  {([
+                    { type: 'CARD' as const, icon: <LayoutList size={15} />, label: 'Kartu' },
+                    { type: 'TABLE' as const, icon: <Table2 size={15} />, label: 'Tabel' },
+                  ]).map(({ type, icon, label }) => (
+                    <button
+                      key={type}
+                      onClick={() => handleViewTypeChange(type)}
+                      className={`h-[46px] flex items-center gap-1.5 px-3 rounded-[9px] text-xs font-semibold transition-all ${
+                        viewType === type ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      {icon}{label}
+                    </button>
+                  ))}
+                </div>
+                {viewType === 'TABLE' && (
                   <button
-                    key={type}
-                    onClick={() => handleViewTypeChange(type)}
-                    className={`h-[46px] flex items-center gap-1.5 px-3 rounded-[9px] text-xs font-semibold transition-all ${
-                      viewType === type ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                    }`}
+                    onClick={() => setIsTableExpanded(true)}
+                    className="hidden md:flex h-[46px] w-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-crimson/30 transition-all active:scale-95"
+                    title="Perluas tampilan tabel"
                   >
-                    {icon}{label}
+                    <Maximize2 size={16} />
                   </button>
-                ))}
+                )}
               </div>
 
               <div className="relative flex-1 min-w-0">
@@ -2027,6 +2026,89 @@ export default function ManajemenJadwalPage() {
         onClose={closeMasterModal}
         onSuccess={handleMasterSuccess}
       />
+
+      {isTableExpanded && timetableData && typeof document !== 'undefined' ? createPortal(
+        <>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[200]" onClick={() => setIsTableExpanded(false)} />
+          <div className="fixed inset-4 md:inset-8 z-[201] bg-white rounded-[12px] shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTableDate(toIsoDateFromDate(addDays(parseLocalDate(tableDate), -1)))}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-crimson hover:border-crimson/30 transition-all active:scale-95 text-sm font-bold"
+                >‹</button>
+                <span className="text-sm font-extrabold text-slate-800">
+                  {parseLocalDate(tableDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTableDate(toIsoDateFromDate(addDays(parseLocalDate(tableDate), 1)))}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-crimson hover:border-crimson/30 transition-all active:scale-95 text-sm font-bold"
+                >›</button>
+              </div>
+              <button type="button" onClick={() => setIsTableExpanded(false)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-crimson hover:border-crimson/30 transition-all active:scale-95">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="overflow-auto flex-1">
+              {timetableData.rooms.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-3">
+                  <CalendarDays size={32} />
+                  <p className="text-sm font-semibold">Tidak ada sesi jadwal.</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="sticky top-0 z-20">
+                    <tr className="bg-slate-50/90 border-b border-slate-100">
+                      <th className="px-4 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap min-w-[120px] border-r border-slate-100">Jam</th>
+                      {timetableData.rooms.map(room => (
+                        <th key={room} className="px-5 py-4 text-center text-[10px] font-black text-slate-500 uppercase tracking-wider whitespace-nowrap min-w-[200px]">{room}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {timetableData.jams.map(jam => (
+                      <tr key={jam.value} className="hover:bg-slate-50/30 transition-colors">
+                        <td className="px-4 py-4 border-r border-slate-100">
+                          <span className="text-xs font-bold text-slate-600 whitespace-nowrap font-mono">{jam.range}</span>
+                        </td>
+                        {timetableData.rooms.map(room => {
+                          const s = timetableData.lookup[jam.value]?.[room];
+                          if (!s) return <td key={room} className="px-4 py-4 text-center"><span className="text-slate-200 text-sm">—</span></td>;
+                          const isPengganti = isPenggantiTipe(s.tipe);
+                          return (
+                            <td key={room} className="px-3 py-3">
+                              <div className={`rounded-xl px-4 py-3 text-left ${isPengganti ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
+                                <p className="text-sm font-bold leading-snug text-slate-700">{s.mata_kuliah}</p>
+                                {s.nama_kelas && <p className="text-xs text-slate-400 font-medium mt-0.5">{s.nama_kelas}</p>}
+                                <div className="flex items-center gap-1 mt-1.5">
+                                  <User className="w-3 h-3 text-slate-400 shrink-0" />
+                                  <p className="text-xs text-slate-400">{pengajarDisplayName(s.pengajar) || '-'}</p>
+                                </div>
+                                {isPengganti && <span className="mt-2 inline-block text-[9px] font-bold uppercase tracking-wider text-crimson bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">Pengganti</span>}
+                                <div className="flex gap-1.5 mt-2.5 pt-2 border-t border-slate-100">
+                                  <button type="button" onClick={() => { setIsTableExpanded(false); handleOpenModal('edit', s); }} disabled={isPengganti} className="flex-1 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-crimson/30 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed" title={isPengganti ? 'Sesi pengganti tidak bisa diedit' : 'Edit sesi'}>
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button type="button" onClick={() => { setIsTableExpanded(false); handleDeleteOpen(s); }} className="flex-1 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-rose-200 hover:bg-rose-50 active:scale-95 transition-all" title="Hapus sesi">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </>,
+        document.body
+      ) : null}
 
     </AsdosPageShell>
   );

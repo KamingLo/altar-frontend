@@ -2,7 +2,7 @@
 import { cookies } from 'next/headers';
 
 const ERROR_MESSAGES: Record<string, string> = {
-  user_not_registered: 'Akun Google ini belum terdaftar. Hubungi koordinator untuk mendaftarkan akunmu.',
+  user_not_registered: 'Akun Google ini belum terdaftar.',
   token_exchange_failed: 'Gagal verifikasi dengan Google. Coba lagi.',
   fetch_user_failed: 'Gagal mengambil data dari Google. Coba lagi.',
   parse_failed: 'Terjadi kesalahan saat memproses akun Google. Coba lagi.',

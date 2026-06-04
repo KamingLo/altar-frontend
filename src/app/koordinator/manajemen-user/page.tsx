@@ -67,6 +67,14 @@ export default function ManajemenAsdosPage() {
 
   const [togglePending, setTogglePending] = useState<Set<string>>(new Set());
   const [showInactive] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((message: string, type: 'error' | 'success' = 'error') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type });
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
+  }, []);
 
   const isFirstTabChange = useRef(true);
   const loadedTabsRef = useRef<Set<TabId>>(new Set());
@@ -107,6 +115,8 @@ export default function ManajemenAsdosPage() {
       if (res.success && res.data) {
         setAsdos(res.data, res.data.length === 10, page, append);
         if (!search && !inactive) loadedTabsRef.current.add(tab); else loadedTabsRef.current.delete(tab);
+      } else if (!res.success) {
+        showToast(res.message || 'Gagal memuat data asisten dosen.');
       }
     } else if (tab === 'koordinator') {
       if (!append) setKoor([], false, 1);
@@ -114,6 +124,8 @@ export default function ManajemenAsdosPage() {
       if (res.success && res.data) {
         setKoor(res.data, res.data.length === 10, page, append);
         if (!search && !inactive) loadedTabsRef.current.add(tab); else loadedTabsRef.current.delete(tab);
+      } else if (!res.success) {
+        showToast(res.message || 'Gagal memuat data koordinator.');
       }
     } else {
       if (!append) setUsers([], false, 1);
@@ -121,10 +133,12 @@ export default function ManajemenAsdosPage() {
       if (res.success && res.data) {
         setUsers(res.data, res.data.length === 10, page, append);
         if (!search) loadedTabsRef.current.add(tab); else loadedTabsRef.current.delete(tab);
+      } else if (!res.success) {
+        showToast(res.message || 'Gagal memuat data user.');
       }
     }
     setIsLoading(false);
-  }, [setAsdos, setKoor, setUsers, setIsLoading]);
+  }, [setAsdos, setKoor, setUsers, setIsLoading, showToast]);
 
   useEffect(() => {
     if (loadedTabsRef.current.size > 0) return;
@@ -142,7 +156,10 @@ export default function ManajemenAsdosPage() {
   }, [setAsdos, setKoor, setUsers, setIsLoading]);
 
   useEffect(() => {
-    return () => { if (modalSearchTimerRef.current) clearTimeout(modalSearchTimerRef.current); };
+    return () => {
+      if (modalSearchTimerRef.current) clearTimeout(modalSearchTimerRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -177,10 +194,13 @@ export default function ManajemenAsdosPage() {
       if (res.success) {
         loadTabData(activeTab, searchQuery, 1, false, showInactive);
       } else {
+        const action = isActive ? 'menonaktifkan' : 'mengaktifkan';
+        showToast(res.message || `Gagal ${action} ${item.username}.`);
         loadTabData(activeTab, searchQuery, 1, false, showInactive);
       }
     } catch {
-      // error silent
+      const action = isActive ? 'menonaktifkan' : 'mengaktifkan';
+      showToast(`Terjadi kesalahan saat ${action} ${item.username}. Coba lagi.`);
     } finally {
       setTogglePending(prev => { const s = new Set(prev); s.delete(item.id); return s; });
     }
@@ -574,7 +594,6 @@ export default function ManajemenAsdosPage() {
 
           {modalType === 'delete' ? (
             <>
-              {/* Desktop: centered modal seperti popup keluar */}
               <div className="hidden lg:flex fixed inset-0 z-50 items-center justify-center">
                 <div className={`bg-white rounded-[1.5rem] shadow-2xl w-full max-w-sm mx-4 overflow-hidden transition-all duration-300 ${isModalVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
                   <div className="p-7 pb-5">
@@ -607,7 +626,6 @@ export default function ManajemenAsdosPage() {
                 </div>
               </div>
 
-              {/* Mobile: bottom sheet */}
               <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
                 <div
                   className="w-full max-w-md bg-white rounded-t-[28px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden pointer-events-auto"
@@ -1023,6 +1041,29 @@ export default function ManajemenAsdosPage() {
           )}
         </>
       )}
+
+      <div
+        className={`fixed left-1/2 -translate-x-1/2 top-8 z-[60] w-[calc(100%-3rem)] max-w-[400px] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          toast ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0 pointer-events-none'
+        }`}
+      >
+        {toast && (
+          <div className="bg-white shadow-[0_12px_40px_rgba(0,0,0,0.15)] rounded-2xl p-4 flex items-center gap-3">
+            <div className={`p-2 rounded-full shrink-0 ${toast.type === 'error' ? 'bg-[#FCA5A5]/30 text-[#DC2626]' : 'bg-[#86EFAC]/30 text-[#16A34A]'}`}>
+              {toast.type === 'error' ? (
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+            <span className="text-[#0D1B2A] text-[13px] font-bold leading-tight flex-1">{toast.message}</span>
+          </div>
+        )}
+      </div>
 
     </AsdosPageShell>
   );
