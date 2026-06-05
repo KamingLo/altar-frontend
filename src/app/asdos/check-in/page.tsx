@@ -163,9 +163,10 @@ export default function CheckInPage() {
         : null;
 
       const currentMinutes = getCurrentMinutes();
-      const isMatchedSessionDisabled = matchedSession
-        ? isSessionEnded(matchedSession, currentMinutes) || !canShowForCheckIn(matchedSession, currentMinutes)
-        : false;
+      // const isMatchedSessionDisabled = matchedSession
+      //   ? isSessionEnded(matchedSession, currentMinutes) || !canShowForCheckIn(matchedSession, currentMinutes)
+      //   : false;
+      const isMatchedSessionDisabled = false;
 
       if (matchedSession && !isMatchedSessionDisabled) {
         setSelectedSessionId(matchedSession.id_sesi);
@@ -184,11 +185,13 @@ export default function CheckInPage() {
           setScanMessage('Sesi ini menggunakan presensi online, bukan QR. Silakan gunakan menu Presensi Kelas Online.');
         } else if (matchedUpcomingQrSession) {
           setScanMessage('Sesi QR ini belum masuk waktu check-in. Silakan coba lagi mendekati jam mengajar.');
-        } else if (matchedSession && isSessionEnded(matchedSession, currentMinutes)) {
-          setScanMessage('Sesi ini sudah selesai dan tidak dapat dilakukan check-in.');
+        // } else if (matchedSession && isSessionEnded(matchedSession, currentMinutes)) {
+        //   setScanMessage('Sesi ini sudah selesai dan tidak dapat dilakukan check-in.');
+        // }
         }
-        
-        const firstActive = fetchedSessions.find(s => !isSessionEnded(s, currentMinutes) && canShowForCheckIn(s, currentMinutes));
+
+        // const firstActive = fetchedSessions.find(s => !isSessionEnded(s, currentMinutes) && canShowForCheckIn(s, currentMinutes));
+        const firstActive = fetchedSessions[0];
         if (firstActive) {
           setSelectedSessionId(firstActive.id_sesi);
         } else if (fetchedSessions.length > 0) {
@@ -359,8 +362,10 @@ export default function CheckInPage() {
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   const selectedSession = sessions.find(s => s.id_sesi === selectedSessionId);
   const currentMinutes = getCurrentMinutes();
-  const activeSessions = sessions.filter(s => !isSessionEnded(s, currentMinutes) && canShowForCheckIn(s, currentMinutes));
-  const disabledSessions = sessions.filter(s => isSessionEnded(s, currentMinutes) || !canShowForCheckIn(s, currentMinutes));
+  // const activeSessions = sessions.filter(s => !isSessionEnded(s, currentMinutes) && canShowForCheckIn(s, currentMinutes));
+  // const disabledSessions = sessions.filter(s => isSessionEnded(s, currentMinutes) || !canShowForCheckIn(s, currentMinutes));
+  const activeSessions = sessions;
+  const disabledSessions: SessionFromAPI[] = [];
 
   const handleCloseSheet = () => {
     setIsSheetClosing(true);
