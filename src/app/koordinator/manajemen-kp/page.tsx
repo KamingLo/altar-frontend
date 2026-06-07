@@ -132,6 +132,13 @@ export default function ManajemenKpPage() {
     }
   };
 
+  const statusCounts = {
+    pending: substitutionList.filter(r => r.status === 'PENDING').length,
+    verified: substitutionList.filter(r => r.status === 'VERIFIED').length,
+    rejected: substitutionList.filter(r => r.status === 'REJECTED').length,
+    total: substitutionList.length,
+  };
+
   const filteredRequests = substitutionList.filter(req => {
 
     if (activeTab !== 'ALL') {
@@ -179,7 +186,7 @@ export default function ManajemenKpPage() {
 
         <div className="w-full z-20 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 
-          <div className="hidden md:block md:w-auto">
+          <div className="hidden md:flex md:flex-col md:w-auto">
             <div className="p-1 rounded-2xl border border-slate-200/80 bg-white/95 flex gap-1 overflow-x-auto hide-scrollbar">
               {(
                 [
@@ -208,31 +215,40 @@ export default function ManajemenKpPage() {
                 );
               })}
             </div>
+            {!isLoading && (
+              <div className="flex gap-4 px-2 pt-2">
+                <span className="text-[11px] text-slate-500">Menunggu <span className="font-bold text-slate-800">{statusCounts.pending}</span></span>
+                <span className="text-[11px] text-slate-500">Disetujui <span className="font-bold text-slate-800">{statusCounts.verified}</span></span>
+                <span className="text-[11px] text-slate-500">Ditolak <span className="font-bold text-slate-800">{statusCounts.rejected}</span></span>
+                <span className="text-[11px] text-slate-500">Total <span className="font-bold text-slate-800">{statusCounts.total}</span></span>
+              </div>
+            )}
           </div>
 
-          <div className="w-full md:w-80 shrink-0 flex items-center gap-2">
+          <div className="w-full md:w-80 shrink-0 flex flex-col gap-2">
 
-            <div className="relative flex-1">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                <Search className="w-5 h-5 text-slate-400" />
-              </span>
-              <input
-                type="text"
-                placeholder="Cari matkul, kelas, atau asisten dosen"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 rounded-[14px] md:rounded-2xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                  <Search className="w-5 h-5 text-slate-400" />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Cari matkul, kelas, atau asisten dosen"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3.5 rounded-[14px] md:rounded-2xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
 
             <div className="md:hidden shrink-0">
               <CustomSelect
@@ -251,6 +267,16 @@ export default function ManajemenKpPage() {
                 triggerClassName={activeTab !== 'PENDING' ? 'bg-red-50 border-crimson text-crimson' : ''}
               />
             </div>
+            </div>
+
+            {!isLoading && (
+              <div className="md:hidden flex gap-4">
+                <span className="text-[11px] text-slate-500">Menunggu <span className="font-bold text-slate-800">{statusCounts.pending}</span></span>
+                <span className="text-[11px] text-slate-500">Disetujui <span className="font-bold text-slate-800">{statusCounts.verified}</span></span>
+                <span className="text-[11px] text-slate-500">Ditolak <span className="font-bold text-slate-800">{statusCounts.rejected}</span></span>
+                <span className="text-[11px] text-slate-500">Total <span className="font-bold text-slate-800">{statusCounts.total}</span></span>
+              </div>
+            )}
 
           </div>
         </div>

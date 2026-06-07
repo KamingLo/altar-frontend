@@ -26,8 +26,9 @@ import {
 import { getSemesterList } from '@/lib/actions/data-master';
 import { getAllSessions } from '@/lib/actions/jadwal';
 import type { SemesterItem } from '@/types/api';
-import { usePresensiStore } from '@/store/usePresensiStore';
+import { usePresensiStore, MOCK_MODE } from '@/store/usePresensiStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import { AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { parseUTC } from '@/lib/jadwal-utils';
 
@@ -130,27 +131,48 @@ export default function DataPresensiPage() {
   const [selectedAsdosName, setSelectedAsdosName] = useState<string | null>(null);
   const [payDropdownOpen, setPayDropdownOpen] = useState(false);
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const [paySheetOpen, setPaySheetOpen] = useState(false);
   const paySearchRef = useRef<HTMLDivElement>(null);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
   const [sessionStartMap, setSessionStartMap] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
+    if (pageTab === 'PAY' && typeof window !== 'undefined' && window.innerWidth < 768) {
+      setPaySheetOpen(true);
+    }
+  }, [pageTab]);
+
+  useEffect(() => {
+    const MOCK_SEMESTER: SemesterItem[] = [{
+      id: 'mock-sem-genap-2526',
+      tahun_ajaran: '2025/2026',
+      tipe_semester: 'Genap',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }];
+    if (MOCK_MODE) {
+      setSemesters(MOCK_SEMESTER);
+      setSemesterFilter(MOCK_SEMESTER[0].id);
+      return;
+    }
     getSemesterList(1, '', 100).then((res) => {
-      if (res.success && res.data) {
-        const items = res.data.items;
-        setSemesters(items);
-        const currentId = findCurrentSemesterId(items);
-        if (currentId) {
-          setSemesterFilter(currentId);
-          fetchPresensi(false, currentId);
-        }
+      const items = (res.success && res.data?.items?.length) ? res.data.items : MOCK_SEMESTER;
+      setSemesters(items);
+      const currentId = findCurrentSemesterId(items);
+      const resolvedId = currentId || items[0]?.id || '';
+      if (resolvedId) {
+        setSemesterFilter(resolvedId);
+        fetchPresensi(false, resolvedId);
       }
+    }).catch(() => {
+      setSemesters(MOCK_SEMESTER);
+      setSemesterFilter(MOCK_SEMESTER[0].id);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!semesterFilter) return;
+    if (MOCK_MODE || !semesterFilter) return;
     getAllSessions({ id_semester: semesterFilter }).then((res) => {
       if (!res.success || !res.data) return;
       const map = new Map<string, number>();
@@ -163,6 +185,7 @@ export default function DataPresensiPage() {
   }, [semesterFilter]);
 
   const fetchPresensi = useCallback(async (silent = false, semId?: string) => {
+    if (MOCK_MODE) return;
     if (!silent) {
       setIsLoading(true);
     }
@@ -172,15 +195,8 @@ export default function DataPresensiPage() {
       if (res.success) {
         setPresensi(res.data ?? []);
         setSelectedIds(new Set());
-      } else {
-        if (!silent) {
-          setPresensi([]);
-        }
       }
     } catch {
-      if (!silent) {
-        setPresensi([]);
-      }
     } finally {
       if (!silent) {
         setIsLoading(false);
@@ -285,6 +301,14 @@ export default function DataPresensiPage() {
       setPayRowPending(prev => { const s = new Set(prev); s.delete(key); return s; });
     }
   }, [updatePaymentLocal, fetchPresensi]);
+
+  const presensiCounts = {
+    pending: presensiList.filter(r => !r.is_verified).length,
+    verified: presensiList.filter(r => r.is_verified).length,
+    paid: presensiList.filter(r => r.is_paid).length,
+    unpaid: presensiList.filter(r => !r.is_paid).length,
+    total: presensiList.length,
+  };
 
   const filteredList = presensiList.filter((item) => {
     if (activeTab === 'PENDING' && item.is_verified) return false;
@@ -542,7 +566,7 @@ export default function DataPresensiPage() {
 
 
   return (
-    <AsdosPageShell scrollTopBottom="bottom-24">
+    <AsdosPageShell scrollTopBottom="bottom-[180px]">
 
       <div className="mb-2 md:mb-3 px-1">
         <p className="text-[11px] font-black text-crimson tracking-[0.15em] uppercase mb-1 md:text-xs">
@@ -558,7 +582,7 @@ export default function DataPresensiPage() {
           </p>
 
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="flex bg-slate-100 p-0.5 rounded-xl w-full md:w-auto md:min-w-[280px]">
+            <div className="hidden md:flex bg-slate-100 p-0.5 rounded-xl md:min-w-[280px]">
               {(['VERIFY', 'PAY'] as const).map(t => (
                 <button
                   key={t}
@@ -577,87 +601,217 @@ export default function DataPresensiPage() {
       </div>
 
       <div className="space-y-6 relative z-20 mb-3 px-1">
-        <div className="w-full z-20 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex w-full md:w-auto">
+
+        <button
+          type="button"
+          onClick={() => setPageTab(pageTab === 'VERIFY' ? 'PAY' : 'VERIFY')}
+          className="md:hidden fixed bottom-[92px] right-4 z-50 w-14 h-14 rounded-full bg-white border border-slate-200/80 shadow-md flex flex-col items-center justify-center gap-0.5 active:scale-90 transition-transform"
+        >
+          {pageTab === 'VERIFY' ? (
+            <>
+              <Banknote className="w-5 h-5 text-slate-600" />
+              <span className="text-[8px] font-black text-slate-500 leading-none">Bayar</span>
+            </>
+          ) : (
+            <>
+              <Check className="w-5 h-5 text-slate-600" />
+              <span className="text-[8px] font-black text-slate-500 leading-none">Absen</span>
+            </>
+          )}
+        </button>
+        {semesters.length > 0 && (
+          <div className="md:hidden fixed bottom-7 right-4 z-50">
+            <CustomSelect
+              variant="icon"
+              align="right"
+              value={semesterFilter}
+              onChange={handleSemesterChange}
+              options={[
+                { value: '', label: 'Semua Semester' },
+                ...semesters.map((s) => ({
+                  value: s.id,
+                  label: `${s.tipe_semester} ${s.tahun_ajaran}`,
+                })),
+              ]}
+              placeholder="Semester"
+              icon={<CalendarDays className="w-5 h-5 text-slate-600" />}
+              triggerClassName="w-14 h-14 rounded-full bg-white border border-slate-200/80 shadow-md flex items-center justify-center active:scale-90 transition-transform"
+            />
+          </div>
+        )}
+
+        <div className="md:hidden">
+          {pageTab === 'VERIFY' ? (
+            <div className="flex flex-col gap-2">
+              <div className="p-1 rounded-2xl border border-slate-200/80 bg-white/95 flex gap-1 w-full">
+                {([
+                  { id: 'PENDING', label: 'Pending' },
+                  { id: 'VERIFIED', label: 'Terverifikasi' },
+                  { id: 'ALL', label: 'Semua' },
+                ] as const).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex-1 px-3 py-3 text-xs font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] select-none text-center ${
+                      activeTab === tab.id ? 'bg-crimson text-white shadow-sm' : 'text-slate-500'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <CustomSelect
+                  variant="icon"
+                  align="left"
+                  value={tipeFilter}
+                  onChange={(v) => setTipeFilter(v as TipeFilter)}
+                  options={FILTER_TIPE_OPTIONS}
+                  placeholder="Filter tipe"
+                  icon={<Filter className="w-[18px] h-[18px]" />}
+                  triggerClassName={tipeFilter !== 'ALL'
+                    ? 'bg-red-50 border-crimson text-crimson h-12 w-12 rounded-xl border flex items-center justify-center shrink-0'
+                    : 'bg-white border-slate-200 text-slate-500 h-12 w-12 rounded-xl border flex items-center justify-center shrink-0'}
+                />
+                <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <Search className="w-4 h-4 text-slate-400" />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Cari..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full h-12 pl-8 pr-7 rounded-xl border border-slate-200 outline-none text-xs font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all"
+                  />
+                  {searchQuery && (
+                    <button type="button" onClick={() => setSearchQuery('')}
+                      className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <span className="text-[10px] text-slate-500">Pending <span className="font-bold text-slate-800">{presensiCounts.pending}</span></span>
+                <span className="text-[10px] text-slate-500">Terverifikasi <span className="font-bold text-slate-800">{presensiCounts.verified}</span></span>
+                <span className="text-[10px] text-slate-500">Total <span className="font-bold text-slate-800">{presensiCounts.total}</span></span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <div ref={downloadMenuRef} className="relative shrink-0">
+                  <button type="button" onClick={() => setDownloadMenuOpen(prev => !prev)}
+                    className="h-12 flex items-center gap-1.5 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 active:scale-95 transition-all">
+                    <Download className="w-4 h-4" />
+                    Excel
+                  </button>
+                  {downloadMenuOpen && (
+                    <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden min-w-[180px]">
+                      <button type="button" disabled={!payTableData || payTableData.length === 0}
+                        onClick={() => { handleDownloadExcel(); setDownloadMenuOpen(false); }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />Asdos Ini
+                      </button>
+                      <button type="button" disabled={!presensiList.length}
+                        onClick={() => { void handleDownloadAllExcel(); setDownloadMenuOpen(false); }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />Semua Asdos (Gabung)
+                      </button>
+                      <button type="button" disabled={!presensiList.length}
+                        onClick={() => { handleDownloadSplitExcel(); setDownloadMenuOpen(false); }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />Semua Asdos (Pisah)
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <Search className="w-4 h-4 text-slate-400" />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Cari nama asisten dosen..."
+                    value={paySearchInput}
+                    readOnly
+                    onFocus={() => setPaySheetOpen(true)}
+                    className="w-full h-12 pl-8 pr-7 rounded-xl border border-slate-200 outline-none text-xs font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson transition-all"
+                  />
+                  {paySearchInput && (
+                    <button type="button" onClick={() => { setPaySearchInput(''); setSelectedAsdosName(null); }}
+                      className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden md:flex w-full z-20 items-center justify-between gap-4">
+          <div className="flex flex-col w-auto">
             {pageTab === 'VERIFY' ? (
-              <div className="p-1 rounded-2xl border border-slate-200/80 bg-white/95 flex gap-1 overflow-x-auto hide-scrollbar w-full md:w-auto">
-                {(
-                  [
+              <>
+                <div className="p-1 rounded-2xl border border-slate-200/80 bg-white/95 flex gap-1">
+                  {([
                     { id: 'PENDING', label: 'Pending' },
                     { id: 'VERIFIED', label: 'Terverifikasi' },
-                    { id: 'ALL', label: 'Semua' }
-                  ] as const
-                ).map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  return (
+                    { id: 'ALL', label: 'Semua' },
+                  ] as const).map((tab) => (
                     <button
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
-                      className={`
-                        flex-1 md:flex-initial min-w-fit px-5 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] select-none
-                        ${isActive
-                          ? 'bg-crimson text-white shadow-sm'
-                          : 'bg-transparent text-slate-500 hover:text-slate-800'
-                        }
-                      `}
+                      className={`min-w-fit px-5 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] select-none ${
+                        activeTab === tab.id ? 'bg-crimson text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
                     >
                       {tab.label}
                     </button>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+                <div className="flex gap-4 px-2 pt-2">
+                  <span className="text-[11px] text-slate-500">Pending <span className="font-bold text-slate-800">{presensiCounts.pending}</span></span>
+                  <span className="text-[11px] text-slate-500">Terverifikasi <span className="font-bold text-slate-800">{presensiCounts.verified}</span></span>
+                  <span className="text-[11px] text-slate-500">Total <span className="font-bold text-slate-800">{presensiCounts.total}</span></span>
+                </div>
+              </>
             ) : (
-              <div className="hidden md:block h-12" />
+              <>
+                <div className="h-12" />
+              </>
             )}
           </div>
 
-          <div className="flex gap-3 flex-1 md:max-w-max md:ml-auto w-full items-end">
+          <div className="flex gap-3 items-end">
             {semesters.length > 0 && (
-              <>
-                <div className={`hidden md:flex flex-col gap-1 shrink-0 ${pageTab === 'PAY' ? 'w-[240px]' : 'w-[180px]'}`}>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Semester</span>
-                  <CustomSelect
-                    variant="field"
-                    value={semesterFilter}
-                    onChange={handleSemesterChange}
-                    options={[
-                      { value: '', label: 'Semua Semester' },
-                      ...semesters.map((s) => ({
-                        value: s.id,
-                        label: `${s.tipe_semester} ${s.tahun_ajaran}`,
-                      })),
-                    ]}
-                    placeholder="Semester"
-                    icon={<CalendarDays className="w-4 h-4 text-slate-400" />}
-                    triggerClassName="py-3.5 px-4 rounded-xl border-slate-200 bg-white text-sm"
-                  />
-                </div>
-
-                <div className="md:hidden fixed bottom-7 right-4 z-50">
-                  <CustomSelect
-                    variant="icon"
-                    align="right"
-                    value={semesterFilter}
-                    onChange={handleSemesterChange}
-                    options={[
-                      { value: '', label: 'Semua Semester' },
-                      ...semesters.map((s) => ({
-                        value: s.id,
-                        label: `${s.tipe_semester} ${s.tahun_ajaran}`,
-                      })),
-                    ]}
-                    placeholder="Semester"
-                    icon={<CalendarDays className="w-5 h-5 text-slate-600" />}
-                    triggerClassName="w-14 h-14 rounded-full bg-white border border-slate-200/80 shadow-md flex items-center justify-center active:scale-90 transition-transform"
-                  />
-                </div>
-              </>
+              <div className={`flex flex-col gap-1 shrink-0 ${pageTab === 'PAY' ? 'w-[240px]' : 'w-[180px]'}`}>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Semester</span>
+                <CustomSelect
+                  variant="field"
+                  value={semesterFilter}
+                  onChange={handleSemesterChange}
+                  options={[
+                    { value: '', label: 'Semua Semester' },
+                    ...semesters.map((s) => ({
+                      value: s.id,
+                      label: `${s.tipe_semester} ${s.tahun_ajaran}`,
+                    })),
+                  ]}
+                  placeholder="Semester"
+                  icon={<CalendarDays className="w-4 h-4 text-slate-400" />}
+                  triggerClassName="py-3.5 px-4 rounded-xl border-slate-200 bg-white text-sm"
+                />
+              </div>
             )}
 
             {pageTab === 'VERIFY' ? (
-              <div className="flex-1 md:flex-initial w-full md:w-[200px] md:shrink-0">
-                <div className="relative w-full">
+              <>
+                <div className="relative w-[200px]">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
                     <Search className="w-5 h-5 text-slate-400" />
                   </span>
@@ -669,122 +823,12 @@ export default function DataPresensiPage() {
                     className="w-full pl-11 pr-10 py-3.5 rounded-xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
                   />
                   {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                    >
+                    <button type="button" onClick={() => setSearchQuery('')}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors">
                       <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>
-              </div>
-            ) : (
-              <>
-                <div ref={downloadMenuRef} className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setDownloadMenuOpen(prev => !prev)}
-                    className="flex items-center gap-2 py-3.5 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span className="hidden md:inline">Excel</span>
-                  </button>
-                  {downloadMenuOpen && (
-                    <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden min-w-[180px]">
-                      <button
-                        type="button"
-                        disabled={!payTableData || payTableData.length === 0}
-                        onClick={() => { handleDownloadExcel(); setDownloadMenuOpen(false); }}
-                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        Asdos Ini
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!presensiList.length}
-                        onClick={() => { void handleDownloadAllExcel(); setDownloadMenuOpen(false); }}
-                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        Semua Asdos (Gabung)
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!presensiList.length}
-                        onClick={() => { handleDownloadSplitExcel(); setDownloadMenuOpen(false); }}
-                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        Semua Asdos (Pisah)
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div ref={paySearchRef} className="flex-1 md:flex-initial w-full md:w-[220px] md:shrink-0 relative">
-                <div className="relative w-full">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                    <Search className="w-5 h-5 text-slate-400" />
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Cari nama asisten dosen..."
-                    value={paySearchInput}
-                    onChange={(e) => {
-                      setPaySearchInput(e.target.value);
-                      setSelectedAsdosName(null);
-                      setPayDropdownOpen(true);
-                    }}
-                    onFocus={() => setPayDropdownOpen(true)}
-                    className="w-full pl-11 pr-10 py-3.5 rounded-xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-                  />
-                  {(paySearchInput || selectedAsdosName) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaySearchInput('');
-                        setSelectedAsdosName(null);
-                        setPayDropdownOpen(false);
-                      }}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                {payDropdownOpen && !selectedAsdosName && (
-                  <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden max-h-56 overflow-y-auto">
-                    {asdosOptions.length === 0 ? (
-                      <div className="px-4 py-3 text-sm text-slate-400 text-center">
-                        {paySearchInput ? `Tidak ada asisten dosen "${paySearchInput}"` : 'Ketik nama untuk mencari'}
-                      </div>
-                    ) : (
-                      asdosOptions.map(name => (
-                        <button
-                          key={name}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setSelectedAsdosName(name);
-                            setPaySearchInput(name);
-                            setPayDropdownOpen(false);
-                          }}
-                          className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5"
-                        >
-                          <User className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-                          {name}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-              </>
-            )}
-
-            {pageTab === 'VERIFY' && (
-              <div className="shrink-0">
                 <CustomSelect
                   variant="icon"
                   align="right"
@@ -793,16 +837,79 @@ export default function DataPresensiPage() {
                   options={FILTER_TIPE_OPTIONS}
                   placeholder="Filter tipe"
                   icon={<Filter className="w-5 h-5" />}
-                  triggerClassName={
-                    tipeFilter !== 'ALL'
-                      ? 'bg-red-50 border-crimson text-crimson py-3.5 px-4 rounded-xl flex items-center justify-center'
-                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 py-3.5 px-4 rounded-xl flex items-center justify-center'
-                  }
+                  triggerClassName={tipeFilter !== 'ALL'
+                    ? 'bg-red-50 border-crimson text-crimson py-3.5 px-4 rounded-xl flex items-center justify-center'
+                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 py-3.5 px-4 rounded-xl flex items-center justify-center'}
                 />
-              </div>
+              </>
+            ) : (
+              <>
+                <div ref={downloadMenuRef} className="relative shrink-0">
+                  <button type="button" onClick={() => setDownloadMenuOpen(prev => !prev)}
+                    className="flex items-center gap-2 py-3.5 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                    <Download className="w-4 h-4" />
+                    <span>Excel</span>
+                  </button>
+                  {downloadMenuOpen && (
+                    <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden min-w-[180px]">
+                      <button type="button" disabled={!payTableData || payTableData.length === 0}
+                        onClick={() => { handleDownloadExcel(); setDownloadMenuOpen(false); }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />Asdos Ini
+                      </button>
+                      <button type="button" disabled={!presensiList.length}
+                        onClick={() => { void handleDownloadAllExcel(); setDownloadMenuOpen(false); }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />Semua Asdos (Gabung)
+                      </button>
+                      <button type="button" disabled={!presensiList.length}
+                        onClick={() => { handleDownloadSplitExcel(); setDownloadMenuOpen(false); }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />Semua Asdos (Pisah)
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div ref={paySearchRef} className="relative w-[220px] shrink-0">
+                  <div className="relative w-full">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                      <Search className="w-5 h-5 text-slate-400" />
+                    </span>
+                    <input type="text" placeholder="Cari nama asisten dosen..."
+                      value={paySearchInput}
+                      onChange={(e) => { setPaySearchInput(e.target.value); setSelectedAsdosName(null); setPayDropdownOpen(true); }}
+                      onFocus={() => setPayDropdownOpen(true)}
+                      className="w-full pl-11 pr-10 py-3.5 rounded-xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-white placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                    />
+                    {(paySearchInput || selectedAsdosName) && (
+                      <button type="button"
+                        onClick={() => { setPaySearchInput(''); setSelectedAsdosName(null); setPayDropdownOpen(false); }}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors">
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  {payDropdownOpen && !selectedAsdosName && (
+                    <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden max-h-56 overflow-y-auto">
+                      {asdosOptions.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-slate-400 text-center">
+                          {paySearchInput ? `Tidak ada asisten dosen "${paySearchInput}"` : 'Ketik nama untuk mencari'}
+                        </div>
+                      ) : asdosOptions.map(name => (
+                        <button key={name} type="button" onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { setSelectedAsdosName(name); setPaySearchInput(name); setPayDropdownOpen(false); }}
+                          className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5">
+                          <User className="w-3.5 h-3.5 text-slate-300 shrink-0" />{name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </div>
+
       </div>
 
       <div className="relative w-full overflow-hidden">
@@ -1338,6 +1445,54 @@ export default function DataPresensiPage() {
           </div>
         </div>
       )}
+
+      <BottomSheet
+        isOpen={paySheetOpen}
+        onClose={() => setPaySheetOpen(false)}
+        title="Pilih Asisten Dosen"
+        maxWidthClassName="max-w-full md:max-w-lg"
+      >
+        <div className="relative mb-3">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+            <Search className="w-5 h-5 text-slate-400" />
+          </span>
+          <input
+            type="text"
+            placeholder="Cari nama asisten dosen..."
+            value={paySearchInput}
+            onChange={(e) => { setPaySearchInput(e.target.value); setSelectedAsdosName(null); }}
+            className="w-full pl-11 pr-10 py-3.5 rounded-xl border border-slate-200 outline-none text-sm font-medium text-slate-800 bg-slate-50 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson transition-all"
+          />
+          {paySearchInput && (
+            <button type="button" onClick={() => setPaySearchInput('')}
+              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          {asdosOptions.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-6">
+              {paySearchInput ? `Tidak ada hasil untuk "${paySearchInput}"` : 'Tidak ada data asisten dosen.'}
+            </p>
+          ) : (
+            asdosOptions.map(name => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => { setSelectedAsdosName(name); setPaySearchInput(name); setPaySheetOpen(false); }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-50 active:bg-slate-100 transition-colors text-left"
+              >
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4 text-slate-400" />
+                </div>
+                <span className="text-sm font-semibold text-slate-800">{name}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </BottomSheet>
 
     </AsdosPageShell>
   );

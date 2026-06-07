@@ -26,6 +26,7 @@ const getSessionEndMinutes = (waktu: string): number | null => {
   return parseInt(match[3], 10) * 60 + parseInt(match[4], 10);
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const isSessionEnded = (session: SessionFromAPI, nowMinutes = getCurrentMinutes()): boolean => {
   const endMinutes = getSessionEndMinutes(session.waktu);
   if (endMinutes === null) return false;
@@ -162,6 +163,7 @@ export default function CheckInPage() {
         ? availableSessions.find(s => s.id_sesi === sessionId && isQrSession(s) && !canShowForCheckIn(s))
         : null;
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const currentMinutes = getCurrentMinutes();
       // const isMatchedSessionDisabled = matchedSession
       //   ? isSessionEnded(matchedSession, currentMinutes) || !canShowForCheckIn(matchedSession, currentMinutes)
@@ -361,6 +363,7 @@ export default function CheckInPage() {
 
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   const selectedSession = sessions.find(s => s.id_sesi === selectedSessionId);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const currentMinutes = getCurrentMinutes();
   // const activeSessions = sessions.filter(s => !isSessionEnded(s, currentMinutes) && canShowForCheckIn(s, currentMinutes));
   // const disabledSessions = sessions.filter(s => isSessionEnded(s, currentMinutes) || !canShowForCheckIn(s, currentMinutes));

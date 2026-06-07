@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown, GraduationCap, LayoutDashboard, ArrowLeftRight, Bell } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
-import { logoutUser } from '@/lib/actions/auth/session';
+import { logoutUser, getSession } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
@@ -58,7 +58,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { user, clearUser } = useUserStore();
+  const { user, setUser, clearUser } = useUserStore();
   const resetRiwayat = useRiwayatKehadiranStore(s => s.reset);
   const resetJadwal = useJadwalStore(s => s.reset);
   const resetPengajuanKp = usePengajuanKpStore(s => s.reset);
@@ -68,6 +68,14 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const hasDualRole = !!(user?.id_asisten && user?.id_koordinator);
   const otherDashboardHref = homeHref === '/koordinator' ? '/asdos' : '/koordinator';
   const otherDashboardLabel = homeHref === '/koordinator' ? 'Asisten Dosen' : 'Koordinator';
+
+  useEffect(() => {
+    getSession().then((res) => {
+      if (res.success && res.data) {
+        setUser(res.data);
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 

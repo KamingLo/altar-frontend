@@ -42,20 +42,8 @@ export const useAuth = () => {
       }
     };
 
-    if (!user) {
-      fetchUser();
-    } else {
-      if (!role) {
-        const derivedRole: UserRole | null = user.id_koordinator
-          ? 'koordinator'
-          : user.id_asisten
-          ? 'asdos'
-          : null;
-        setRole(derivedRole);
-      }
-      setLoading(false);
-    }
-  }, [router, setUser, setRole, setLoading, user, role, clearUser, isHydrated]);
+    fetchUser();
+  }, [isHydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = async () => {
     try {

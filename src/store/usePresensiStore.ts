@@ -1,6 +1,8 @@
 ﻿import { create } from 'zustand';
 import type { PresensiResponseDTO } from '@/lib/actions/presensi';
 
+export const MOCK_MODE = false;
+
 interface PresensiState {
   presensiList: PresensiResponseDTO[];
   isLoading: boolean;
