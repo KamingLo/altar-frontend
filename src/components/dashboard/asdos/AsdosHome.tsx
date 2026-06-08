@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ScanLine,
@@ -237,6 +237,7 @@ export default function AsdosHome() {
   const [presensiItem, setPresensiItem] = useState<PresensiResponseDTO | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentMinutes, setCurrentMinutes] = useState(getCurrentMinutes);
+  const fetchingRef = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentMinutes(getCurrentMinutes()), 30000);
@@ -244,6 +245,9 @@ export default function AsdosHome() {
   }, []);
 
   useEffect(() => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    let cancelled = false;
     async function fetchDashboard() {
       try {
         const date = todayISO();
@@ -254,6 +258,8 @@ export default function AsdosHome() {
           getMySubstitutions(),
           getMyPresensi(),
         ]);
+
+        if (cancelled) return;
 
         const schedules = scheduleRes.success && scheduleRes.data ? scheduleRes.data : [];
         const substitutions = kpRes.success && kpRes.data?.items ? kpRes.data.items : [];
@@ -281,13 +287,15 @@ export default function AsdosHome() {
         if (recentKp) setLastSeenKpId(recentKp.id);
         if (verifiedToday) setLastSeenPresensiId(verifiedToday.id_presensi);
 
-        markSeen();
+        if (!cancelled) markSeen();
       } finally {
-        setIsLoading(false);
+        fetchingRef.current = false;
+        if (!cancelled) setIsLoading(false);
       }
     }
 
     fetchDashboard();
+    return () => { cancelled = true; };
   }, [markSeen, setPendingCount]);
 
   const displayName = getDisplayName(user?.email);

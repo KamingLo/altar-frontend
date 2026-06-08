@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Search, Filter, Clock, MapPin, BookOpen, Info, Table2, LayoutList, Check } from 'lucide-react';
 import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { getSessionsByDate } from '@/lib/actions/jadwal';
@@ -8,6 +8,7 @@ import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { pengajarDisplayName, subjectDisplayName, parseUTC } from '@/lib/jadwal-utils';
+import { isOnlinePresensi } from '@/lib/presensi-mode';
 
 type ViewType = 'CARD' | 'TABLE';
 
@@ -16,11 +17,15 @@ type HistoryItem = {
   checkIn: string; checkOut: string; room: string; className: string; teachingTeam: string;
   status: 'BERJALAN' | 'SELESAI'; materi: string;
   isVerified: boolean; isPaid: boolean;
+  isOnline: boolean; linkVideo: string;
+  forgotCheckout?: boolean;
+  waktuCheckInRaw?: string;
 };
 
 type TeachingSessionInfo = {
   teachingTeam: string;
   isPengganti: boolean;
+  waktuSelesai?: string;
 };
 
 function isActivePresensi(item: PresensiResponseDTO) {
@@ -67,6 +72,25 @@ function getTeachingLookupKey(date: string, sessionId?: string) {
   return sessionId ? `${date}-${sessionId}` : '';
 }
 
+function getAutoCheckOutTimeStr(tanggalMengajar: string, waktuSelesai?: string): string | null {
+  if (!waktuSelesai) return null;
+  const [endH, endM] = waktuSelesai.split(':').map(Number);
+  if (isNaN(endH) || isNaN(endM)) return null;
+
+  const baseDate = new Date(tanggalMengajar);
+  const deadline = new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate(),
+    endH,
+    endM + 30,
+    0,
+    0
+  );
+
+  return deadline.toISOString();
+}
+
 function mapPresensiToHistory(item: PresensiResponseDTO, teachingInfoBySession: Record<string, TeachingSessionInfo>): HistoryItem {
   const active = isActivePresensi(item);
   const dateKey = getHistoryDateKey(item);
@@ -76,13 +100,42 @@ function mapPresensiToHistory(item: PresensiResponseDTO, teachingInfoBySession: 
   const teachingTeam = teachingInfo?.teachingTeam || formatTeachingTeam(item);
   const isPengganti = item.menggantikan || !!item.id_sesi_pengganti || !!teachingInfo?.isPengganti;
 
+  const forgotCheckout = (() => {
+    const hasValidCheckout = item.waktu_checkout && item.waktu_checkout !== '' && item.waktu_checkout !== 'null' && !String(item.waktu_checkout).startsWith('0001');
+    if (hasValidCheckout) return false;
+    if (isOnlinePresensi(item)) return false;
+    if (active) return false;
+
+    if (teachingInfo?.waktuSelesai) {
+      const autoTime = getAutoCheckOutTimeStr(item.tanggal_mengajar || item.waktu_checkin, teachingInfo.waktuSelesai);
+      if (autoTime && new Date() > new Date(autoTime)) {
+        return true;
+      }
+    }
+    return false;
+  })();
+
   return {
     id: item.id_presensi,
     subject: subjectDisplayName(item.nama_mata_kuliah, isPengganti),
     date: formatDate(item.tanggal_mengajar || item.waktu_checkin),
     rawDate: item.tanggal_mengajar || item.waktu_checkin || '',
     checkIn: formatTime(item.waktu_checkin),
-    checkOut: active ? '--:--' : formatTime(item.waktu_checkout),
+    checkOut: (() => {
+      if (active) return '--:--';
+      const hasValidCheckout = item.waktu_checkout && item.waktu_checkout !== '' && item.waktu_checkout !== 'null' && !String(item.waktu_checkout).startsWith('0001');
+      if (hasValidCheckout) return formatTime(item.waktu_checkout);
+      if (isOnlinePresensi(item)) return teachingInfo?.waktuSelesai ?? '--:--';
+
+      if (teachingInfo?.waktuSelesai) {
+        const autoTime = getAutoCheckOutTimeStr(item.tanggal_mengajar || item.waktu_checkin, teachingInfo.waktuSelesai);
+        if (autoTime && new Date() > new Date(autoTime)) {
+          return formatTime(autoTime);
+        }
+      }
+
+      return '--:--';
+    })(),
     room: item.nama_ruangan,
     className: item.nama_kelas || '-',
     teachingTeam,
@@ -90,6 +143,10 @@ function mapPresensiToHistory(item: PresensiResponseDTO, teachingInfoBySession: 
     materi: item.deskripsi_materi || (active ? 'Sesi sedang berlangsung. Materi belum diisi.' : '-'),
     isVerified: item.is_verified,
     isPaid: item.is_paid,
+    isOnline: isOnlinePresensi(item),
+    linkVideo: item.link_video || '',
+    forgotCheckout,
+    waktuCheckInRaw: item.waktu_checkin,
   };
 }
 
@@ -111,8 +168,10 @@ export default function RiwayatKehadiranPage() {
   } = useRiwayatKehadiranStore();
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
   const [teachingInfoBySession, setTeachingInfoBySession] = useState<Record<string, TeachingSessionInfo>>({});
+  const fetchedDatesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    let cancelled = false;
     async function fetchHistory() {
       if (fetched) {
         setLoading(false);
@@ -121,6 +180,7 @@ export default function RiwayatKehadiranPage() {
       setLoading(true);
       setError(null);
       const res = await getMyPresensi();
+      if (cancelled) return;
       if (res.success) {
         setItems(res.data ?? []);
       } else {
@@ -129,43 +189,62 @@ export default function RiwayatKehadiranPage() {
       setLoading(false);
     }
     fetchHistory();
+    return () => { cancelled = true; };
   }, [fetched, setError, setItems, setLoading]);
 
   useEffect(() => {
+    let cancelled = false;
     async function fetchTeachingTeams() {
-      const dates = Array.from(new Set(items.map(getHistoryDateKey).filter(Boolean)));
-      if (dates.length === 0) {
-        setTeachingInfoBySession({});
-        return;
-      }
-
-      const results = await Promise.all(dates.map(async date => {
-        const res = await getSessionsByDate(date);
-        return { date, sessions: res.success ? res.data ?? [] : [] };
-      }));
+      const allDates = Array.from(new Set(items.map(getHistoryDateKey).filter(Boolean)));
+      const dates = allDates.filter(d => !fetchedDatesRef.current.has(d));
+      if (dates.length === 0) return;
 
       const lookup: Record<string, TeachingSessionInfo> = {};
-      results.forEach(({ date, sessions }) => {
-        sessions.forEach(session => {
-          if (session.pengajar) {
-            lookup[getTeachingLookupKey(date, session.id_sesi)] = {
-              teachingTeam: pengajarDisplayName(session.pengajar),
-              isPengganti: session.tipe_jadwal === 'PENGGANTI',
-            };
-          }
+      for (let i = 0; i < dates.length; i += 5) {
+        if (cancelled) return;
+        const batch = dates.slice(i, i + 5);
+        const batchResults = await Promise.all(batch.map(async date => {
+          const res = await getSessionsByDate(date);
+          return { date, sessions: res.success ? res.data ?? [] : [] };
+        }));
+        if (cancelled) return;
+        batchResults.forEach(({ date, sessions }) => {
+          fetchedDatesRef.current.add(date);
+          sessions.forEach(session => {
+            if (session.pengajar) {
+              const waktuSelesai = session.waktu.split(', ').pop()?.split(' - ')[1]?.trim();
+              lookup[getTeachingLookupKey(date, session.id_sesi)] = {
+                teachingTeam: pengajarDisplayName(session.pengajar),
+                isPengganti: session.tipe_jadwal === 'PENGGANTI',
+                waktuSelesai,
+              };
+            }
+          });
         });
-      });
-      setTeachingInfoBySession(lookup);
+      }
+      setTeachingInfoBySession(prev => ({ ...prev, ...lookup }));
     }
 
     fetchTeachingTeams();
+    return () => { cancelled = true; };
   }, [items]);
 
   useEffect(() => {
     resetVisible();
   }, [searchTerm, filterStatus, resetVisible]);
 
-  const history = items.map(item => mapPresensiToHistory(item, teachingInfoBySession));
+  const history = items
+    .map(item => mapPresensiToHistory(item, teachingInfoBySession))
+    .sort((a, b) => {
+      const dateStrA = a.rawDate.split('T')[0];
+      const dateStrB = b.rawDate.split('T')[0];
+      if (dateStrA !== dateStrB) {
+        return dateStrB.localeCompare(dateStrA);
+      }
+      const timeA = a.waktuCheckInRaw ? new Date(a.waktuCheckInRaw).getTime() : 0;
+      const timeB = b.waktuCheckInRaw ? new Date(b.waktuCheckInRaw).getTime() : 0;
+      return timeA - timeB;
+    });
   const filtered = history.filter(item =>
     (item.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.className.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -351,7 +430,14 @@ export default function RiwayatKehadiranPage() {
                                   >
                                     <td className="px-4 py-3 text-xs text-slate-400 font-medium">{currentNum}</td>
                                     <td className="px-4 py-3">
-                                      <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">{item.subject}</span>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-xs font-semibold text-slate-800">{item.subject}</span>
+                                        {item.isOnline && (
+                                          <span className="border border-crimson text-crimson text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                                            Online
+                                          </span>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="px-4 py-3">
                                       <span className="text-xs text-slate-600 whitespace-nowrap">{item.className}</span>
@@ -430,7 +516,14 @@ export default function RiwayatKehadiranPage() {
               <article className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
 
                 <div className="flex flex-col gap-1 w-full md:w-1/3">
-                  <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 leading-snug">{item.subject}</h2>
+                  <div className="flex items-start gap-2 mb-1 flex-wrap">
+                    <h2 className="text-xl md:text-2xl font-bold text-slate-900 leading-snug">{item.subject}</h2>
+                    {item.isOnline && (
+                      <span className="mt-1 border border-crimson text-crimson text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
+                        Online
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-slate-500 font-medium">Kelas: {item.className}</p>
                   <p className="text-sm text-slate-500 font-medium">Ruangan: {item.room}</p>
                   <p className="text-sm text-slate-500 font-medium">Asisten Dosen: {item.teachingTeam}</p>
@@ -466,9 +559,19 @@ export default function RiwayatKehadiranPage() {
                 <p className="text-sm text-slate-500 mt-1 ml-1 leading-relaxed">
                   &quot;{item.materi}&quot;
                 </p>
-                {item.checkOut === '--:--' && item.status === 'SELESAI' && (
+                {item.isOnline && item.linkVideo && (
+                  <a
+                    href={item.linkVideo}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-1 text-xs font-semibold text-crimson underline underline-offset-2 break-all"
+                  >
+                    {item.linkVideo}
+                  </a>
+                )}
+                 {(item.forgotCheckout || (item.checkOut === '--:--' && item.status === 'SELESAI')) && (
                   <p className="text-xs font-semibold text-crimson mt-2 ml-1">
-                    Kamu tidak melakukan checkout pada sesi ini.
+                    Sesi ini di-checkout otomatis oleh sistem (Auto CO).
                   </p>
                 )}
               </div>
@@ -575,11 +678,21 @@ export default function RiwayatKehadiranPage() {
                 <BookOpen className="w-3 h-3 md:w-4 md:h-4 text-slate-400" />
                 <h4 className="text-[10px] md:text-xs font-bold text-slate-400 tracking-widest uppercase">Bahasan Materi Lengkap</h4>
               </div>
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-6 text-sm md:text-base text-slate-600 shadow-[0_2px_10px_rgba(0,0,0,0.02)] leading-relaxed min-h-[80px]">
-                {selectedItem.materi}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-6 text-sm md:text-base text-slate-600 shadow-[0_2px_10px_rgba(0,0,0,0.02)] leading-relaxed min-h-[80px] flex flex-col gap-3">
+                <span>{selectedItem.materi}</span>
+                {selectedItem.isOnline && selectedItem.linkVideo && (
+                  <a
+                    href={selectedItem.linkVideo}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-semibold text-crimson underline underline-offset-2 break-all"
+                  >
+                    {selectedItem.linkVideo}
+                  </a>
+                )}
               </div>
               {selectedItem.checkOut === '--:--' && selectedItem.status === 'SELESAI' && (
-                <p className="text-xs font-semibold text-red-500 mt-2 ml-1">Kamu tidak melakukan checkout pada sesi ini.</p>
+                <p className="text-xs font-semibold text-red-500 mt-2 ml-1">Sesi ini di-checkout otomatis oleh sistem (Auto CO).</p>
               )}
             </div>
             <button onClick={() => setSelectedItem(null)}

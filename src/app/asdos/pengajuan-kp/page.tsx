@@ -5,7 +5,7 @@ import { createSubstitution, deleteSubstitution, getMySubstitutions } from '@/li
 import { getRuanganList, getSemesterList } from '@/lib/actions/data-master';
 import { getMyScheduleTimeline, getScheduleTimeline, getSessionsByDate } from '@/lib/actions/jadwal';
 import { getMyPresensi } from '@/lib/actions/presensi';
-import type { RuanganItem, UnifiedJadwalResponse } from '@/types/api';
+import type { RuanganItem, UnifiedJadwalResponse, SubstituteSessionDetail } from '@/types/api';
 import type { SessionFromAPI } from '@/lib/actions/jadwal';
 import { AsdosPageHeader, AsdosPageShell, AsdosPrimaryButton, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
 import { usePengajuanKpStore } from '@/store/usePengajuanKpStore';
@@ -312,6 +312,7 @@ export default function PengajuanKpPage() {
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState<string | null>(null);
   const [coveredByOtherIds, setCoveredByOtherIds] = useState<Set<string>>(new Set());
+  const [myPendingOrVerifiedIds, setMyPendingOrVerifiedIds] = useState<Set<string>>(new Set());
   const [coveredByOtherList, setCoveredByOtherList] = useState<Array<{ id_sesi: string; mata_kuliah: string; nama_kelas: string; original_date: string; substitute_date: string }>>([]);
 
   const fetchHistory = useCallback(async () => {
@@ -325,6 +326,12 @@ export default function PengajuanKpPage() {
           item => item.status !== 'REJECTED' && item.id_asdos1 !== user?.id_asisten && !!item.session?.id_sesi,
         );
         setCoveredByOtherIds(new Set(coveredItems.map(item => item.session!.id_sesi)));
+
+        const myPendingOrVerified = res.data.items.filter(
+          item => item.status !== 'REJECTED' && item.id_asdos1 === user?.id_asisten && !!item.session?.id_sesi,
+        );
+        setMyPendingOrVerifiedIds(new Set(myPendingOrVerified.map(item => item.session!.id_sesi)));
+
         const seen = new Set<string>();
         const uniqueList: Array<{ id_sesi: string; mata_kuliah: string; nama_kelas: string; original_date: string; substitute_date: string }> = [];
         for (const item of coveredItems) {
@@ -414,6 +421,7 @@ useEffect(() => {
       setFormBoxHeight(null);
       return;
     }
+    if (isSuccess) return;
     const el = formBoxRef.current;
     if (!el) return;
     const ro = new ResizeObserver(entries => {
@@ -424,7 +432,7 @@ useEffect(() => {
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [isFormOpen, isMobile]);
+  }, [isFormOpen, isMobile, isSuccess]);
 
   useEffect(() => {
     if (!idSession || !originalDate) {
@@ -477,6 +485,60 @@ useEffect(() => {
     setOriginalDate(''); setSubstituteDate(''); setIdSession('');
     setIdRuangan(''); setSlotOption(1); setReason(''); setSubmitError(null);
     setWeekOffset(0);
+  };
+
+  const calculateWeekOffset = (targetDateStr: string) => {
+    try {
+      const today = new Date();
+      const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      const [y, m, d] = targetDateStr.split('T')[0].split('-').map(Number);
+      const targetDate = new Date(y, m - 1, d);
+      
+      const todayDow = todayMidnight.getDay();
+      const daysToMon = todayDow === 0 ? -6 : 1 - todayDow;
+      const todayMonday = new Date(todayMidnight.getFullYear(), todayMidnight.getMonth(), todayMidnight.getDate() + daysToMon);
+      
+      const targetDow = targetDate.getDay();
+      const targetDaysToMon = targetDow === 0 ? -6 : 1 - targetDow;
+      const targetMonday = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + targetDaysToMon);
+      
+      const diffTime = targetMonday.getTime() - todayMonday.getTime();
+      return Math.round(diffTime / (7 * 24 * 60 * 60 * 1000));
+    } catch {
+      return 0;
+    }
+  };
+
+  const handleResubmit = (item: SubstituteSessionDetail) => {
+    const mappedSessionId = item.session?.id_sesi ?? '';
+    setIdSession(mappedSessionId);
+
+    const oDate = item.original_date ? item.original_date.split('T')[0] : '';
+    setOriginalDate(oDate);
+
+    const sDate = item.substitute_date ? item.substitute_date.split('T')[0] : '';
+    setSubstituteDate(sDate);
+
+    const matchedRoom = ruanganList.find(r => roomLabel(r) === item.room);
+    setIdRuangan(matchedRoom ? matchedRoom.id : '');
+
+    const itemRange = parseTimeRangeMinutes(item.time_slot);
+    const matchedSlot = itemRange ? SLOT_OPTIONS.find(slot => {
+      const slotRangeObj = parseTimeRangeMinutes(slot.label);
+      return slotRangeObj && Math.abs(slotRangeObj.start - itemRange.start) < 5;
+    }) : null;
+    setSlotOption(matchedSlot ? matchedSlot.value : 1);
+
+    setReason(item.reason ?? '');
+
+    if (oDate) {
+      const offset = calculateWeekOffset(oDate);
+      setWeekOffset(offset);
+    }
+
+    setIsFormOpen(true);
+    setSubmitError(null);
   };
 
   const handleOpenDelete = (id: string) => {
@@ -619,7 +681,9 @@ useEffect(() => {
   );
 
   const selectedSessionCheckedIn = !!idSession && !!originalDate && checkedInKeys.has(`${originalDate}|${idSession}`);
-  const sessionAlreadyCovered = !!idSession && coveredByOtherIds.has(idSession);
+  const sessionCoveredByOther = !!idSession && coveredByOtherIds.has(idSession);
+  const sessionCoveredByMe = !!idSession && myPendingOrVerifiedIds.has(idSession);
+  const sessionAlreadyCovered = sessionCoveredByOther || sessionCoveredByMe;
   const canSubmit = isFormValid && !roomConflict && !selectedSessionCheckedIn && !sessionAlreadyCovered;
 
   const renderCoveredBanner = (ref?: React.RefObject<HTMLDivElement | null>) => {
@@ -708,7 +772,8 @@ useEffect(() => {
                   {day.sessions.map(s => {
                     const isCheckedIn = checkedInKeys.has(`${day.iso}|${s.id_sesi}`);
                     const isCovered = coveredByOtherIds.has(s.id_sesi);
-                    const isDisabled = isCheckedIn || isCovered;
+                    const isSubmittedByMe = myPendingOrVerifiedIds.has(s.id_sesi);
+                    const isDisabled = isCheckedIn || isCovered || isSubmittedByMe;
                     const isActive = idSession === s.id_sesi;
                     const timeOnly = s.waktu.split(', ')[1] ?? s.waktu;
                     return (
@@ -740,6 +805,7 @@ useEffect(() => {
                           {s.nama_kelas} <span className="text-[10px] text-slate-400/90 font-normal">· {s.pengajar}</span>
                           {isCheckedIn && <span className="ml-1 text-amber-600 font-semibold">· Check-in</span>}
                           {isCovered && !isCheckedIn && <span className="ml-1 text-blue-600 font-semibold">· Diajukan rekan</span>}
+                          {isSubmittedByMe && !isCheckedIn && <span className="ml-1 text-amber-600 font-semibold">· Sudah diajukan</span>}
                         </p>
                       </button>
                     );
@@ -756,7 +822,7 @@ useEffect(() => {
   const renderFormContent = () => {
     if (isSuccess) {
       return (
-        <div className="h-56 md:h-64 flex flex-col items-center justify-center text-center">
+        <div className="flex-1 flex flex-col items-center justify-center text-center py-10 md:py-0">
           <div className="relative flex items-center justify-center mb-8">
             <div className="absolute w-28 h-28 bg-crimson/5 rounded-full animate-ping" />
             <div className="absolute w-20 h-20 bg-crimson/10 rounded-full" />
@@ -871,13 +937,25 @@ useEffect(() => {
               </div>
             </div>
 
-            {sessionAlreadyCovered && (
+            {sessionCoveredByOther && (
               <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3.5 text-sm text-blue-700">
                 <Info className="w-[18px] h-[18px] mt-0.5 shrink-0 text-blue-500" strokeWidth={2.5} />
                 <div>
                   <p className="font-bold">Sesi ini sudah diajukan KP</p>
                   <p className="font-medium text-blue-600/80 mt-0.5">
                     Asisten dosen lain sudah mengajukan Kelas Pengganti untuk sesi ini. Anda tidak perlu mengajukan lagi.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {sessionCoveredByMe && (
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3.5 text-sm text-amber-700">
+                <Info className="w-[18px] h-[18px] mt-0.5 shrink-0 text-amber-500" strokeWidth={2.5} />
+                <div>
+                  <p className="font-bold">Sesi ini sudah Anda ajukan</p>
+                  <p className="font-medium text-amber-600/80 mt-0.5">
+                    Anda sudah memiliki pengajuan aktif (Menunggu/Disetujui) untuk sesi ini.
                   </p>
                 </div>
               </div>
@@ -1106,6 +1184,14 @@ useEffect(() => {
                             }
                           </button>
                         )}
+                        {item.status === 'REJECTED' && (
+                          <button
+                            onClick={() => handleResubmit(item)}
+                            className="px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-white text-crimson hover:bg-crimson hover:text-white transition-all active:scale-[0.97] whitespace-nowrap shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.12)]"
+                          >
+                            Ajukan Kembali
+                          </button>
+                        )}
                       </div>
 
                     </article>
@@ -1162,6 +1248,7 @@ useEffect(() => {
                   <div
                     ref={formBoxRef}
                     className="bg-white rounded-[12px] p-6 md:p-8 border border-slate-100 flex flex-col w-full self-start max-h-[calc(100vh-160px)] overflow-y-auto"
+                    style={isSuccess && formBoxHeight ? { minHeight: formBoxHeight } : undefined}
                   >
                     {renderFormContent()}
                   </div>

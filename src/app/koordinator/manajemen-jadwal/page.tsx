@@ -69,6 +69,7 @@ const FILTER_TIPE_OPTIONS = [
   { value: 'PENGGANTI', label: 'Pengganti' },
 ];
 const HARI_SELECT_OPTIONS = HARI_OPTIONS.map(h => ({ value: String(h.value), label: h.label }));
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const JAM_SELECT_OPTIONS = JAM_OPTIONS.map(j => ({
   value: String(j.value),
   label: j.range,
@@ -345,6 +346,8 @@ export default function ManajemenJadwalPage() {
   const [form, setForm] = useState<SessionForm>(emptyForm);
   const [instructorType, setInstructorType] = useState<'DOSEN' | 'ASDOS'>('DOSEN');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [dropdownLoading, setDropdownLoading] = useState(false);
 
   const [kelasList, setKelasList] = useState<KelasItem[]>([]);
@@ -403,16 +406,17 @@ export default function ManajemenJadwalPage() {
     setViewType(type);
     if (type === 'TABLE') {
       setTableDate(startDate);
-      setEndDate(startDate);
-    } else {
-      setEndDate(toIsoDateFromDate(addDays(parseLocalDate(startDate), 6)));
     }
+    // No date range change — both views share the already-loaded sessions
   };
 
   const handleTableDateChange = (value: string) => {
     setTableDate(value);
-    setStartDate(value);
-    setEndDate(value);
+    // Only fetch when navigating outside the currently loaded range
+    if (value < startDate || value > endDate) {
+      setStartDate(value);
+      setEndDate(toIsoDateFromDate(addDays(parseLocalDate(value), 6)));
+    }
   };
 
   const hasActiveSearch = Boolean(searchTerm.trim()) || filterTipe !== 'ALL';
@@ -464,6 +468,7 @@ export default function ManajemenJadwalPage() {
     () => mkList.map(m => ({ value: m.id, label: m.nama_mk, description: `${m.kode_mk} - ${m.sks} SKS` })),
     [mkList],
   );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const ruanganOptions = useMemo(
     () => ruanganList.map(r => ({ value: r.id, label: r.nama_ruangan, description: `Lantai ${r.lantai} - Kapasitas ${r.kapasitas}` })),
     [ruanganList],
@@ -472,10 +477,12 @@ export default function ManajemenJadwalPage() {
     () => asdosList.map(a => ({ value: a.id_asdos, label: a.username, description: a.nim })),
     [asdosList],
   );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const asdos2Options = useMemo(
     () => asdosOptions.filter(a => a.value !== form.id_asdos1),
     [asdosOptions, form.id_asdos1],
   );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const lecturerOptions = useMemo(
     () => lecturerList.map(l => ({ value: l.id, label: l.nama, description: l.nip })),
     [lecturerList],
@@ -510,6 +517,85 @@ export default function ManajemenJadwalPage() {
 
     return { ruangan: ruanganConflict, pengajar: pengajarConflict };
   }, [isModalOpen, form, sessions, ruanganList, asdosList, lecturerList, editingId]);
+
+  const sameDateAndJamSessions = useMemo(() => {
+    if (!isModalOpen || !form.tanggal || !form.opsi_jam) return [];
+    return sessions.filter(s => {
+      if (s.id_sesi === editingId) return false;
+      return sessionDateKey(s.tanggal) === form.tanggal && opsiJamFromWaktu(s.waktu) === form.opsi_jam;
+    });
+  }, [isModalOpen, sessions, form.tanggal, form.opsi_jam, editingId]);
+
+  const ruanganOptionsWithConflict = useMemo(() => ruanganList.map(r => {
+    const conflict = sameDateAndJamSessions.find(
+      s => s.ruangan.toLowerCase() === r.nama_ruangan.toLowerCase(),
+    );
+    return {
+      value: r.id,
+      label: r.nama_ruangan,
+      description: conflict
+        ? `Sudah dipakai — ${conflict.mata_kuliah} ${conflict.nama_kelas}`
+        : `Lantai ${r.lantai} · Kapasitas ${r.kapasitas}`,
+      disabled: !!conflict,
+    };
+  }), [ruanganList, sameDateAndJamSessions]);
+
+  const jamOptionsWithConflict = useMemo(() => {
+    const selectedRuangan = ruanganList.find(r => r.id === form.id_ruangan);
+    return JAM_OPTIONS.map(j => {
+      const conflict = selectedRuangan && form.tanggal
+        ? sessions.find(s => {
+            if (s.id_sesi === editingId) return false;
+            return sessionDateKey(s.tanggal) === form.tanggal
+              && opsiJamFromWaktu(s.waktu) === j.value
+              && s.ruangan.toLowerCase() === selectedRuangan.nama_ruangan.toLowerCase();
+          }) ?? null
+        : null;
+      return {
+        value: String(j.value),
+        label: j.range,
+        description: conflict
+          ? `Ruangan dipakai — ${conflict.mata_kuliah} ${conflict.nama_kelas}`
+          : undefined,
+        disabled: !!conflict,
+      };
+    });
+  }, [sessions, form.id_ruangan, form.tanggal, ruanganList, editingId]);
+
+  const dosenOptionsWithConflict = useMemo(() => lecturerList.map(l => {
+    const conflict = sameDateAndJamSessions.find(s =>
+      pengajarDisplayName(s.pengajar)
+        .toLowerCase()
+        .split(' & ')
+        .some(n => n.trim().includes(l.nama.toLowerCase())),
+    );
+    return {
+      value: l.id,
+      label: l.nama,
+      description: conflict ? `Sudah mengajar — ${conflict.mata_kuliah}` : l.nip,
+      disabled: !!conflict,
+    };
+  }), [lecturerList, sameDateAndJamSessions]);
+
+  const asdosOptionsWithConflict = useMemo(() => asdosList.map(a => {
+    const conflict = sameDateAndJamSessions.find(s =>
+      pengajarDisplayName(s.pengajar)
+        .toLowerCase()
+        .split(' & ')
+        .some(n => n.trim() === a.username.toLowerCase()),
+    );
+    return {
+      value: a.id_asdos,
+      label: a.username,
+      description: conflict ? `Sudah mengajar — ${conflict.mata_kuliah}` : a.nim,
+      disabled: !!conflict,
+    };
+  }), [asdosList, sameDateAndJamSessions]);
+
+  const asdos2OptionsWithConflict = useMemo(
+    () => asdosOptionsWithConflict.filter(a => a.value !== form.id_asdos1),
+    [asdosOptionsWithConflict, form.id_asdos1],
+  );
 
   const handleStartDateChange = (value: string) => {
     if (!value) return;
@@ -855,6 +941,7 @@ export default function ManajemenJadwalPage() {
     setEditingSession(session ?? null);
     setIsClosing(false);
     setSheetDragY(0);
+    setFormError(null);
     setIsModalOpen(true);
     setTimeout(() => setIsModalVisible(true), 10);
 
@@ -891,6 +978,7 @@ export default function ManajemenJadwalPage() {
   const handleCloseModal = () => {
     setIsClosing(true);
     setIsModalVisible(false);
+    setFormError(null);
     setTimeout(() => {
       setIsModalOpen(false);
       setIsClosing(false);
@@ -907,6 +995,7 @@ export default function ManajemenJadwalPage() {
     if (modalType === 'edit' && !editingId) { return; }
 
     setIsSubmitting(true);
+    setFormError(null);
     const payload = buildPayload();
     const instanceDate =
       modalType === 'edit' && editingSession
@@ -920,6 +1009,7 @@ export default function ManajemenJadwalPage() {
 
     if (!res.success) {
       if (redirectIfSessionExpired(res.message)) return;
+      setFormError(res.message || 'Gagal menyimpan sesi. Silakan coba lagi.');
       return;
     }
     handleCloseModal();
@@ -936,6 +1026,7 @@ export default function ManajemenJadwalPage() {
   const handleCloseDelete = () => {
     setIsDeleteClosing(true);
     setIsDeleteVisible(false);
+    setDeleteError(null);
     setTimeout(() => {
       setDeleteTarget(null);
       setIsDeleteClosing(false);
@@ -990,6 +1081,7 @@ export default function ManajemenJadwalPage() {
     setIsDeleteSubmitting(false);
     if (!res.success) {
       if (redirectIfSessionExpired(res.message)) return;
+      setDeleteError(res.message || 'Gagal menghapus sesi. Silakan coba lagi.');
       return;
     }
     handleCloseDelete();
@@ -1247,7 +1339,29 @@ export default function ManajemenJadwalPage() {
               </div>
             )}
 
-            {!loading && viewType === 'TABLE' && timetableData && (
+            {!loading && fetchError && (
+              <div className="bg-white rounded-2xl p-8 md:p-12 border border-dashed border-red-200 text-center shadow-sm max-w-md mx-auto my-4">
+                <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-crimson">
+                  <AlertCircle size={26} />
+                </div>
+                <p className="text-sm md:text-base font-semibold text-slate-800">Gagal Memuat Jadwal</p>
+                <p className="text-xs md:text-sm text-slate-500 mt-1 mb-6">
+                  {fetchError || 'Koneksi lambat atau server sedang sibuk. Silakan segarkan jadwal.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={refreshSessions}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-crimson text-white font-bold text-sm active:scale-95 transition-all shadow-md shadow-crimson/10 hover:bg-[#7a1727]"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89" />
+                  </svg>
+                  Segarkan Jadwal
+                </button>
+              </div>
+            )}
+
+            {!loading && !fetchError && viewType === 'TABLE' && timetableData && (
               timetableData.rooms.length > 0 ? (
                 <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
                   <div className="overflow-auto max-h-[70vh]">
@@ -1336,7 +1450,7 @@ export default function ManajemenJadwalPage() {
               )
             )}
 
-            {!loading && viewType === 'CARD' &&
+            {!loading && !fetchError && viewType === 'CARD' &&
               (() => {
                 const grouped = filtered.reduce<Record<string, SessionTimeline[]>>((acc, s) => {
                   const key = sessionDateKey(s.tanggal);
@@ -1625,7 +1739,7 @@ export default function ManajemenJadwalPage() {
                       <CustomSelect
                         value={form.id_ruangan}
                         onChange={v => setForm(f => ({ ...f, id_ruangan: v }))}
-                        options={ruanganOptions}
+                        options={ruanganOptionsWithConflict}
                         placeholder="Pilih ruangan"
                         searchable
                         searchPlaceholder="Cari ruangan..."
@@ -1672,7 +1786,7 @@ export default function ManajemenJadwalPage() {
                         <CustomSelect
                           value={String(form.opsi_jam)}
                           onChange={v => setForm(f => ({ ...f, opsi_jam: Number(v) }))}
-                          options={JAM_SELECT_OPTIONS}
+                          options={jamOptionsWithConflict}
                         />
                         {(conflictInfo.ruangan || conflictInfo.pengajar) && (
                           <div className="flex items-start gap-1.5 mt-1.5 px-1">
@@ -1719,7 +1833,7 @@ export default function ManajemenJadwalPage() {
                             id_asdos1: '',
                             id_asdos2: ''
                           }))}
-                          options={[{ value: '', label: 'Pilih Dosen' }, ...lecturerOptions]}
+                          options={[{ value: '', label: 'Pilih Dosen' }, ...dosenOptionsWithConflict]}
                           placeholder="Pilih Dosen"
                           icon={<User className="w-4 h-4" />}
                           searchable
@@ -1749,7 +1863,7 @@ export default function ManajemenJadwalPage() {
                               id_asdos1: v,
                               id_dosen: ''
                             }))}
-                            options={[{ value: '', label: 'Pilih Asisten Dosen 1' }, ...asdosOptions]}
+                            options={[{ value: '', label: 'Pilih Asisten Dosen 1' }, ...asdosOptionsWithConflict]}
                             placeholder="Pilih Asisten Dosen 1"
                             icon={<Users className="w-4 h-4" />}
                           />
@@ -1771,7 +1885,7 @@ export default function ManajemenJadwalPage() {
                               id_asdos2: v,
                               id_dosen: ''
                             }))}
-                            options={[{ value: '', label: 'Opsional (Asisten Dosen 2)' }, ...asdos2Options]}
+                            options={[{ value: '', label: 'Opsional (Asisten Dosen 2)' }, ...asdos2OptionsWithConflict]}
                             placeholder="Opsional"
                             icon={<Users className="w-4 h-4" />}
                           />
@@ -1790,22 +1904,32 @@ export default function ManajemenJadwalPage() {
                 )}
               </div>
 
-              <div className="sticky bottom-0 p-5 border-t border-slate-100 bg-white flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="flex-1 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-[15px] active:scale-[0.98]"
-                >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={isSubmitting || dropdownLoading}
-                  className="flex-1 py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] shadow-md shadow-crimson/20 active:scale-[0.98] disabled:opacity-60"
-                >
-                  {isSubmitting ? 'Menyimpan...' : modalType === 'add' ? 'Buat Sesi' : 'Simpan'}
-                </button>
+              <div className="sticky bottom-0 border-t border-slate-100 bg-white">
+                {formError && (
+                  <div className="px-5 pt-4 pb-0">
+                    <div className="flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                      <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                      <p className="text-xs font-semibold text-amber-700 leading-relaxed">{formError}</p>
+                    </div>
+                  </div>
+                )}
+                <div className="p-5 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="flex-1 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-[15px] active:scale-[0.98]"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || dropdownLoading}
+                    className="flex-1 py-3.5 rounded-xl bg-crimson text-white font-bold text-[15px] shadow-md shadow-crimson/20 active:scale-[0.98] disabled:opacity-60"
+                  >
+                    {isSubmitting ? 'Menyimpan...' : modalType === 'add' ? 'Buat Sesi' : 'Simpan'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1848,6 +1972,12 @@ export default function ManajemenJadwalPage() {
                   Sesi <span className="font-semibold text-slate-700">{deleteTarget.mata_kuliah}</span> pada{' '}
                   {deleteTarget.tanggal} akan dihapus permanen.
                 </p>
+                {deleteError && (
+                  <div className="flex items-start gap-2 mt-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-xs font-semibold text-amber-700 leading-relaxed">{deleteError}</p>
+                  </div>
+                )}
                 <div className="mt-6 flex gap-3">
                   <button
                     type="button"

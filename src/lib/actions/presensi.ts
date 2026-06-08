@@ -1,4 +1,4 @@
-﻿'use server';
+'use server';
 
 import { apiClient } from '@/lib/api/client';
 
@@ -44,6 +44,7 @@ export interface PresensiResponseDTO {
   is_verified: boolean;
   is_paid: boolean;
   menggantikan: boolean;
+  forgot_checkout?: boolean;
   link_video?: string;
 }
 

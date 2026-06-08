@@ -27,7 +27,7 @@ import type { SemesterItem, SessionTimeline } from '@/types/api';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { AsdosPageShell, AsdosPageHeader } from '@/components/dashboard/asdos/AsdosUI';
 
-const REFRESH_INTERVAL_SEC = 240; 
+const REFRESH_INTERVAL_SEC = 300; 
 
 export default function GenerateQrPage() {
   const [semesters, setSemesters] = useState<SemesterItem[]>([]);

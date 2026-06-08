@@ -3,9 +3,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 
-const THRESHOLD = 110;
-const MAX_DRAG = 130;
+const THRESHOLD = 72;
+const MAX_DRAG = 92;
 const INDICATOR = 44;
+
+function getScrollTop() {
+  return document.getElementById('dashboard-children-container')?.scrollTop ?? window.scrollY;
+}
 
 export function PullToRefresh() {
   const [drag, setDrag] = useState(0);
@@ -15,7 +19,7 @@ export function PullToRefresh() {
   const dragRef = useRef(0);
 
   const onTouchStart = useCallback((e: TouchEvent) => {
-    if (window.scrollY > 0) return;
+    if (getScrollTop() > 0) return;
     startY.current = e.touches[0].clientY;
     active.current = true;
   }, []);
@@ -29,7 +33,7 @@ export function PullToRefresh() {
       setDrag(0);
       return;
     }
-    const d = Math.min(raw * 0.28, MAX_DRAG);
+    const d = Math.min(raw * 0.55, MAX_DRAG);
     dragRef.current = d;
     setDrag(d);
   }, [refreshing]);

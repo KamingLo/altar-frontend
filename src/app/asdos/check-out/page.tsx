@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Check, Scan, ArrowLeft, BookOpen, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
-import { getMyPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/actions/presensi';
+import { getMyPresensi, getAllPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { getSessionsByDate } from '@/lib/actions/jadwal';
 
 import Link from 'next/link';
@@ -27,7 +28,9 @@ type SharedMateriOption = {
 export default function CheckOutPage() {
   const MAX_HURUF = 100;
 
+  const router = useRouter();
   const [step, setStep] = useState(1);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const [materi, setMateri] = useState('');
   const [partnerMateri, setPartnerMateri] = useState<{ materi: string; nama: string } | null>(null);
   const [sharedMateriOptions, setSharedMateriOptions] = useState<SharedMateriOption[]>([]);
@@ -51,6 +54,7 @@ export default function CheckOutPage() {
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
   useEffect(() => {
+    let cancelled = false;
     async function fetchActivePresensi() {
       setIsLoading(true);
       try {
@@ -59,6 +63,7 @@ export default function CheckOutPage() {
           getMyPresensi(),
           getSessionsByDate(today),
         ]);
+        if (cancelled) return;
         if (res.success && res.data) {
           const records = res.data;
           const active = records.find(p => {
@@ -70,7 +75,37 @@ export default function CheckOutPage() {
                            String(checkout).startsWith('0001');
             if (!isOpen) return false;
             const presensiDate = String(p.tanggal_mengajar ?? '').split('T')[0];
-            return presensiDate === today;
+            if (presensiDate !== today) return false;
+
+            // Check if past checkout deadline (end of class + 30 minutes)
+            const matchedSchedule = (scheduleRes.success ? scheduleRes.data ?? [] : []).find(session =>
+              session.id_sesi === p.id_sesi || session.id_sesi === p.id_sesi_pengganti,
+            );
+            if (matchedSchedule) {
+              const timePart = matchedSchedule.waktu.split(', ').pop();
+              if (timePart) {
+                const endStr = timePart.split(' - ')[1]?.trim();
+                if (endStr) {
+                  const [endH, endM] = endStr.split(':').map(Number);
+                  if (!isNaN(endH) && !isNaN(endM)) {
+                    const sessionDate = new Date(p.tanggal_mengajar || p.waktu_checkin);
+                    const deadline = new Date(
+                      sessionDate.getFullYear(),
+                      sessionDate.getMonth(),
+                      sessionDate.getDate(),
+                      endH,
+                      endM + 30,
+                      0,
+                      0
+                    );
+                    if (new Date() > deadline) {
+                      return false; // Auto checked out virtually!
+                    }
+                  }
+                }
+              }
+            }
+            return true;
           });
           setActivePresensi(active ?? null);
           if (active) {
@@ -79,20 +114,34 @@ export default function CheckOutPage() {
             );
             setActiveTeachingTeam(matchedSchedule?.pengajar || formatTeachingTeam(active));
 
-            const sharedOptions = records
-              .filter(p => {
-              if (p.id_presensi === active.id_presensi) return false;
-                const sameMainSession = p.id_sesi === active.id_sesi;
-                const sameSubstituteSession = !!active.id_sesi_pengganti && p.id_sesi_pengganti === active.id_sesi_pengganti;
-                if (!sameMainSession && !sameSubstituteSession) return false;
-              if (String(p.tanggal_mengajar ?? '').split('T')[0] !== today) return false;
-              return hasCheckout(p.waktu_checkout) && !!p.deskripsi_materi?.trim();
-              })
-              .map(p => ({
-                id: p.id_presensi,
-                materi: p.deskripsi_materi?.trim() ?? '',
-                nama: p.nama_asdos || 'partner Anda',
-              }));
+            const findPartnerOptions = (pool: PresensiResponseDTO[]) =>
+              pool
+                .filter(p => {
+                  if (p.id_presensi === active.id_presensi) return false;
+                  const sameMain = p.id_sesi === active.id_sesi;
+                  const sameSub = !!active.id_sesi_pengganti && p.id_sesi_pengganti === active.id_sesi_pengganti;
+                  if (!sameMain && !sameSub) return false;
+                  if (String(p.tanggal_mengajar ?? '').split('T')[0] !== today) return false;
+                  return hasCheckout(p.waktu_checkout) && !!p.deskripsi_materi?.trim();
+                })
+                .map(p => ({
+                  id: p.id_presensi,
+                  materi: p.deskripsi_materi?.trim() ?? '',
+                  nama: p.nama_asdos || 'partner Anda',
+                }));
+
+            let sharedOptions = findPartnerOptions(records);
+
+            if (sharedOptions.length === 0 && active.nama_asdos_rekan) {
+              try {
+                const allRes = await getAllPresensi();
+                if (allRes.success && allRes.data) {
+                  sharedOptions = findPartnerOptions(allRes.data);
+                }
+              } catch {
+                // endpoint mungkin butuh role koordinator — abaikan
+              }
+            }
 
             if (sharedOptions.length > 0) {
               const firstOption = sharedOptions[0];
@@ -122,12 +171,13 @@ export default function CheckOutPage() {
           setMateri('');
         }
       } catch (error) {
-        console.error('Error in fetchActivePresensi:', error);
+        if (!cancelled) console.error('Error in fetchActivePresensi:', error);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
     fetchActivePresensi();
+    return () => { cancelled = true; };
   }, []);
 
   const stopCamera = useCallback(() => {
@@ -146,6 +196,22 @@ export default function CheckOutPage() {
     if (step !== 1) stopCamera();
     return () => stopCamera();
   }, [step, stopCamera]);
+
+  useEffect(() => {
+    if (step === 3) {
+      document.getElementById('dashboard-children-container')?.scrollTo(0, 0);
+      setCountdown(10);
+    } else {
+      setCountdown(null);
+    }
+  }, [step]);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) { router.push('/asdos'); return; }
+    const t = setTimeout(() => setCountdown(c => (c ?? 1) - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown, router]);
 
   const startDecodeLoop = useCallback(async () => {
     const jsQR = (await import('jsqr')).default;
@@ -533,38 +599,40 @@ export default function CheckOutPage() {
           </div>
 
           <div className="flex flex-col gap-6">
-            <section className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-5 shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col gap-5 w-full">
-              <article className="flex flex-col md:flex-row md:items-center gap-6 md:gap-4">
-                <div className="flex flex-col gap-1 w-full md:min-w-0">
-                  <h2 className="text-xl md:text-base font-bold text-slate-900 leading-snug line-clamp-2 mb-1 md:mb-0.5">
-                    {activePresensi.nama_mata_kuliah}
-                  </h2>
-                  <p className="text-sm md:text-xs text-slate-500 font-medium">{activePresensi.nama_kelas}</p>
+            <div className="bg-white rounded-[12px] md:rounded-[24px] p-5 md:p-6 border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
+              <article className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+                <div className="flex flex-col gap-0.5 min-w-0 md:w-1/3">
+                  <h3 className="text-base md:text-lg font-bold text-slate-900 leading-snug">{activePresensi.nama_mata_kuliah}</h3>
+                  <p className="text-xs text-slate-500 font-medium">{activePresensi.nama_kelas}</p>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 md:gap-y-3 w-full md:w-auto shrink-0 md:ml-auto">
-                  <div className="flex flex-col gap-1 md:gap-0.5 border-l-2 border-slate-100 pl-4">
-                    <span className="text-[10px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
-                    <span className="text-sm md:text-xs font-bold text-slate-800">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3 flex-1">
+                  <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-3">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
+                    <span className="text-xs md:text-sm font-bold text-slate-800">
                       {new Date(activePresensi.tanggal_mengajar).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </span>
                   </div>
-                  <div className="flex flex-col gap-1 md:gap-0.5 border-l-2 border-slate-100 pl-4">
-                    <span className="text-[10px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-in</span>
-                    <span className="text-sm md:text-xs font-bold text-slate-800">
+                  <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-3">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Check-in</span>
+                    <span className="text-xs md:text-sm font-bold text-slate-800">
                       {parseUTC(activePresensi.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
                     </span>
                   </div>
-                  <div className="flex flex-col gap-1 md:gap-0.5 border-l-2 border-slate-100 pl-4">
-                    <span className="text-[10px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
-                    <span className="text-sm md:text-xs font-bold text-slate-800">{activePresensi.nama_ruangan}</span>
+                  <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-3">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ruangan</span>
+                    <span className="text-xs md:text-sm font-bold text-slate-800">{activePresensi.nama_ruangan}</span>
                   </div>
-                  <div className="flex flex-col gap-1 md:gap-0.5 border-l-2 border-slate-100 pl-4">
-                    <span className="text-[10px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">Asisten Dosen</span>
-                    <span className="text-sm md:text-xs font-bold text-slate-800">{activeTeachingTeam || formatTeachingTeam(activePresensi)}</span>
+                  <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-3">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asisten Dosen</span>
+                    <div className="flex flex-col gap-0.5">
+                      {(activeTeachingTeam || formatTeachingTeam(activePresensi)).split(' & ').map((name, i) => (
+                        <span key={i} className="text-xs md:text-sm font-bold text-slate-800 leading-snug">{name}</span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </article>
-            </section>
+            </div>
 
             <section className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col gap-5 w-full">
               <div className="flex items-center gap-2">
@@ -601,7 +669,7 @@ export default function CheckOutPage() {
                   }}
                   disabled={!!partnerMateri}
                   placeholder="Ketik bahasan materi yang diajarkan..."
-                  className="w-full bg-fog rounded-[14px] p-4 md:p-5 pb-8 text-sm md:text-base text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-crimson/30 transition-all resize-none h-36 md:h-48 border-0 disabled:cursor-not-allowed disabled:text-slate-500"
+                  className="w-full bg-fog rounded-[14px] p-4 md:p-5 pb-8 text-sm md:text-base text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-crimson/30 transition-all resize-none h-24 md:h-32 border-0 disabled:cursor-not-allowed disabled:text-slate-500"
                 />
                 <div className={`absolute bottom-3 right-4 text-[10px] font-medium bg-fog/80 px-1 ${materi.length >= MAX_HURUF ? 'text-crimson' : 'text-slate-400'}`}>
                   {materi.length} / {MAX_HURUF} huruf
@@ -723,6 +791,11 @@ export default function CheckOutPage() {
               >
                 Kembali ke Beranda
               </Link>
+              {countdown !== null && (
+                <p className="text-center text-xs text-slate-400 mt-3">
+                  Diarahkan otomatis dalam <span className="font-bold text-slate-600">{countdown}s</span>
+                </p>
+              )}
             </div>
           </div>
         </>

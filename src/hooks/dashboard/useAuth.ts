@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSession, logoutUser } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
+import { usePrefetchStore } from '@/store/usePrefetchStore';
 import type { UserRole } from '@/types/api';
 
 export const useAuth = () => {
@@ -17,10 +18,12 @@ export const useAuth = () => {
 
   useEffect(() => {
     if (!isHydrated) return;
+    let cancelled = false;
 
     const fetchUser = async () => {
       try {
         const res = await getSession();
+        if (cancelled) return;
 
         if (res.success && res.data) {
           setUser(res.data);
@@ -35,14 +38,17 @@ export const useAuth = () => {
           router.push('/auth/login');
         }
       } catch {
-        clearUser();
-        router.push('/auth/login');
+        if (!cancelled) {
+          clearUser();
+          router.push('/auth/login');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchUser();
+    return () => { cancelled = true; };
   }, [isHydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = async () => {
@@ -50,6 +56,7 @@ export const useAuth = () => {
       await logoutUser();
     } finally {
       clearUser();
+      usePrefetchStore.getState().reset();
       router.push('/auth/login');
     }
   };

@@ -350,14 +350,19 @@ export default function ManajemenAsdosPage() {
       setFormError('Nama lengkap dan email wajib diisi.');
       return;
     }
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail.endsWith('@stu.untar.ac.id')) {
+      setFormError('Format email salah. Harus menggunakan domain @stu.untar.ac.id.');
+      return;
+    }
     setIsSubmitting(true);
-    const res = await createUser({ username: username.trim(), email: email.trim() });
+    const res = await createUser({ username: username.trim(), email: trimmedEmail });
     setIsSubmitting(false);
     if (!res.success) { setFormError(res.message || 'Gagal membuat user.'); return; }
     setFormError('');
     setCreateUserForm({ username: '', email: '' });
     setAddStep('role_search');
-    handleModalSearchChange(email.trim());
+    handleModalSearchChange(trimmedEmail);
   };
 
   const handleAssignRole = async () => {

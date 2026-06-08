@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Check, Scan, ArrowLeft, X, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { getSessionsByDate, type SessionFromAPI } from '@/lib/actions/jadwal';
 import { submitCheckIn, getMyPresensi } from '@/lib/actions/presensi';
@@ -8,6 +9,7 @@ import { getMySubstitutions, deleteSubstitution } from '@/lib/actions/pergantian
 import { AsdosQrScanSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 import { decodeJwtPayload } from '@/lib/auth/jwt';
 import { getSubstituteSessionId, isQrSession } from '@/lib/presensi-mode';
+import { useUserStore } from '@/store/useUserStore';
 
 const getCurrentMinutes = () => {
   const now = new Date();
@@ -58,7 +60,10 @@ const normalizeScannedQrToken = (rawToken: string): string => {
 };
 
 export default function CheckInPage() {
+  const router = useRouter();
+  const { user } = useUserStore();
   const [step, setStep] = useState(1);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const [sessions, setSessions] = useState<SessionFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,6 +84,7 @@ export default function CheckInPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scanningRef = useRef(false);
 
   const parseAndValidateQrToken = useCallback((token: string): { isValid: boolean; sessionId?: string } => {
     const normalizedToken = normalizeScannedQrToken(token);
@@ -117,6 +123,9 @@ export default function CheckInPage() {
   }, []);
 
   const handleValidQrScanned = useCallback(async (token: string) => {
+    if (scanningRef.current) return;
+    scanningRef.current = true;
+
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
         navigator.vibrate(100);
@@ -128,6 +137,7 @@ export default function CheckInPage() {
     setQrToken(normalizedToken);
     setIsLoading(true);
 
+    try {
     const today = new Date().toISOString().split('T')[0];
     const [res, presensiRes] = await Promise.all([
       getSessionsByDate(today),
@@ -206,6 +216,9 @@ export default function CheckInPage() {
       setCameraStatus('idle');
       setIsLoading(false);
     }
+    } finally {
+      scanningRef.current = false;
+    }
   }, [parseAndValidateQrToken]);
 
   const stopCamera = useCallback(() => {
@@ -225,6 +238,22 @@ export default function CheckInPage() {
     if (step !== 1) stopCamera();
     return () => stopCamera();
   }, [step, stopCamera]);
+
+  useEffect(() => {
+    if (step === 3) {
+      document.getElementById('dashboard-children-container')?.scrollTo(0, 0);
+      setCountdown(10);
+    } else {
+      setCountdown(null);
+    }
+  }, [step]);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) { router.push('/asdos'); return; }
+    const t = setTimeout(() => setCountdown(c => (c ?? 1) - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown, router]);
 
   const startDecodeLoop = useCallback(async () => {
     const jsQR = (await import('jsqr')).default;
@@ -393,12 +422,30 @@ export default function CheckInPage() {
   const handleConfirmCheckIn = async () => {
     if (!selectedSessionId) return;
     const substituteSessionId = getSubstituteSessionId(selectedSession);
+
+    let id_asdos_rekan: string | undefined = undefined;
+    if (selectedSession) {
+      const currentAsdosId = user?.id_asisten;
+      const id1 = selectedSession.id_asdos1;
+      const id2 = selectedSession.id_asdos2;
+      if (currentAsdosId) {
+        if (id1 === currentAsdosId) {
+          id_asdos_rekan = id2 || undefined;
+        } else if (id2 === currentAsdosId) {
+          id_asdos_rekan = id1 || undefined;
+        } else {
+          id_asdos_rekan = id1 || undefined;
+        }
+      }
+    }
+
     setIsSubmitting(true);
     const res = await submitCheckIn({
       id_sesi: selectedSessionId,
       qr_token: qrToken,
       menggantikan: selectedSession?.tipe_jadwal === 'PENGGANTI' && !!substituteSessionId,
       id_sesi_pengganti: substituteSessionId,
+      id_asdos_rekan,
     });
     if (res.success) {
 
@@ -447,18 +494,22 @@ try {
           }`}
         >
           <article className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div className="flex flex-col gap-1 w-full md:w-1/3">
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-start justify-between gap-4 md:block w-full md:w-1/3">
+              <div className="flex flex-col gap-1 min-w-0">
                 <h3 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 leading-snug line-clamp-2">
                   {s.mata_kuliah}
                 </h3>
+                <p className="text-sm text-slate-500 font-medium">{s.nama_kelas || 'Kelas tidak tersedia'}</p>
+                {s.tipe_jadwal === 'PENGGANTI' && (
+                  <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">
+                    Pengganti
+                  </span>
+                )}
               </div>
-              <p className="text-sm text-slate-500 font-medium">{s.nama_kelas || 'Kelas tidak tersedia'}</p>
-              {s.tipe_jadwal === 'PENGGANTI' && (
-                <span className="w-fit mt-2 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-fog text-ink uppercase">
-                  Pengganti
-                </span>
-              )}
+              {/* Check button mobile — kanan atas */}
+              <div className={`md:hidden shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isSel ? 'bg-crimson text-white shadow-md shadow-crimson/20' : 'bg-slate-100 text-slate-300'}`}>
+                <Check size={17} strokeWidth={3} />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full md:w-[480px]">
@@ -476,11 +527,16 @@ try {
               </div>
               <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asisten Dosen</span>
-                <span className="text-sm md:text-base font-bold text-slate-800">{s.pengajar || '-'}</span>
+                <div className="flex flex-col gap-0.5">
+                  {(s.pengajar || '-').split(' & ').map((name, i) => (
+                    <span key={i} className="text-sm md:text-base font-bold text-slate-800 leading-snug">{name}</span>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isSel ? 'bg-crimson text-white shadow-md shadow-crimson/20' : 'bg-slate-100 text-slate-300'}`}>
+            {/* Check button desktop — ujung kanan */}
+            <div className={`hidden md:flex shrink-0 w-10 h-10 rounded-xl items-center justify-center transition-all ${isSel ? 'bg-crimson text-white shadow-md shadow-crimson/20' : 'bg-slate-100 text-slate-300'}`}>
               <Check size={17} strokeWidth={3} />
             </div>
           </article>
@@ -837,6 +893,10 @@ try {
                   <p className="text-sm text-slate-400 mt-1 max-w-md mx-auto leading-relaxed">
                     Sesi QR hari ini belum tersedia, belum jam untuk mengajar, atau sudah tercatat check-in.
                   </p>
+                  <p className="text-xs text-slate-400 mt-3 flex items-center justify-center gap-1.5">
+                    <span>↓</span>
+                    <span>Tarik halaman ke bawah untuk refresh</span>
+                  </p>
                 </div>
               ) : (
                 <>
@@ -884,9 +944,14 @@ try {
                   </p>
                 </div>
               </div>
-              <button onClick={() => setStep(1)} className="mt-4 w-full bg-crimson text-white font-bold py-4 md:text-[15px] rounded-xl md:rounded-2xl shadow-md shadow-crimson/20 active:scale-[0.98] transition-all hover:bg-[#7a1727]">
+              <button onClick={() => router.push('/asdos')} className="mt-4 w-full bg-crimson text-white font-bold py-4 md:text-[15px] rounded-xl md:rounded-2xl shadow-md shadow-crimson/20 active:scale-[0.98] transition-all hover:bg-[#7a1727]">
                 Kembali ke Beranda
               </button>
+              {countdown !== null && (
+                <p className="text-center text-xs text-slate-400 mt-3">
+                  Diarahkan otomatis dalam <span className="font-bold text-slate-600">{countdown}s</span>
+                </p>
+              )}
             </div>
           </div>
         </>

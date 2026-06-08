@@ -4,13 +4,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown, GraduationCap, LayoutDashboard, ArrowLeftRight, Bell } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
-import { logoutUser, getSession } from '@/lib/actions/auth/session';
+import { logoutUser } from '@/lib/actions/auth/session';
 import { useUserStore } from '@/store/useUserStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useRiwayatKehadiranStore } from '@/store/useRiwayatKehadiranStore';
 import { useJadwalStore } from '@/store/useJadwalStore';
 import { usePengajuanKpStore } from '@/store/usePengajuanKpStore';
 import { usePresensiStore } from '@/store/usePresensiStore';
+import { usePrefetchStore } from '@/store/usePrefetchStore';
 import { getAllSubstitutions } from '@/lib/actions/pergantian-kelas';
 import { getAllPresensi, getMyPresensi } from '@/lib/actions/presensi';
 
@@ -58,7 +59,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { user, setUser, clearUser } = useUserStore();
+  const { user, clearUser } = useUserStore();
   const resetRiwayat = useRiwayatKehadiranStore(s => s.reset);
   const resetJadwal = useJadwalStore(s => s.reset);
   const resetPengajuanKp = usePengajuanKpStore(s => s.reset);
@@ -69,13 +70,6 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
   const otherDashboardHref = homeHref === '/koordinator' ? '/asdos' : '/koordinator';
   const otherDashboardLabel = homeHref === '/koordinator' ? 'Asisten Dosen' : 'Koordinator';
 
-  useEffect(() => {
-    getSession().then((res) => {
-      if (res.success && res.data) {
-        setUser(res.data);
-      }
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
@@ -103,14 +97,28 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
     if (pathname === homeHref) markSeen();
   }, [pathname, homeHref, markSeen]);
 
+  const lastPollTimeRef = useRef<number>(0);
   const pollingRef = useRef(false);
 
   useEffect(() => {
-    if (pathname === homeHref) return;
+    if (pathname === homeHref) {
+      // If we are on homeHref, the home component itself handles fetching latest counts,
+      // so we can mark the last poll time as now to avoid immediate polling when navigating away.
+      lastPollTimeRef.current = Date.now();
+      return;
+    }
 
     const poll = async () => {
       if (pollingRef.current) return;
+
+      const now = Date.now();
+      if (now - lastPollTimeRef.current < 30000) {
+        // Skip API calls if fetched less than 30 seconds ago
+        return;
+      }
+
       pollingRef.current = true;
+      lastPollTimeRef.current = now;
       try {
         if (homeHref === '/koordinator') {
           const [kpRes, presensiRes] = await Promise.all([
@@ -145,7 +153,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
     };
 
     poll();
-    const interval = setInterval(poll, 15000);
+    const interval = setInterval(poll, 60000);
     return () => clearInterval(interval);
   }, [pathname, homeHref, setPendingCount]);
 
@@ -156,6 +164,7 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
     resetJadwal();
     resetPengajuanKp();
     resetPresensi();
+    usePrefetchStore.getState().reset();
     router.replace('/auth/login');
   };
 
