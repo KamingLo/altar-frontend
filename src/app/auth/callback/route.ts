@@ -1,5 +1,4 @@
 ﻿import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const ERROR_MESSAGES: Record<string, string> = {
   user_not_registered: 'Akun Google ini belum terdaftar.',
@@ -25,8 +24,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const cookieStore = await cookies();
-  cookieStore.set('auth_token', token, {
+  const response = NextResponse.redirect(new URL('/dashboard', origin));
+  response.cookies.set('auth_token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -34,5 +33,5 @@ export async function GET(request: Request) {
     maxAge: 60 * 60 * 24 * 7,
   });
 
-  return NextResponse.redirect(new URL('/dashboard', origin));
+  return response;
 }
