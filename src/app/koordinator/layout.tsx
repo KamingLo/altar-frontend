@@ -56,6 +56,8 @@ export default function KoordinatorLayout({ children }: { children: React.ReactN
       .finally(() => {
         setPrefetched();
       });
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (isLoading || !user) {
     return <DashboardLoading />;
   }
