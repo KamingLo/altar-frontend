@@ -40,27 +40,24 @@ export default function ManajemenKpPage() {
 
   const hasLoadedRef = useRef(false);
 
-  const fetchRequests = useCallback(async (silent = false) => {
-    if (!silent && !hasLoadedRef.current) {
-      setIsLoading(true);
-    }
+  const fetchRequests = useCallback(async (silent = false, retryCount = 0) => {
+    if (!silent && !hasLoadedRef.current) setIsLoading(true);
     try {
       const res = await getAllSubstitutions(undefined);
       if (res.success && res.data?.items) {
         setSubstitutions(res.data.items);
         hasLoadedRef.current = true;
+      } else if (res.message === 'Gagal terhubung ke server' && retryCount < 2) {
+        setTimeout(() => fetchRequests(silent, retryCount + 1), 3000);
+        return;
       } else if (!silent) {
         setSubstitutions([]);
         hasLoadedRef.current = true;
       }
     } catch {
-      if (!silent) {
-        setSubstitutions([]);
-      }
+      if (!silent) setSubstitutions([]);
     } finally {
-      if (!silent) {
-        setIsLoading(false);
-      }
+      if (!silent) setIsLoading(false);
     }
   }, [setSubstitutions, setIsLoading]);
 

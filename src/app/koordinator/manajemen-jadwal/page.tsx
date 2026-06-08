@@ -1250,7 +1250,6 @@ export default function ManajemenJadwalPage() {
             {!loading && viewType === 'TABLE' && timetableData && (
               timetableData.rooms.length > 0 ? (
                 <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-                  <div className="h-3 border-b border-slate-100" />
                   <div className="overflow-auto max-h-[70vh]">
                     <table className="w-full">
                       <thead className="sticky top-0 z-20">

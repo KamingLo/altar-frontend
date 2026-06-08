@@ -353,23 +353,22 @@ export default function DataPresensiPage() {
     }).catch(() => { });
   }, [semesterFilter]);
 
-  const fetchPresensi = useCallback(async (silent = false, semId?: string) => {
+  const fetchPresensi = useCallback(async (silent = false, semId?: string, retryCount = 0) => {
     if (MOCK_MODE) return;
-    if (!silent) {
-      setIsLoading(true);
-    }
+    if (!silent) setIsLoading(true);
     try {
       const activeSem = (semId !== undefined ? semId : semesterFilter) || undefined;
       const res = await getAllPresensi(undefined, undefined, undefined, activeSem);
       if (res.success) {
         setPresensi(res.data ?? []);
         setSelectedIds(new Set());
+      } else if (res.message === 'Gagal terhubung ke server' && retryCount < 2) {
+        setTimeout(() => fetchPresensi(silent, semId, retryCount + 1), 3000);
+        return;
       }
     } catch {
     } finally {
-      if (!silent) {
-        setIsLoading(false);
-      }
+      if (!silent) setIsLoading(false);
     }
   }, [setPresensi, setIsLoading, semesterFilter]);
 
