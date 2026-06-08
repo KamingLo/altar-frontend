@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { checkIsAsdos, checkIsKoordinator } from '@/lib/actions/auth/checkRole';
 import { getSession } from '@/lib/actions/auth/session';
@@ -9,11 +9,13 @@ import type { UserRole } from '@/types/api';
 
 export const useRoleGuard = (expectedRole: UserRole) => {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
     const verify = async () => {
+      setIsLoading(true);
       const check =
         expectedRole === 'koordinator'
           ? await checkIsKoordinator()
@@ -40,6 +42,10 @@ export const useRoleGuard = (expectedRole: UserRole) => {
           setRole(derivedRole);
         }
       }
+
+      if (!cancelled) {
+        setIsLoading(false);
+      }
     };
 
     verify();
@@ -48,5 +54,7 @@ export const useRoleGuard = (expectedRole: UserRole) => {
       cancelled = true;
     };
   }, [expectedRole, router]);
+
+  return { isLoading };
 };
 

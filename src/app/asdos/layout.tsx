@@ -12,9 +12,10 @@ import { useDataMasterStore } from '@/store/useDataMasterStore';
 import { getMyPresensi } from '@/lib/actions/presensi';
 import { getSessionsByDate } from '@/lib/actions/jadwal';
 import { getSemesterList, getRuanganList } from '@/lib/actions/data-master';
+import { DashboardLoading } from '@/components/dashboard/DashboardLoading';
 
 export default function AsdosLayout({ children }: { children: React.ReactNode }) {
-  useRoleGuard('asdos');
+  const { isLoading } = useRoleGuard('asdos');
   const { user } = useUserStore();
   const { isPrefetched, isPrefetching, setPrefetching, setPrefetched } = usePrefetchStore();
   const { setItems: setRiwayatItems } = useRiwayatKehadiranStore();
@@ -22,7 +23,7 @@ export default function AsdosLayout({ children }: { children: React.ReactNode })
   const { setSemester, setRuangan } = useDataMasterStore();
 
   useEffect(() => {
-    if (isPrefetched || isPrefetching || !user?.id) return;
+    if (isLoading || isPrefetched || isPrefetching || !user?.id) return;
 
     setPrefetching();
 
@@ -55,7 +56,9 @@ export default function AsdosLayout({ children }: { children: React.ReactNode })
       .finally(() => {
         setPrefetched();
       });
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (isLoading || !user) {
+    return <DashboardLoading />;
+  }
 
   const menuGroups: MenuGroup[] = [];
   if (user?.id_koordinator) {
