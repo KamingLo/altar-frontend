@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { apiClient } from '@/lib/api/client';
+import { decodeJwtPayload } from '@/lib/auth/jwt';
 import type { UserData } from '@/types/api';
 
 export async function getSession() {
@@ -12,7 +13,26 @@ export async function getSession() {
     return { success: false, message: 'Unauthorized' };
   }
 
-  return apiClient.get<UserData>('/auth/me', { auth: true, cache: 'no-store' });
+  const result = await apiClient.get<UserData>('/auth/me', { auth: true, cache: 'no-store' });
+
+  // Supplement missing role IDs from JWT payload (handles cases where OAuth token
+  // only returns one role from the API but the JWT itself encodes both)
+  if (result.success && result.data) {
+    const payload = decodeJwtPayload(token);
+    console.log('[getSession] /auth/me data:', JSON.stringify(result.data));
+    console.log('[getSession] JWT payload:', JSON.stringify(payload));
+    if (payload) {
+      if (!result.data.id_asisten && payload.id_asisten) {
+        result.data.id_asisten = payload.id_asisten as string;
+      }
+      if (!result.data.id_koordinator && payload.id_koordinator) {
+        result.data.id_koordinator = payload.id_koordinator as string;
+      }
+    }
+    console.log('[getSession] final data:', JSON.stringify(result.data));
+  }
+
+  return result;
 }
 
 export async function setSession(token: string) {
