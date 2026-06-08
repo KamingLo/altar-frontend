@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Filter, Search, Table2, User, Users, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Calendar, ChevronLeft, ChevronRight, Filter, Maximize2, Search, Table2, User, Users, X } from 'lucide-react';
 import { getMyScheduleTimeline, getScheduleTimeline, type SessionFromAPI } from '@/lib/actions/jadwal';
 import { getRuanganList, getSemesterList } from '@/lib/actions/data-master';
 import type { UnifiedJadwalResponse } from '@/types/api';
@@ -275,6 +276,7 @@ export default function JadwalAjarPage() {
   const today = useMemo(() => new Date(), []);
   const [viewMode, setViewMode] = useState<ViewMode>('PERSONAL');
   const [viewType, setViewType] = useState<ViewType>('CARD');
+  const [isTableExpanded, setIsTableExpanded] = useState(false);
   const [selectedSemesterId, setSelectedSemesterId] = useState('');
   const [startDate, setStartDate] = useState(() => toIsoDateFromDate(today));
   const [endDate, setEndDate] = useState(() => toIsoDateFromDate(addDays(today, 6)));
@@ -581,22 +583,33 @@ export default function JadwalAjarPage() {
               </div>
             </div>
           )}
-          <div className="flex bg-slate-100 p-0.5 rounded-xl md:w-[260px] shrink-0">
-            {(['PERSONAL', 'ALL'] as const).map(mode => (
+          <div className="flex gap-2 items-center shrink-0">
+            <div className="flex bg-slate-100 p-0.5 rounded-xl md:w-[260px] shrink-0">
+              {(['PERSONAL', 'ALL'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    setViewMode(mode);
+                    handleViewTypeChange(mode === 'ALL' ? 'TABLE' : 'CARD');
+                  }}
+                  className={`flex-1 h-[46px] flex items-center justify-center gap-1.5 px-3 rounded-[10px] text-xs font-semibold transition-all ${
+                    viewMode === mode ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  {mode === 'PERSONAL' ? <User size={14} /> : <Users size={14} />}
+                  {mode === 'PERSONAL' ? 'Jadwal Saya' : 'Semua Jadwal'}
+                </button>
+              ))}
+            </div>
+            {viewType === 'TABLE' && (
               <button
-                key={mode}
-                onClick={() => {
-                  setViewMode(mode);
-                  handleViewTypeChange(mode === 'ALL' ? 'TABLE' : 'CARD');
-                }}
-                className={`flex-1 h-[46px] flex items-center justify-center gap-1.5 px-3 rounded-[10px] text-xs font-semibold transition-all ${
-                  viewMode === mode ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                }`}
+                onClick={() => setIsTableExpanded(true)}
+                className="hidden md:flex h-[46px] w-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-crimson/30 transition-all active:scale-95"
+                title="Perluas tampilan tabel"
               >
-                {mode === 'PERSONAL' ? <User size={14} /> : <Users size={14} />}
-                {mode === 'PERSONAL' ? 'Jadwal Saya' : 'Semua Jadwal'}
+                <Maximize2 size={16} />
               </button>
-            ))}
+            )}
           </div>
         </div>
 
@@ -679,7 +692,7 @@ export default function JadwalAjarPage() {
                           const isRunning = deriveStatus(s.waktu) === 'Berjalan';
                           return (
                             <td key={room} className="px-2 py-2">
-                              <div className={`rounded-lg px-3 py-2.5 text-left transition-all ${
+                              <div className={`rounded-lg px-3 py-2.5 text-center transition-all ${
                                 isRunning ? 'bg-crimson/10 border border-crimson/20' : 'bg-slate-50 border border-slate-100'
                               }`}>
                                 <p className={`text-xs font-bold leading-snug line-clamp-2 ${isRunning ? 'text-crimson' : 'text-slate-700'}`}>
@@ -688,7 +701,7 @@ export default function JadwalAjarPage() {
                                 {s.nama_kelas && (
                                   <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">{s.nama_kelas}</p>
                                 )}
-                                <div className="flex items-center gap-1 mt-1.5">
+                                <div className="flex items-center justify-center gap-1 mt-1.5">
                                   <User className="w-2.5 h-2.5 text-slate-400 shrink-0" />
                                   <p className="text-[10px] text-slate-400 truncate">{s.pengajar || '-'}</p>
                                 </div>
@@ -754,6 +767,84 @@ export default function JadwalAjarPage() {
           </>
         )}
       </div>
+
+      {isTableExpanded && timetableData && typeof document !== 'undefined' ? createPortal(
+        <>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[200]" onClick={() => setIsTableExpanded(false)} />
+          <div className="fixed inset-4 md:inset-8 z-[201] bg-white rounded-[12px] shadow-2xl flex flex-col overflow-hidden text-slate-800">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleTableDateChange(toIsoDateFromDate(addDays(parseLocalDate(tableDate), -1)))}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-crimson hover:border-crimson/30 transition-all active:scale-95 text-sm font-bold"
+                >‹</button>
+                <span className="text-sm font-extrabold text-slate-800">
+                  {parseLocalDate(tableDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleTableDateChange(toIsoDateFromDate(addDays(parseLocalDate(tableDate), 1)))}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-crimson hover:border-crimson/30 transition-all active:scale-95 text-sm font-bold"
+                >›</button>
+              </div>
+              <button type="button" onClick={() => setIsTableExpanded(false)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-crimson hover:border-crimson/30 transition-all active:scale-95">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="overflow-auto flex-1">
+              {timetableData.rooms.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-3">
+                  <Table2 size={32} />
+                  <p className="text-sm font-semibold">Tidak ada jadwal hari ini.</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="sticky top-0 z-20">
+                    <tr className="bg-slate-50/90 border-b border-slate-100">
+                      <th className="px-4 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap min-w-[120px] border-r border-slate-100">Jam</th>
+                      {timetableData.rooms.map(room => (
+                        <th key={room} className="px-5 py-4 text-center text-[10px] font-black text-slate-500 uppercase tracking-wider whitespace-nowrap min-w-[200px]">{room}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {timetableData.jams.map(jam => (
+                      <tr key={jam.value} className="hover:bg-slate-50/30 transition-colors">
+                        <td className="px-4 py-4 border-r border-slate-100">
+                          <span className="text-xs font-bold text-slate-600 whitespace-nowrap font-mono">{jam.range}</span>
+                        </td>
+                        {timetableData.rooms.map(room => {
+                          const s = timetableData.lookup[jam.value]?.[room];
+                          if (!s) return <td key={room} className="px-4 py-4 text-center"><span className="text-slate-200 text-sm">—</span></td>;
+                          const isRunning = deriveStatus(s.waktu) === 'Berjalan';
+                          return (
+                            <td key={room} className="px-3 py-3">
+                              <div className={`rounded-xl px-4 py-3 text-center transition-all ${
+                                isRunning ? 'bg-crimson/10 border border-crimson/20' : 'bg-slate-50 border border-slate-100'
+                              }`}>
+                                <p className={`text-sm font-bold leading-snug line-clamp-2 ${isRunning ? 'text-crimson' : 'text-slate-700'}`}>
+                                  {s.mata_kuliah}
+                                </p>
+                                {s.nama_kelas && <p className="text-xs text-slate-400 font-medium mt-0.5">{s.nama_kelas}</p>}
+                                <div className="flex items-center justify-center gap-1.5 mt-1.5">
+                                  <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <p className="text-xs text-slate-400 truncate">{s.pengajar || '-'}</p>
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </>,
+        document.body
+      ) : null}
     </AsdosPageShell>
   );
 }

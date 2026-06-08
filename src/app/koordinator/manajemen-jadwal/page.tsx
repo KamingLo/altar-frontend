@@ -443,9 +443,11 @@ export default function ManajemenJadwalPage() {
       if (!lookup[slot]) lookup[slot] = {};
       lookup[slot][s.ruangan] = s;
     });
-    const rooms = Array.from(roomSet).sort();
-    return { jams: JAM_OPTIONS, rooms, lookup, daySessions };
-  }, [filtered, viewType, tableDate]);
+    const tableRooms = ruanganList.length > 0
+      ? ruanganList.map(r => `${r.nama_ruangan} (Lantai ${r.lantai})`).sort((a, b) => a.localeCompare(b, 'id-ID'))
+      : Array.from(roomSet).sort();
+    return { jams: JAM_OPTIONS, rooms: tableRooms, lookup, daySessions };
+  }, [filtered, viewType, tableDate, ruanganList]);
 
   const selectedSemester = semesters.find(s => s.id === selectedSemesterId);
   const deleteSemesterTarget = semesters.find(s => s.id === deleteSemesterTargetId);
@@ -1281,12 +1283,12 @@ export default function ManajemenJadwalPage() {
                               const isPengganti = isPenggantiTipe(s.tipe);
                               return (
                                 <td key={room} className="px-2.5 py-2">
-                                  <div className={`rounded-lg px-3 py-2.5 text-left ${isPengganti ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
+                                  <div className={`rounded-lg px-3 py-2.5 text-center ${isPengganti ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
                                     <p className="text-xs font-bold leading-snug line-clamp-2 text-slate-700">{s.mata_kuliah}</p>
                                     {s.nama_kelas && (
                                       <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">{s.nama_kelas}</p>
                                     )}
-                                    <div className="flex items-center gap-1 mt-1">
+                                    <div className="flex items-center justify-center gap-1 mt-1">
                                       <User className="w-2.5 h-2.5 text-slate-400 shrink-0" />
                                       <p className="text-[10px] text-slate-400 truncate">{pengajarDisplayName(s.pengajar) || '-'}</p>
                                     </div>
@@ -1295,12 +1297,12 @@ export default function ManajemenJadwalPage() {
                                         Pengganti
                                       </span>
                                     )}
-                                    <div className="flex gap-1 mt-2 pt-1.5 border-t border-slate-100">
+                                    <div className="flex justify-center gap-1.5 mt-2 pt-1.5 border-t border-slate-100">
                                       <button
                                         type="button"
                                         onClick={() => handleOpenModal('edit', s)}
                                         disabled={isPengganti}
-                                        className="flex-1 h-6 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-crimson/30 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                        className="h-6 w-6 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-crimson/30 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                                         title={isPengganti ? 'Sesi pengganti tidak bisa diedit' : 'Edit sesi'}
                                       >
                                         <Pencil className="w-3 h-3" />
@@ -1308,7 +1310,7 @@ export default function ManajemenJadwalPage() {
                                       <button
                                         type="button"
                                         onClick={() => handleDeleteOpen(s)}
-                                        className="flex-1 h-6 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-rose-200 hover:bg-rose-50 active:scale-95 transition-all"
+                                        className="h-6 w-6 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-rose-200 hover:bg-rose-50 active:scale-95 transition-all"
                                         title="Hapus sesi"
                                       >
                                         <Trash2 className="w-3 h-3" />
@@ -1653,7 +1655,7 @@ export default function ManajemenJadwalPage() {
                       />
                       {form.tanggal && (
                         <p className="text-[11px] text-slate-500 font-medium mt-1 ml-1">
-                          Hari: {HARI_OPTIONS.find(h => h.value === form.opsi_hari)?.label ?? 'â€”'}
+                          Hari: {HARI_OPTIONS.find(h => h.value === form.opsi_hari)?.label ?? '—'}
                         </p>
                       )}
                     </Field>
@@ -2079,19 +2081,19 @@ export default function ManajemenJadwalPage() {
                           const isPengganti = isPenggantiTipe(s.tipe);
                           return (
                             <td key={room} className="px-3 py-3">
-                              <div className={`rounded-xl px-4 py-3 text-left ${isPengganti ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
+                              <div className={`rounded-xl px-4 py-3 text-center ${isPengganti ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
                                 <p className="text-sm font-bold leading-snug text-slate-700">{s.mata_kuliah}</p>
                                 {s.nama_kelas && <p className="text-xs text-slate-400 font-medium mt-0.5">{s.nama_kelas}</p>}
-                                <div className="flex items-center gap-1 mt-1.5">
+                                <div className="flex items-center justify-center gap-1.5 mt-1.5">
                                   <User className="w-3 h-3 text-slate-400 shrink-0" />
                                   <p className="text-xs text-slate-400">{pengajarDisplayName(s.pengajar) || '-'}</p>
                                 </div>
                                 {isPengganti && <span className="mt-2 inline-block text-[9px] font-bold uppercase tracking-wider text-crimson bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">Pengganti</span>}
-                                <div className="flex gap-1.5 mt-2.5 pt-2 border-t border-slate-100">
-                                  <button type="button" onClick={() => { setIsTableExpanded(false); handleOpenModal('edit', s); }} disabled={isPengganti} className="flex-1 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-crimson/30 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed" title={isPengganti ? 'Sesi pengganti tidak bisa diedit' : 'Edit sesi'}>
+                                <div className="flex justify-center gap-1.5 mt-2.5 pt-2 border-t border-slate-100">
+                                  <button type="button" onClick={() => { setIsTableExpanded(false); handleOpenModal('edit', s); }} disabled={isPengganti} className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-crimson/30 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed" title={isPengganti ? 'Sesi pengganti tidak bisa diedit' : 'Edit sesi'}>
                                     <Pencil className="w-3.5 h-3.5" />
                                   </button>
-                                  <button type="button" onClick={() => { setIsTableExpanded(false); handleDeleteOpen(s); }} className="flex-1 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-rose-200 hover:bg-rose-50 active:scale-95 transition-all" title="Hapus sesi">
+                                  <button type="button" onClick={() => { setIsTableExpanded(false); handleDeleteOpen(s); }} className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-crimson hover:border-rose-200 hover:bg-rose-50 active:scale-95 transition-all" title="Hapus sesi">
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>

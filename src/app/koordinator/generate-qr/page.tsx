@@ -49,6 +49,8 @@ export default function GenerateQrPage() {
   const [mode, setMode] = useState<'NORMAL' | 'KIOSK'>('NORMAL');
   const [qrToken, setQrToken] = useState('');
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_SEC);
+  const [refreshCount, setRefreshCount] = useState(0);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isPinVisible, setIsPinVisible] = useState(false);
@@ -234,10 +236,33 @@ export default function GenerateQrPage() {
     return () => clearTimeout(timer);
   }, [mode, countdown]);
 
+  useEffect(() => {
+    if (cooldownRemaining <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownRemaining(c => {
+        if (c <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownRemaining]);
+
   const handleManualRefresh = useCallback(async () => {
+    if (cooldownRemaining > 0) return;
     await refreshQRToken();
     setCountdown(REFRESH_INTERVAL_SEC);
-  }, [refreshQRToken]);
+    setRefreshCount(prev => {
+      const next = prev + 1;
+      if (next >= 3) {
+        setCooldownRemaining(10);
+        return 0;
+      }
+      return next;
+    });
+  }, [refreshQRToken, cooldownRemaining]);
 
   const downloadQRCode = async () => {
     if (!qrToken) return;
@@ -778,80 +803,69 @@ export default function GenerateQrPage() {
 
               <div className="lg:col-span-7 bg-white border border-slate-100 rounded-[1.75rem] p-4 shadow-sm lg:rounded-[2.5rem] lg:p-6 xl:p-8 flex flex-col items-center justify-center relative overflow-hidden text-slate-800">
 
-                <div className="flex flex-col items-center max-w-sm w-full lg:flex-row lg:max-w-full lg:items-center lg:gap-8 xl:flex-col xl:items-center xl:max-w-sm">
+                <div className="flex flex-col items-center w-full max-w-md lg:max-w-lg xl:max-w-xl">
 
-                  <div className="flex flex-col items-center w-full lg:items-start lg:w-auto lg:order-1 xl:items-center xl:w-full xl:order-none">
-                    <h2 className="text-base xl:text-xl font-extrabold text-slate-800 text-center lg:text-left xl:text-center tracking-tight">SCAN QR CHECK-IN</h2>
-                    <p className="text-xs text-slate-400 mt-1 mb-3 lg:mb-6 xl:mb-8 text-center lg:text-left xl:text-center font-medium">Buka aplikasi asisten dosen Anda dan scan kode QR ini</p>
-
-                    {qrToken && (
-                      <button
-                        type="button"
-                        onClick={downloadQRCode}
-                        className="mb-4 lg:mb-0 xl:mb-0 flex items-center gap-2 px-4 py-2 rounded-xl bg-crimson text-white hover:bg-[#7a1728] active:scale-95 transition-all text-xs font-bold shadow-sm shadow-crimson/10 hidden lg:flex xl:hidden"
-                      >
-                        <Download className="w-4 h-4" />
-                        Unduh Gambar QR
-                      </button>
-                    )}
-
-                    <div className="w-full mt-3 hidden lg:flex xl:hidden items-center justify-between">
-                      <span className="text-[10px] font-bold tracking-wider text-slate-400">SEKALI PAKAI</span>
-                      <span className={`text-[10px] font-bold tracking-wider ${countdown === 0 ? 'text-crimson' : 'text-slate-400'}`}>
-                        {countdown === 0 ? 'KEDALUWARSA' : `${countdown}s`}
-                      </span>
-                    </div>
+                  <div className="flex flex-col items-center w-full">
+                    <h2 className="text-base md:text-lg xl:text-2xl font-black text-slate-800 text-center tracking-tight">SCAN QR CHECK-IN</h2>
+                    <p className="text-xs md:text-sm text-slate-400 mt-1 mb-4 md:mb-6 text-center font-medium">Buka aplikasi asisten dosen Anda dan scan kode QR ini</p>
                   </div>
 
-                  <div className="flex flex-col items-center lg:order-2 lg:shrink-0 lg:ml-auto xl:order-none xl:shrink xl:ml-0">
-                    <div className="bg-white p-3 lg:p-5 xl:p-7 rounded-[1.5rem] lg:rounded-[2.5rem] xl:rounded-[3rem] shadow-[0_12px_30px_rgba(15,23,42,0.08)] lg:shadow-lg border border-slate-100 flex items-center justify-center aspect-square max-w-[250px] lg:max-w-[280px] xl:max-w-[340px] w-full relative overflow-hidden">
+                  <div className="flex flex-col items-center w-full">
+                    <div className="bg-white p-4 md:p-6 lg:p-8 rounded-[1.75rem] md:rounded-[2.5rem] xl:rounded-[3rem] shadow-[0_12px_30px_rgba(15,23,42,0.08)] lg:shadow-xl border border-slate-100 flex items-center justify-center aspect-square max-w-[280px] sm:max-w-[320px] md:max-w-[400px] lg:max-w-[420px] xl:max-w-[480px] w-full relative overflow-hidden">
                       {qrToken ? (
                         <>
                           <Image
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrToken)}`}
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrToken)}`}
                             alt="QR Code"
-                            width={300}
-                            height={300}
+                            width={500}
+                            height={500}
                             className={`w-full h-full object-contain transition-all duration-300 ${countdown === 0 ? 'opacity-20 blur-sm' : ''}`}
                           />
                           {countdown === 0 && (
                             <button
                               type="button"
                               onClick={handleManualRefresh}
-                              className="absolute inset-0 flex flex-col items-center justify-center gap-2 hover:bg-white/10 transition-colors cursor-pointer"
+                              disabled={cooldownRemaining > 0}
+                              className="absolute inset-0 flex flex-col items-center justify-center gap-2 hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <RefreshCw className="w-8 h-8 text-crimson" />
-                              <span className="text-xs font-extrabold text-crimson tracking-wide">Perbarui QR</span>
+                              <RefreshCw className="w-10 h-10 text-crimson" />
+                              <span className="text-xs font-extrabold text-crimson tracking-wide">
+                                {cooldownRemaining > 0 ? `Tunggu ${cooldownRemaining}s` : 'Perbarui QR'}
+                              </span>
                             </button>
                           )}
                         </>
                       ) : (
                         <div className="flex flex-col items-center gap-3">
-                          <Loader2 className="w-8 h-8 text-crimson animate-spin" />
+                          <Loader2 className="w-10 h-10 text-crimson animate-spin" />
                           <p className="text-xs font-semibold text-slate-400">Generating...</p>
                         </div>
                       )}
                     </div>
-
                     {qrToken && (
-                      <button
-                        type="button"
-                        onClick={downloadQRCode}
-                        className="mt-3 xl:mt-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-crimson text-white hover:bg-[#7a1728] active:scale-95 transition-all text-xs font-bold shadow-sm shadow-crimson/10 lg:hidden xl:flex"
-                      >
-                        <Download className="w-4 h-4" />
-                        Unduh Gambar QR
-                      </button>
+                      <div className="mt-4 flex items-center gap-3 w-full max-w-[280px] sm:max-w-[320px] md:max-w-[400px] lg:max-w-[420px] xl:max-w-[480px]">
+                        <button
+                          type="button"
+                          onClick={downloadQRCode}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-crimson text-white hover:bg-[#7a1728] active:scale-95 transition-all text-xs md:text-sm font-bold shadow-sm shadow-crimson/10"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>Unduh QR</span>
+                        </button>
+                         <button
+                          type="button"
+                          onClick={handleManualRefresh}
+                          disabled={cooldownRemaining > 0}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 active:scale-95 transition-all text-xs md:text-sm font-bold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <RefreshCw className="w-4 h-4 text-slate-400" />
+                          <span>{cooldownRemaining > 0 ? `Tunggu ${cooldownRemaining}s` : 'Perbarui QR'}</span>
+                        </button>
+                      </div>
                     )}
-                    <div className="w-full mt-3 flex items-center justify-between lg:hidden">
-                      <span className="text-[10px] font-bold tracking-wider text-slate-400">SEKALI PAKAI</span>
-                      <span className={`text-[10px] font-bold tracking-wider ${countdown === 0 ? 'text-crimson' : 'text-slate-400'}`}>
-                        {countdown === 0 ? 'KEDALUWARSA' : `${countdown}s`}
-                      </span>
-                    </div>
-                    <div className="w-full mt-4 hidden xl:flex xl:items-center xl:justify-between">
-                      <span className="text-[10px] font-bold tracking-wider text-slate-400">SEKALI PAKAI</span>
-                      <span className={`text-[10px] font-bold tracking-wider ${countdown === 0 ? 'text-crimson' : 'text-slate-400'}`}>
+                    <div className="w-full max-w-[280px] sm:max-w-[320px] md:max-w-[400px] lg:max-w-[420px] xl:max-w-[480px] mt-4 flex items-center justify-between">
+                      <span className="text-[10px] md:text-xs font-bold tracking-wider text-slate-400">SEKALI PAKAI</span>
+                      <span className={`text-[10px] md:text-xs font-bold tracking-wider ${countdown === 0 ? 'text-crimson' : 'text-slate-400'}`}>
                         {countdown === 0 ? 'KEDALUWARSA' : `${countdown}s`}
                       </span>
                     </div>

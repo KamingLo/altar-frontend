@@ -10,8 +10,9 @@ import {
 import type { UserListItem } from '@/lib/actions/manajemen';
 import { useManajemenStore } from '@/store/useManajemenStore';
 import Image from 'next/image';
-import { Plus, Search, Power } from 'lucide-react';
+import { Plus, Search, Filter } from 'lucide-react';
 import { AsdosPageShell, AsdosPageHeader, AsdosState, AsdosListSkeleton, AsdosPrimaryButton } from '@/components/dashboard/asdos/AsdosUI';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 type TabId = 'asdos' | 'koordinator' | 'user';
 type AddStep = 'role_search' | 'create_user' | 'role_data';
@@ -66,7 +67,7 @@ export default function ManajemenAsdosPage() {
   );
 
   const [togglePending, setTogglePending] = useState<Set<string>>(new Set());
-  const [showInactive] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -102,9 +103,12 @@ export default function ManajemenAsdosPage() {
   };
 
   const activeItems: DisplayItem[] = (() => {
-    if (activeTab === 'asdos') return asdosList.map(a => ({ id: a.id_asdos, username: a.username, identifier: a.nim, deactivated_at: a.deactivated_at }));
-    if (activeTab === 'koordinator') return koorList.map(k => ({ id: k.id_koor, username: k.username, identifier: k.nip, deactivated_at: k.deactivated_at }));
-    return userList.map(u => ({ id: u.id, username: u.username, identifier: u.email }));
+    let items: DisplayItem[];
+    if (activeTab === 'asdos') items = asdosList.map(a => ({ id: a.id_asdos, username: a.username, identifier: a.nim, deactivated_at: a.deactivated_at }));
+    else if (activeTab === 'koordinator') items = koorList.map(k => ({ id: k.id_koor, username: k.username, identifier: k.nip, deactivated_at: k.deactivated_at }));
+    else items = userList.map(u => ({ id: u.id, username: u.username, identifier: u.email }));
+    if (statusFilter === 'inactive') return items.filter(i => !!i.deactivated_at);
+    return items;
   })();
 
   const loadTabData = useCallback(async (tab: TabId, search: string, page: number, append = false, inactive = false) => {
@@ -175,14 +179,14 @@ export default function ManajemenAsdosPage() {
       return;
     }
 
-    if (!searchQuery && !showInactive && loadedTabsRef.current.has(activeTab)) return;
+    if (!searchQuery && statusFilter === 'active' && loadedTabsRef.current.has(activeTab)) return;
     const timer = setTimeout(() => {
-      loadTabData(activeTab, searchQuery, 1, false, showInactive);
+      loadTabData(activeTab, searchQuery, 1, false, statusFilter !== 'active');
     }, searchQuery ? 400 : 0);
     return () => clearTimeout(timer);
-  }, [activeTab, searchQuery, showInactive, loadTabData]);
+  }, [activeTab, searchQuery, statusFilter, loadTabData]);
 
-  const handleLoadMore = () => loadTabData(activeTab, searchQuery, currentPage + 1, true, showInactive);
+  const handleLoadMore = () => loadTabData(activeTab, searchQuery, currentPage + 1, true, statusFilter !== 'active');
 
   const handleToggleActive = async (item: DisplayItem) => {
     const isActive = !item.deactivated_at;
@@ -192,11 +196,22 @@ export default function ManajemenAsdosPage() {
         ? isActive ? await deactivateAsdos(item.id) : await activateAsdos(item.id)
         : isActive ? await deactivateKoor(item.id) : await activateKoor(item.id);
       if (res.success) {
-        loadTabData(activeTab, searchQuery, 1, false, showInactive);
+        const updatedDeactivatedAt = isActive ? new Date().toISOString() : null;
+        if (activeTab === 'asdos') {
+          const updatedList = asdosList.map(a =>
+            a.id_asdos === item.id ? { ...a, deactivated_at: updatedDeactivatedAt } : a
+          );
+          setAsdos(updatedList, asdosHasMore, asdosPage, false);
+        } else if (activeTab === 'koordinator') {
+          const updatedList = koorList.map(k =>
+            k.id_koor === item.id ? { ...k, deactivated_at: updatedDeactivatedAt } : k
+          );
+          setKoor(updatedList, koorHasMore, koorPage, false);
+        }
       } else {
         const action = isActive ? 'menonaktifkan' : 'mengaktifkan';
         showToast(res.message || `Gagal ${action} ${item.username}.`);
-        loadTabData(activeTab, searchQuery, 1, false, showInactive);
+        loadTabData(activeTab, searchQuery, 1, false, statusFilter !== 'active');
       }
     } catch {
       const action = isActive ? 'menonaktifkan' : 'mengaktifkan';
@@ -224,7 +239,16 @@ export default function ManajemenAsdosPage() {
     setIsSubmitting(false);
     if (!res.success) { setFormError(res.message || 'Gagal menghapus user.'); return; }
     handleCloseModal();
-    loadTabData('user', searchQuery, 1, false, false);
+    if (activeTab === 'asdos') {
+      const updatedList = asdosList.filter(a => a.id_asdos !== selectedId);
+      setAsdos(updatedList, asdosHasMore, asdosPage, false);
+    } else if (activeTab === 'koordinator') {
+      const updatedList = koorList.filter(k => k.id_koor !== selectedId);
+      setKoor(updatedList, koorHasMore, koorPage, false);
+    } else if (activeTab === 'user') {
+      const updatedList = userList.filter(u => u.id !== selectedId);
+      setUsers(updatedList, userHasMore, userPage, false);
+    }
   };
 
   const handleOpenModal = async (type: 'add' | 'edit' = 'add', item?: DisplayItem) => {
@@ -353,7 +377,7 @@ export default function ManajemenAsdosPage() {
       if (!res.success) { setFormError(res.message || 'Gagal menyimpan data.'); return; }
     }
     handleCloseModal();
-    loadTabData(activeTab, '', 1, false, showInactive);
+    loadTabData(activeTab, '', 1, false, statusFilter !== 'active');
   };
 
   const handleSave = async () => {
@@ -370,7 +394,10 @@ export default function ManajemenAsdosPage() {
       setIsSubmitting(false);
       if (!res.success) { setFormError(res.message || 'Gagal memperbarui data.'); return; }
       handleCloseModal();
-      loadTabData('user', searchQuery, 1, false, false);
+      const updatedList = userList.map(u =>
+        u.id === selectedId ? { ...u, username: username.trim(), email: modalForm.email.trim() } : u
+      );
+      setUsers(updatedList, userHasMore, userPage, false);
       return;
     }
 
@@ -385,7 +412,17 @@ export default function ManajemenAsdosPage() {
 
     if (!res.success) { setFormError(res.message || 'Gagal memperbarui data.'); return; }
     handleCloseModal();
-    loadTabData(activeTab, searchQuery, 1, false, showInactive);
+    if (activeTab === 'asdos') {
+      const updatedList = asdosList.map(a =>
+        a.id_asdos === selectedId ? { ...a, nim: nim.trim() } : a
+      );
+      setAsdos(updatedList, asdosHasMore, asdosPage, false);
+    } else if (activeTab === 'koordinator') {
+      const updatedList = koorList.map(k =>
+        k.id_koor === selectedId ? { ...k, nip: nip.trim() } : k
+      );
+      setKoor(updatedList, koorHasMore, koorPage, false);
+    }
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => setSheetStartY(e.touches[0].clientY);
@@ -425,7 +462,7 @@ export default function ManajemenAsdosPage() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => { setActiveTab(tab.id); setSearchQuery(''); }}
+                onClick={() => { setActiveTab(tab.id); setSearchQuery(''); setStatusFilter('active'); }}
                 className={`flex-1 min-w-fit px-3 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] ${activeTab === tab.id ? 'bg-crimson text-white' : 'bg-transparent text-slate-500'}`}
               >
                 <span>{tab.short}</span>
@@ -435,6 +472,24 @@ export default function ManajemenAsdosPage() {
         </div>
 
         <div className="flex gap-2 flex-1 md:w-auto md:max-w-sm shrink-0 items-center">
+          {activeTab !== 'user' && (
+            <CustomSelect
+              variant="icon"
+              align="left"
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v as 'active' | 'inactive' | 'all')}
+              options={[
+                { value: 'active', label: 'Aktif' },
+                { value: 'inactive', label: 'Nonaktif' },
+                { value: 'all', label: 'Semua' },
+              ]}
+              placeholder="Filter status"
+              icon={<Filter className="w-[18px] h-[18px]" />}
+              triggerClassName={statusFilter !== 'active'
+                ? 'bg-red-50 border-crimson text-crimson h-[50px] w-[50px] rounded-lg md:rounded-[14px] border flex items-center justify-center shrink-0'
+                : 'bg-white border-slate-200 text-slate-500 h-[50px] w-[50px] rounded-lg md:rounded-[14px] border flex items-center justify-center shrink-0'}
+            />
+          )}
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
               <Search className="w-5 h-5" />

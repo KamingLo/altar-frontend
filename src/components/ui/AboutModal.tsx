@@ -83,7 +83,7 @@ function ModalContent({ onClose }: { onClose: () => void }) {
           </div>
         </section>
 
-        <p className="text-center text-[11px] text-slate-300 font-medium">© {new Date().getFullYear()} Altar · Universitas Tarumanagara · Version 1.06.7</p>
+        <p className="text-center text-[11px] text-slate-300 font-medium">© {new Date().getFullYear()} Altar · Universitas Tarumanagara · Version 1.06.8</p>
       </div>
     </>
   );

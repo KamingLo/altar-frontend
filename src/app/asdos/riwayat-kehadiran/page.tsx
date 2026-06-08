@@ -316,64 +316,98 @@ export default function RiwayatKehadiranPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {filtered.map((item, index) => (
-                      <tr
-                        key={item.id}
-                        className="hover:bg-slate-50/40 transition-colors"
-                      >
-                        <td className="px-4 py-3 text-xs text-slate-400 font-medium">{index + 1}</td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">{item.subject}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-slate-600 whitespace-nowrap">{item.className}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-slate-600 whitespace-nowrap">{item.teachingTeam}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-slate-600 whitespace-nowrap">{item.room}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-slate-600 whitespace-nowrap">{formatDateCompact(item.rawDate)}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-slate-600 font-mono whitespace-nowrap">{item.checkIn}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-slate-600 font-mono whitespace-nowrap">{item.checkOut}</span>
-                        </td>
-                        <td className="px-4 py-3 min-w-[160px]">
-                          {item.materi && item.materi !== '-' ? (
-                            <span className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">{item.materi}</span>
-                          ) : (
-                            <span className="text-slate-300 text-xs">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto ${
-                            item.isVerified ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200 bg-white'
-                          }`}>
-                            {item.isVerified && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto ${
-                            item.isPaid ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200 bg-white'
-                          }`}>
-                            {item.isPaid && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filtered.length < 15 && [...Array(15 - filtered.length)].map((_, i) => (
-                      <tr key={`empty-${i}`} className="opacity-20">
-                        <td className="px-4 py-3 text-xs text-slate-400">{filtered.length + i + 1}</td>
-                        <td colSpan={10} className="px-4 py-3">
-                          <div className="h-2 bg-slate-100 rounded-full w-24" />
-                        </td>
-                      </tr>
-                    ))}
+                    {(() => {
+                      const groups: { key: string; label: string; items: HistoryItem[] }[] = [];
+                      for (const item of filtered) {
+                        const date = new Date(item.rawDate);
+                        const isValid = !isNaN(date.getTime());
+                        const key = isValid ? `${date.getFullYear()}-${date.getMonth()}` : 'other';
+                        const label = isValid
+                          ? date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+                          : 'Lainnya';
+                        const existing = groups.find(g => g.key === key);
+                        if (existing) existing.items.push(item);
+                        else groups.push({ key, label, items: [item] });
+                      }
+                      let rowNum = 0;
+                      return (
+                        <>
+                          {groups.map(({ key, label, items }) => (
+                            <React.Fragment key={key}>
+                              <tr className="bg-slate-50 border-y border-slate-100">
+                                <td colSpan={11} className="px-4 py-2">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
+                                  </div>
+                                </td>
+                              </tr>
+                              {items.map((item) => {
+                                rowNum++;
+                                const currentNum = rowNum;
+                                return (
+                                  <tr
+                                    key={item.id}
+                                    className="hover:bg-slate-50/40 transition-colors"
+                                  >
+                                    <td className="px-4 py-3 text-xs text-slate-400 font-medium">{currentNum}</td>
+                                    <td className="px-4 py-3">
+                                      <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">{item.subject}</span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="text-xs text-slate-600 whitespace-nowrap">{item.className}</span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="text-xs text-slate-600 whitespace-nowrap">{item.teachingTeam}</span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="text-xs text-slate-600 whitespace-nowrap">{item.room}</span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="text-xs text-slate-600 whitespace-nowrap">{formatDateCompact(item.rawDate)}</span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="text-xs text-slate-600 font-mono whitespace-nowrap">{item.checkIn}</span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="text-xs text-slate-600 font-mono whitespace-nowrap">{item.checkOut}</span>
+                                    </td>
+                                    <td className="px-4 py-3 min-w-[160px]">
+                                      {item.materi && item.materi !== '-' ? (
+                                        <span className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">{item.materi}</span>
+                                      ) : (
+                                        <span className="text-slate-300 text-xs">—</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto ${
+                                        item.isVerified ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200 bg-white'
+                                      }`}>
+                                        {item.isVerified && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto ${
+                                        item.isPaid ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200 bg-white'
+                                      }`}>
+                                        {item.isPaid && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </React.Fragment>
+                          ))}
+                          {filtered.length < 15 && [...Array(15 - filtered.length)].map((_, i) => (
+                            <tr key={`empty-${i}`} className="opacity-20">
+                              <td className="px-4 py-3 text-xs text-slate-400">{filtered.length + i + 1}</td>
+                              <td colSpan={10} className="px-4 py-3">
+                                <div className="h-2 bg-slate-100 rounded-full w-24" />
+                              </td>
+                            </tr>
+                          ))}
+                        </>
+                      );
+                    })()}
                   </tbody>
                 </table>
               </div>

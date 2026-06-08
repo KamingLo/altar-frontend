@@ -14,7 +14,6 @@ import {
   Banknote,
   Download,
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 
 import {
@@ -25,6 +24,7 @@ import {
 } from '@/lib/actions/presensi';
 import { getSemesterList } from '@/lib/actions/data-master';
 import { getAllSessions } from '@/lib/actions/jadwal';
+import { getAsdosList, getAsdosDetail } from '@/lib/actions/manajemen';
 import type { SemesterItem } from '@/types/api';
 import { usePresensiStore, MOCK_MODE } from '@/store/usePresensiStore';
 import { CustomSelect } from '@/components/ui/CustomSelect';
@@ -109,7 +109,174 @@ function formatTime(timeStr?: string) {
   } catch { return timeStr; }
 }
 
-const colWidths = [{ wch: 4 }, { wch: 28 }, { wch: 10 }, { wch: 18 }, { wch: 8 }, { wch: 8 }, { wch: 35 }, { wch: 20 }, { wch: 14 }, { wch: 12 }];
+async function fetchAsdosInfo(name: string): Promise<{ nim: string; email: string; phone: string }> {
+  try {
+    const fetchPromise = (async () => {
+      const listRes = await getAsdosList(1, name, 20);
+      if (!listRes.success || !listRes.data?.length) return { nim: '-', email: '-', phone: '-' };
+      const match = listRes.data.find(a => a.username === name) ?? listRes.data[0];
+      const detailRes = await getAsdosDetail(match.id_asdos);
+      if (!detailRes.success || !detailRes.data) return { nim: match.nim || '-', email: '-', phone: '-' };
+      return {
+        nim: detailRes.data.nim || '-',
+        email: detailRes.data.user?.email || '-',
+        phone: detailRes.data.phone_number || '-',
+      };
+    })();
+
+    const timeoutPromise = new Promise<{ nim: string; email: string; phone: string }>(resolve =>
+      setTimeout(() => resolve({ nim: '-', email: '-', phone: '-' }), 1500)
+    );
+
+    return await Promise.race([fetchPromise, timeoutPromise]);
+  } catch {
+    return { nim: '-', email: '-', phone: '-' };
+  }
+}
+
+function buildAsdosWorksheet(
+  ws: ExcelJS.Worksheet,
+  asdosName: string,
+  info: { nim: string; email: string; phone: string },
+  items: PresensiResponseDTO[],
+) {
+  const NUM_COLS = 10;
+  const colWidthsEx = [4, 30, 10, 18, 8, 8, 35, 20, 14, 13];
+  colWidthsEx.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+  let r = 1;
+
+  // ── Title ──
+  ws.mergeCells(r, 1, r, NUM_COLS);
+  const titleCell = ws.getCell(r, 1);
+  titleCell.value = 'LAPORAN PRESENSI ASISTEN DOSEN';
+  titleCell.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(r).height = 26;
+  r++;
+
+  // ── Asdos info rows ──
+  const infoLabelFill: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  const infoValueFill: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+  const infoRows: [string, string][] = [
+    ['Nama', asdosName],
+    ['NIM', info.nim],
+    ['Email', info.email],
+    ['No. Telepon', info.phone],
+  ];
+  for (const [label, value] of infoRows) {
+    const lc = ws.getCell(r, 1);
+    lc.value = label;
+    lc.font = { bold: true, size: 10, color: { argb: 'FF475569' } };
+    lc.fill = infoLabelFill;
+    lc.alignment = { horizontal: 'right', vertical: 'middle' };
+    ws.mergeCells(r, 2, r, NUM_COLS);
+    const vc = ws.getCell(r, 2);
+    vc.value = value;
+    vc.font = { size: 10, color: { argb: 'FF1F2937' } };
+    vc.fill = infoValueFill;
+    vc.alignment = { vertical: 'middle' };
+    ws.getRow(r).height = 18;
+    r++;
+  }
+  r++; // empty gap
+
+  // ── Table header ──
+  const headers = ['No', 'Nama Pelajaran', 'Kelas', 'Tgl Perkuliahan', 'Mulai', 'Selesai', 'Bahasan Materi', 'Pengajar Rekan', 'Verifikasi', 'Pembayaran'];
+  headers.forEach((h, i) => {
+    const cell = ws.getCell(r, i + 1);
+    cell.value = h;
+    cell.font = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+    cell.alignment = { horizontal: i === 0 ? 'center' : 'left', vertical: 'middle', wrapText: true };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF475569' } },
+      bottom: { style: 'thin', color: { argb: 'FF475569' } },
+      left: { style: 'thin', color: { argb: 'FF475569' } },
+      right: { style: 'thin', color: { argb: 'FF475569' } },
+    };
+  });
+  ws.getRow(r).height = 20;
+  r++;
+
+  // ── Group by month ──
+  const groups: { key: string; label: string; items: PresensiResponseDTO[] }[] = [];
+  const sorted = [...items].sort((a, b) => {
+    const dateA = a.tanggal_mengajar || '';
+    const dateB = b.tanggal_mengajar || '';
+    return dateA.localeCompare(dateB);
+  });
+  for (const item of sorted) {
+    const dateStr = item.tanggal_mengajar || item.waktu_checkin || '';
+    const d = new Date(dateStr);
+    const isValid = !isNaN(d.getTime());
+    const key = isValid ? `${d.getFullYear()}-${d.getMonth()}` : 'other';
+    const label = isValid ? d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }) : 'Tanggal Lainnya';
+    const existing = groups.find(g => g.key === key);
+    if (existing) existing.items.push(item);
+    else groups.push({ key, label, items: [item] });
+  }
+
+  const thinBorder = (argb = 'FFE2E8F0'): Partial<ExcelJS.Border> => ({ style: 'thin', color: { argb } });
+
+  let rowNum = 0;
+  for (const { label, items: groupItems } of groups) {
+    // Month header
+    ws.mergeCells(r, 1, r, NUM_COLS);
+    const mc = ws.getCell(r, 1);
+    mc.value = label.toUpperCase();
+    mc.font = { bold: true, size: 9, color: { argb: 'FF1E40AF' } };
+    mc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+    mc.alignment = { horizontal: 'left', vertical: 'middle' };
+    mc.border = { bottom: thinBorder('FFBFDBFE'), top: thinBorder('FFBFDBFE') };
+    ws.getRow(r).height = 16;
+    r++;
+
+    for (const item of groupItems) {
+      rowNum++;
+      const isOdd = rowNum % 2 !== 0;
+      const rowArgb = isOdd ? 'FFFFFFFF' : 'FFF8FAFC';
+      const borderColor = 'FFE2E8F0';
+
+      const values: (string | number)[] = [
+        rowNum,
+        item.nama_mata_kuliah || '-',
+        item.nama_kelas || '-',
+        formatDateCompact(item.tanggal_mengajar),
+        formatTime(item.waktu_checkin),
+        item.tipe_absensi === 'link' ? 'Online' : (formatTime(item.waktu_checkout) || '-'),
+        item.deskripsi_materi || '-',
+        item.nama_asdos_rekan || '-',
+        item.is_verified ? 'Terverifikasi' : 'Pending',
+        item.is_paid ? 'Lunas' : 'Belum Lunas',
+      ];
+
+      values.forEach((v, i) => {
+        const cell = ws.getCell(r, i + 1);
+        cell.value = v;
+        cell.border = {
+          top: thinBorder(borderColor), bottom: thinBorder(borderColor),
+          left: thinBorder(borderColor), right: thinBorder(borderColor),
+        };
+        cell.alignment = { vertical: 'middle', wrapText: i === 6 };
+        if (i === 8) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: item.is_verified ? 'FFD1FAE5' : 'FFFEF9C3' } };
+          cell.font = { size: 9, bold: true, color: { argb: item.is_verified ? 'FF065F46' : 'FF92400E' } };
+        } else if (i === 9) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: item.is_paid ? 'FFD1FAE5' : 'FFFEE2E2' } };
+          cell.font = { size: 9, bold: true, color: { argb: item.is_paid ? 'FF065F46' : 'FF991B1B' } };
+        } else {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowArgb } };
+          cell.font = { size: 9, color: { argb: i === 0 ? 'FF94A3B8' : 'FF1F2937' } };
+          if (i === 0) cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        }
+      });
+      ws.getRow(r).height = 16;
+      r++;
+    }
+  }
+}
 
 export default function DataPresensiPage() {
   const { presensiList, isLoading, setPresensi, verifyPresensiLocal, updatePaymentLocal, setIsLoading } = usePresensiStore();
@@ -131,9 +298,11 @@ export default function DataPresensiPage() {
   const [selectedAsdosName, setSelectedAsdosName] = useState<string | null>(null);
   const [payDropdownOpen, setPayDropdownOpen] = useState(false);
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const [downloadPending, setDownloadPending] = useState(false);
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const paySearchRef = useRef<HTMLDivElement>(null);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
+  const downloadMenuRefMobile = useRef<HTMLDivElement>(null);
   const [sessionStartMap, setSessionStartMap] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -168,7 +337,7 @@ export default function DataPresensiPage() {
       setSemesters(MOCK_SEMESTER);
       setSemesterFilter(MOCK_SEMESTER[0].id);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -181,7 +350,7 @@ export default function DataPresensiPage() {
         if (mins !== null) map.set(s.id_sesi, mins);
       }
       setSessionStartMap(map);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [semesterFilter]);
 
   const fetchPresensi = useCallback(async (silent = false, semId?: string) => {
@@ -330,10 +499,13 @@ export default function DataPresensiPage() {
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (paySearchRef.current && !paySearchRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (paySearchRef.current && !paySearchRef.current.contains(target)) {
         setPayDropdownOpen(false);
       }
-      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target as Node)) {
+      const insideDesktop = downloadMenuRef.current && downloadMenuRef.current.contains(target);
+      const insideMobile = downloadMenuRefMobile.current && downloadMenuRefMobile.current.contains(target);
+      if (!insideDesktop && !insideMobile) {
         setDownloadMenuOpen(false);
       }
     };
@@ -389,180 +561,74 @@ export default function DataPresensiPage() {
     }
   }, [updatePaymentLocal, fetchPresensi]);
 
-  const buildSheetData = (items: PresensiResponseDTO[]) => {
-    const groups: { key: string; label: string; items: PresensiResponseDTO[] }[] = [];
-    for (const item of items) {
-      const date = new Date(item.tanggal_mengajar);
-      const key = `${date.getFullYear()}-${date.getMonth()}`;
-      const label = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-      const existing = groups.find(g => g.key === key);
-      if (existing) existing.items.push(item);
-      else groups.push({ key, label, items: [item] });
-    }
-    const header = ['No', 'Nama Pelajaran', 'Kelas', 'Tgl Perkuliahan', 'Mulai', 'Selesai', 'Bahasan Materi', 'Pengajar Rekan', 'Verifikasi', 'Pembayaran'];
-    const sheetData: (string | number)[][] = [header];
-    let rowNum = 0;
-    for (const { label, items: groupItems } of groups) {
-      sheetData.push([label, '', '', '', '', '', '', '', '', '']);
-      for (const item of groupItems) {
-        rowNum++;
-        sheetData.push([
-          rowNum,
-          item.nama_mata_kuliah || '-',
-          item.nama_kelas || '-',
-          formatDateCompact(item.tanggal_mengajar),
-          formatTime(item.waktu_checkin),
-          item.tipe_absensi === 'link' ? 'Online' : formatTime(item.waktu_checkout),
-          item.deskripsi_materi || '-',
-          item.nama_asdos_rekan || '-',
-          item.is_verified ? 'Terverifikasi' : 'Pending',
-          item.is_paid ? 'Lunas' : 'Belum Lunas',
-        ]);
-      }
-    }
-    return sheetData;
-  };
-
-  const handleDownloadExcel = useCallback(() => {
-    if (!payTableData || !selectedAsdosName) return;
-    const sheetData = buildSheetData(payTableData);
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!cols'] = colWidths;
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, selectedAsdosName.slice(0, 31));
-    const date = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
-    XLSX.writeFile(wb, `Presensi_${selectedAsdosName}_${date}.xlsx`);
-  }, [payTableData, selectedAsdosName]);
-
-  const handleDownloadAllExcel = useCallback(async () => {
-    if (!presensiList.length) return;
-
-    const NUM_COLS = 10;
-    const header = ['No', 'Nama Pelajaran', 'Kelas', 'Tgl Perkuliahan', 'Mulai', 'Selesai', 'Bahasan Materi', 'Pengajar Rekan', 'Verifikasi', 'Pembayaran'];
-    const colWidthsEx = [4, 28, 10, 18, 8, 8, 35, 20, 14, 12];
-    const boxBorder: Partial<ExcelJS.Borders> = {
-      top:    { style: 'medium' },
-      bottom: { style: 'medium' },
-      left:   { style: 'medium' },
-      right:  { style: 'medium' },
-    };
-
-    const asdosMap = new Map<string, PresensiResponseDTO[]>();
-    for (const item of presensiList) {
-      const name = (item.nama_asdos || '').trim();
-      if (!name) continue;
-      if (!asdosMap.has(name)) asdosMap.set(name, []);
-      asdosMap.get(name)!.push(item);
-    }
-
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('Semua Asdos');
-    colWidthsEx.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
-
-    let currentRow = 1;
-
-    asdosMap.forEach((items, name) => {
-      const blockStart = currentRow;
-
-      ws.getRow(currentRow).getCell(1).value = name;
-      ws.getRow(currentRow).getCell(1).font = { bold: true };
-      currentRow++;
-
-      header.forEach((h, i) => {
-        const cell = ws.getRow(currentRow).getCell(i + 1);
-        cell.value = h;
-        cell.font = { bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-      });
-      currentRow++;
-
-      const groups: { key: string; label: string; items: PresensiResponseDTO[] }[] = [];
-      const sorted = [...items].sort((a, b) => a.tanggal_mengajar.localeCompare(b.tanggal_mengajar));
-      for (const item of sorted) {
-        const d = new Date(item.tanggal_mengajar);
-        const key = `${d.getFullYear()}-${d.getMonth()}`;
-        const label = d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-        const existing = groups.find(g => g.key === key);
-        if (existing) existing.items.push(item);
-        else groups.push({ key, label, items: [item] });
-      }
-
-      let rowNum = 0;
-      for (const { label, items: groupItems } of groups) {
-        const mCell = ws.getRow(currentRow).getCell(1);
-        mCell.value = label;
-        mCell.font = { bold: true, color: { argb: 'FF64748B' } };
-        mCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-        currentRow++;
-
-        for (const item of groupItems) {
-          rowNum++;
-          const row = ws.getRow(currentRow);
-          const values = [
-            rowNum,
-            item.nama_mata_kuliah || '-',
-            item.nama_kelas || '-',
-            formatDateCompact(item.tanggal_mengajar),
-            formatTime(item.waktu_checkin),
-            item.tipe_absensi === 'link' ? 'Online' : formatTime(item.waktu_checkout),
-            item.deskripsi_materi || '-',
-            item.nama_asdos_rekan || '-',
-            item.is_verified ? 'Terverifikasi' : 'Pending',
-            item.is_paid ? 'Lunas' : 'Belum Lunas',
-          ];
-          values.forEach((v, i) => { row.getCell(i + 1).value = v; });
-          currentRow++;
-        }
-      }
-
-      const blockEnd = currentRow - 1;
-
-      for (let r = blockStart; r <= blockEnd; r++) {
-        for (let c = 1; c <= NUM_COLS; c++) {
-          const cell = ws.getRow(r).getCell(c);
-          const border: Partial<ExcelJS.Borders> = {};
-          if (r === blockStart) border.top = boxBorder.top;
-          if (r === blockEnd)   border.bottom = boxBorder.bottom;
-          if (c === 1)          border.left = boxBorder.left;
-          if (c === NUM_COLS)   border.right = boxBorder.right;
-          if (Object.keys(border).length) cell.border = { ...cell.border, ...border };
-        }
-      }
-
-      currentRow += 2;
-    });
-
-    const buffer = await wb.xlsx.writeBuffer();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const triggerDownload = (buffer: any, filename: string) => {
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const date = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
     a.href = url;
-    a.download = `Presensi_Semua_Asdos_${date}.xlsx`;
+    a.download = filename;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [presensiList]);
+  };
 
-  const handleDownloadSplitExcel = useCallback(() => {
-    if (!presensiList.length) return;
-    const asdosMap = new Map<string, PresensiResponseDTO[]>();
-    for (const item of presensiList) {
-      const name = (item.nama_asdos || '').trim();
-      if (!name) continue;
-      if (!asdosMap.has(name)) asdosMap.set(name, []);
-      asdosMap.get(name)!.push(item);
+  const handleDownloadExcel = useCallback(async () => {
+    console.log('handleDownloadExcel clicked', { payTableData, selectedAsdosName, downloadPending });
+    if (!payTableData || !selectedAsdosName || downloadPending) {
+      alert(`Unduh dibatalkan: data=${!!payTableData}, nama=${selectedAsdosName || 'null'}, pending=${downloadPending}`);
+      return;
     }
-    const wb = XLSX.utils.book_new();
-    asdosMap.forEach((items, name) => {
-      const sorted = [...items].sort((a, b) => a.tanggal_mengajar.localeCompare(b.tanggal_mengajar));
-      const sheetData = buildSheetData(sorted);
-      const ws = XLSX.utils.aoa_to_sheet(sheetData);
-      ws['!cols'] = colWidths;
-      XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
-    });
-    const date = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
-    XLSX.writeFile(wb, `Presensi_Semua_Asdos_${date}.xlsx`);
-  }, [presensiList]);
+    setDownloadPending(true);
+    try {
+      const info = await fetchAsdosInfo(selectedAsdosName);
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet(selectedAsdosName.slice(0, 31));
+      buildAsdosWorksheet(ws, selectedAsdosName, info, payTableData);
+      const buffer = await wb.xlsx.writeBuffer();
+      triggerDownload(buffer, `Presensi_${selectedAsdosName}_${new Date().toLocaleDateString('id-ID').replace(/\//g, '-')}.xlsx`);
+    } catch (err: any) {
+      console.error('Download failed:', err);
+      alert(`Gagal mengunduh file Excel: ${err?.message || err}`);
+    } finally {
+      setDownloadPending(false);
+    }
+  }, [payTableData, selectedAsdosName, downloadPending]);
+
+  const handleDownloadSplitExcel = useCallback(async () => {
+    console.log('handleDownloadSplitExcel clicked', { presensiListLength: presensiList.length, downloadPending });
+    if (!presensiList.length || downloadPending) {
+      alert(`Unduh dibatalkan: total data=${presensiList.length}, pending=${downloadPending}`);
+      return;
+    }
+    setDownloadPending(true);
+    try {
+      const asdosMap = new Map<string, PresensiResponseDTO[]>();
+      for (const item of presensiList) {
+        const name = (item.nama_asdos || '').trim();
+        if (!name) continue;
+        if (!asdosMap.has(name)) asdosMap.set(name, []);
+        asdosMap.get(name)!.push(item);
+      }
+      const wb = new ExcelJS.Workbook();
+      const asdosNames = Array.from(asdosMap.keys());
+      const infos = await Promise.all(asdosNames.map(name => fetchAsdosInfo(name)));
+      asdosNames.forEach((name, index) => {
+        const info = infos[index];
+        const items = asdosMap.get(name) || [];
+        const ws = wb.addWorksheet(name.slice(0, 31));
+        buildAsdosWorksheet(ws, name, info, items);
+      });
+      const buffer = await wb.xlsx.writeBuffer();
+      triggerDownload(buffer, `Presensi_Semua_Asdos_${new Date().toLocaleDateString('id-ID').replace(/\//g, '-')}.xlsx`);
+    } catch (err: any) {
+      console.error('Download failed:', err);
+      alert(`Gagal mengunduh file Excel: ${err?.message || err}`);
+    } finally {
+      setDownloadPending(false);
+    }
+  }, [presensiList, downloadPending]);
 
 
   return (
@@ -588,9 +654,8 @@ export default function DataPresensiPage() {
                   key={t}
                   type="button"
                   onClick={() => setPageTab(t)}
-                  className={`flex-1 h-10 flex items-center justify-center gap-2 px-3 rounded-[8px] text-[11px] font-bold transition-all ${
-                    pageTab === t ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                  }`}
+                  className={`flex-1 h-10 flex items-center justify-center gap-2 px-3 rounded-[8px] text-[11px] font-bold transition-all ${pageTab === t ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    }`}
                 >
                   {t === 'VERIFY' ? 'Verifikasi' : 'Pembayaran'}
                 </button>
@@ -653,9 +718,8 @@ export default function DataPresensiPage() {
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 px-3 py-3 text-xs font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] select-none text-center ${
-                      activeTab === tab.id ? 'bg-crimson text-white shadow-sm' : 'text-slate-500'
-                    }`}
+                    className={`flex-1 px-3 py-3 text-xs font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] select-none text-center ${activeTab === tab.id ? 'bg-crimson text-white shadow-sm' : 'text-slate-500'
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -694,15 +758,21 @@ export default function DataPresensiPage() {
                 </div>
               </div>
               <div className="flex gap-3 justify-end">
-                <span className="text-[10px] text-slate-500">Pending <span className="font-bold text-slate-800">{presensiCounts.pending}</span></span>
-                <span className="text-[10px] text-slate-500">Terverifikasi <span className="font-bold text-slate-800">{presensiCounts.verified}</span></span>
-                <span className="text-[10px] text-slate-500">Total <span className="font-bold text-slate-800">{presensiCounts.total}</span></span>
+                {activeTab === 'PENDING' && (
+                  <span className="text-[10px] text-slate-500">Ada <span className="font-bold text-slate-800">{presensiCounts.pending}</span> presensi yang belum diverifikasi</span>
+                )}
+                {activeTab === 'VERIFIED' && (
+                  <span className="text-[10px] text-slate-500"><span className="font-bold text-slate-800">{presensiCounts.verified}</span> presensi yang telah terverifikasi</span>
+                )}
+                {activeTab === 'ALL' && (
+                  <span className="text-[10px] text-slate-500">Total ada <span className="font-bold text-slate-800">{presensiCounts.total}</span> presensi</span>
+                )}
               </div>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
-                <div ref={downloadMenuRef} className="relative shrink-0">
+                <div ref={downloadMenuRefMobile} className="relative shrink-0">
                   <button type="button" onClick={() => setDownloadMenuOpen(prev => !prev)}
                     className="h-12 flex items-center gap-1.5 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 active:scale-95 transition-all">
                     <Download className="w-4 h-4" />
@@ -710,20 +780,17 @@ export default function DataPresensiPage() {
                   </button>
                   {downloadMenuOpen && (
                     <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden min-w-[180px]">
-                      <button type="button" disabled={!payTableData || payTableData.length === 0}
-                        onClick={() => { handleDownloadExcel(); setDownloadMenuOpen(false); }}
+                      <button type="button" disabled={!payTableData || payTableData.length === 0 || downloadPending}
+                        onClick={() => { void handleDownloadExcel(); setDownloadMenuOpen(false); }}
                         className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
-                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />Asdos Ini
+                        {downloadPending ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                        Asdos Ini
                       </button>
-                      <button type="button" disabled={!presensiList.length}
-                        onClick={() => { void handleDownloadAllExcel(); setDownloadMenuOpen(false); }}
+                      <button type="button" disabled={!presensiList.length || downloadPending}
+                        onClick={() => { void handleDownloadSplitExcel(); setDownloadMenuOpen(false); }}
                         className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
-                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />Semua Asdos (Gabung)
-                      </button>
-                      <button type="button" disabled={!presensiList.length}
-                        onClick={() => { handleDownloadSplitExcel(); setDownloadMenuOpen(false); }}
-                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
-                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />Semua Asdos (Pisah)
+                        {downloadPending ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                        Semua Asdos
                       </button>
                     </div>
                   )}
@@ -766,18 +833,23 @@ export default function DataPresensiPage() {
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
-                      className={`min-w-fit px-5 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] select-none ${
-                        activeTab === tab.id ? 'bg-crimson text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                      }`}
+                      className={`min-w-fit px-5 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all active:scale-[0.98] select-none ${activeTab === tab.id ? 'bg-crimson text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                        }`}
                     >
                       {tab.label}
                     </button>
                   ))}
                 </div>
                 <div className="flex gap-4 px-2 pt-2">
-                  <span className="text-[11px] text-slate-500">Pending <span className="font-bold text-slate-800">{presensiCounts.pending}</span></span>
-                  <span className="text-[11px] text-slate-500">Terverifikasi <span className="font-bold text-slate-800">{presensiCounts.verified}</span></span>
-                  <span className="text-[11px] text-slate-500">Total <span className="font-bold text-slate-800">{presensiCounts.total}</span></span>
+                  {activeTab === 'PENDING' && (
+                    <span className="text-[11px] text-slate-500">Ada <span className="font-bold text-slate-800">{presensiCounts.pending}</span> presensi yang belum diverifikasi</span>
+                  )}
+                  {activeTab === 'VERIFIED' && (
+                    <span className="text-[11px] text-slate-500"><span className="font-bold text-slate-800">{presensiCounts.verified}</span> presensi telah terverifikasi</span>
+                  )}
+                  {activeTab === 'ALL' && (
+                    <span className="text-[11px] text-slate-500">Total <span className="font-bold text-slate-800">{presensiCounts.total}</span> presensi</span>
+                  )}
                 </div>
               </>
             ) : (
@@ -852,20 +924,17 @@ export default function DataPresensiPage() {
                   </button>
                   {downloadMenuOpen && (
                     <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden min-w-[180px]">
-                      <button type="button" disabled={!payTableData || payTableData.length === 0}
-                        onClick={() => { handleDownloadExcel(); setDownloadMenuOpen(false); }}
+                      <button type="button" disabled={!payTableData || payTableData.length === 0 || downloadPending}
+                        onClick={() => { void handleDownloadExcel(); setDownloadMenuOpen(false); }}
                         className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
-                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />Asdos Ini
+                        {downloadPending ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                        Asdos Ini
                       </button>
-                      <button type="button" disabled={!presensiList.length}
-                        onClick={() => { void handleDownloadAllExcel(); setDownloadMenuOpen(false); }}
+                      <button type="button" disabled={!presensiList.length || downloadPending}
+                        onClick={() => { void handleDownloadSplitExcel(); setDownloadMenuOpen(false); }}
                         className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
-                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />Semua Asdos (Gabung)
-                      </button>
-                      <button type="button" disabled={!presensiList.length}
-                        onClick={() => { handleDownloadSplitExcel(); setDownloadMenuOpen(false); }}
-                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-crimson transition-colors flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
-                        <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />Semua Asdos (Pisah)
+                        {downloadPending ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                        Semua Asdos
                       </button>
                     </div>
                   )}
@@ -921,9 +990,8 @@ export default function DataPresensiPage() {
           }}
         >
           <div
-            className={`w-1/2 shrink-0 transition-opacity duration-300 ${
-              pageTab === 'PAY' ? 'opacity-0 pointer-events-none' : 'opacity-100'
-            }`}
+            className={`w-1/2 shrink-0 transition-opacity duration-300 ${pageTab === 'PAY' ? 'opacity-0 pointer-events-none' : 'opacity-100'
+              }`}
           >
             {isLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 relative z-10">
@@ -1149,48 +1217,47 @@ export default function DataPresensiPage() {
           </div>
 
           <div
-            className={`w-1/2 shrink-0 transition-opacity duration-300 ${
-              pageTab === 'PAY' ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
+            className={`w-1/2 shrink-0 transition-opacity duration-300 ${pageTab === 'PAY' ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              }`}
           >
             {isLoading ? (
               <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-                  <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                    <div className="space-y-1.5">
-                      <div className="h-4 w-36 bg-slate-100 rounded animate-shimmer" />
-                      <div className="h-3 w-24 bg-slate-100 rounded animate-shimmer" />
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[900px]">
-                      <thead>
-                        <tr className="bg-slate-50/70 border-b border-slate-100">
-                          {['No', 'Nama Pelajaran', 'Kelas', 'Tgl Perkuliahan', 'Mulai', 'Selesai', 'Bahasan Materi', 'Pengajar', 'Verifikasi', 'Pembayaran'].map(col => (
-                            <th key={col} className="px-4 py-3 text-left">
-                              <div className="h-2.5 bg-slate-100 rounded animate-shimmer w-16" />
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...Array(8)].map((_, i) => (
-                          <tr key={i} className="border-b border-slate-50">
-                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-4" /></td>
-                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-32" /></td>
-                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-16" /></td>
-                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-24" /></td>
-                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-12" /></td>
-                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-12" /></td>
-                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-28" /></td>
-                            <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-20" /></td>
-                            <td className="px-4 py-3"><div className="h-5 w-5 bg-slate-100 rounded animate-shimmer mx-auto" /></td>
-                            <td className="px-4 py-3"><div className="h-5 w-5 bg-slate-100 rounded animate-shimmer mx-auto" /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                  <div className="space-y-1.5">
+                    <div className="h-4 w-36 bg-slate-100 rounded animate-shimmer" />
+                    <div className="h-3 w-24 bg-slate-100 rounded animate-shimmer" />
                   </div>
                 </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[900px]">
+                    <thead>
+                      <tr className="bg-slate-50/70 border-b border-slate-100">
+                        {['No', 'Nama Pelajaran', 'Kelas', 'Tgl Perkuliahan', 'Mulai', 'Selesai', 'Bahasan Materi', 'Pengajar', 'Verifikasi', 'Pembayaran'].map(col => (
+                          <th key={col} className="px-4 py-3 text-left">
+                            <div className="h-2.5 bg-slate-100 rounded animate-shimmer w-16" />
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...Array(8)].map((_, i) => (
+                        <tr key={i} className="border-b border-slate-50">
+                          <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-4" /></td>
+                          <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-32" /></td>
+                          <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-16" /></td>
+                          <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-24" /></td>
+                          <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-12" /></td>
+                          <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-12" /></td>
+                          <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-28" /></td>
+                          <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded animate-shimmer w-20" /></td>
+                          <td className="px-4 py-3"><div className="h-5 w-5 bg-slate-100 rounded animate-shimmer mx-auto" /></td>
+                          <td className="px-4 py-3"><div className="h-5 w-5 bg-slate-100 rounded animate-shimmer mx-auto" /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             ) : (
               <div className="space-y-4">
                 {payTableData === null ? (
@@ -1208,210 +1275,206 @@ export default function DataPresensiPage() {
                     className="mt-2"
                   />
                 ) : (
-              <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[900px]">
-                    <thead>
-                      <tr className="bg-slate-50/70 border-b border-slate-100">
-                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider w-8">No</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Nama Pelajaran</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Kelas</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Tgl Perkuliahan</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Mulai</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Selesai</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Link Video</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider min-w-[160px]">Bahasan Materi</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Partner</th>
-                        <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-24">Verifikasi</th>
-                        <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-24">Pembayaran</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {(() => {
-                        const groups: { key: string; label: string; items: PresensiResponseDTO[] }[] = [];
-                        for (const item of payTableData) {
-                          const date = new Date(item.tanggal_mengajar);
-                          const key = `${date.getFullYear()}-${date.getMonth()}`;
-                          const label = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-                          const existing = groups.find(g => g.key === key);
-                          if (existing) existing.items.push(item);
-                          else groups.push({ key, label, items: [item] });
-                        }
-                        let rowNum = 0;
-                        return (
-                          <>
-                            {groups.map(({ key, label, items }) => {
-                              const allVerified = items.every(i => i.is_verified);
-                              const allPaid = items.every(i => i.is_paid);
-                              const verifyMonthKey = `month-verify-${items[0]?.id_presensi}`;
-                              const payMonthKey = `month-pay-${items[0]?.id_presensi}`;
-                              const verifyMonthPending = payRowPending.has(verifyMonthKey);
-                              const payMonthPending = payRowPending.has(payMonthKey);
-                              return (
-                              <React.Fragment key={key}>
-                                <tr className="bg-slate-50 border-y border-slate-100">
-                                  <td colSpan={11} className="px-4 py-2">
-                                    <div className="flex items-center justify-between gap-4">
-                                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
-                                      <div className="flex items-center gap-2 shrink-0">
-                                        <button
-                                          type="button"
-                                          disabled={verifyMonthPending}
-                                          onClick={() => handleMonthVerify(items, !allVerified)}
-                                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 disabled:opacity-50 ${
-                                            allVerified
-                                              ? 'border-emerald-500 text-emerald-600 bg-white hover:bg-emerald-50'
-                                              : 'border-slate-300 text-slate-500 bg-white hover:border-emerald-400 hover:text-emerald-600'
-                                          }`}
-                                        >
-                                          {verifyMonthPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                                          {allVerified ? 'Batalkan Verifikasi' : 'Verifikasi Semua'}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          disabled={payMonthPending}
-                                          onClick={() => handleMonthPay(items, !allPaid)}
-                                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
-                                            allPaid
-                                              ? 'border-emerald-500 text-emerald-600 bg-white hover:bg-emerald-50'
-                                              : 'border-slate-300 text-slate-500 bg-white hover:border-emerald-400 hover:text-emerald-600'
-                                          }`}
-                                        >
-                                          {payMonthPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Banknote className="w-3 h-3" />}
-                                          {allPaid ? 'Batalkan Pembayaran' : 'Bayar Semua'}
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                                {items.map((item) => {
-                                  rowNum++;
-                                  const verifyKey = `verify-${item.id_presensi}`;
-                                  const payKey = `pay-${item.id_presensi}`;
-                                  const verifyPending = payRowPending.has(verifyKey);
-                                  const payPending = payRowPending.has(payKey);
-                                  const isOnline = item.tipe_absensi === 'link';
-                                  const isLate = isCheckInLate(item.waktu_checkin, sessionStartMap.get(item.id_sesi));
-                                  const currentNum = rowNum;
+                  <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[900px]">
+                        <thead>
+                          <tr className="bg-slate-50/70 border-b border-slate-100">
+                            <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider w-8">No</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Nama Pelajaran</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Kelas</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Tgl Perkuliahan</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Mulai</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Selesai</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Link Video</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider min-w-[160px]">Bahasan Materi</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Partner</th>
+                            <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-24">Verifikasi</th>
+                            <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-24">Pembayaran</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {(() => {
+                            const groups: { key: string; label: string; items: PresensiResponseDTO[] }[] = [];
+                            for (const item of payTableData) {
+                              const date = new Date(item.tanggal_mengajar);
+                              const key = `${date.getFullYear()}-${date.getMonth()}`;
+                              const label = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                              const existing = groups.find(g => g.key === key);
+                              if (existing) existing.items.push(item);
+                              else groups.push({ key, label, items: [item] });
+                            }
+                            let rowNum = 0;
+                            return (
+                              <>
+                                {groups.map(({ key, label, items }) => {
+                                  const allVerified = items.every(i => i.is_verified);
+                                  const allPaid = items.every(i => i.is_paid);
+                                  const verifyMonthKey = `month-verify-${items[0]?.id_presensi}`;
+                                  const payMonthKey = `month-pay-${items[0]?.id_presensi}`;
+                                  const verifyMonthPending = payRowPending.has(verifyMonthKey);
+                                  const payMonthPending = payRowPending.has(payMonthKey);
                                   return (
-                                  <tr key={item.id_presensi} className="hover:bg-slate-50/40 transition-colors">
-                                    <td className="px-4 py-3 text-xs text-slate-400 font-medium">{currentNum}</td>
-                            <td className="px-4 py-3">
-                              <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">
-                                {item.nama_mata_kuliah || '-'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="text-xs text-slate-600 whitespace-nowrap">{item.nama_kelas || '-'}</span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="text-xs text-slate-600 whitespace-nowrap">{formatDateCompact(item.tanggal_mengajar)}</span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkin)}</span>
-                                {isLate && (
-                                  <span className="text-[8px] font-extrabold text-amber-600 border border-amber-400 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
-                                    Terlambat
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              {isOnline ? (
-                                <span className="text-[8px] font-extrabold text-crimson border border-crimson/40 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">Online</span>
-                              ) : (
-                                <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkout)}</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {isOnline && item.link_video ? (
-                                <a
-                                  href={toExternalUrl(item.link_video)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-crimson hover:underline whitespace-nowrap"
-                                >
-                                  <ExternalLink size={12} />
-                                  Buka
-                                </a>
-                              ) : (
-                                <span className="text-slate-300 text-xs">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 min-w-[160px]">
-                              {item.deskripsi_materi ? (
-                                <span className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">{item.deskripsi_materi}</span>
-                              ) : (
-                                <span className="text-slate-300 text-xs">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {item.nama_asdos_rekan ? (
-                                <span className="text-xs text-slate-600 whitespace-nowrap">{item.nama_asdos_rekan}</span>
-                              ) : (
-                                <span className="text-slate-300 text-xs">—</span>
-                              )}
-                            </td>
+                                    <React.Fragment key={key}>
+                                      <tr className="bg-slate-50 border-y border-slate-100">
+                                        <td colSpan={11} className="px-4 py-2">
+                                          <div className="flex items-center justify-between gap-4">
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                              <button
+                                                type="button"
+                                                disabled={verifyMonthPending}
+                                                onClick={() => handleMonthVerify(items, !allVerified)}
+                                                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 disabled:opacity-50 ${allVerified
+                                                  ? 'border-emerald-500 text-emerald-600 bg-white hover:bg-emerald-50'
+                                                  : 'border-slate-300 text-slate-500 bg-white hover:border-emerald-400 hover:text-emerald-600'
+                                                  }`}
+                                              >
+                                                {verifyMonthPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                                {allVerified ? 'Batalkan Verifikasi' : 'Verifikasi Semua'}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                disabled={payMonthPending}
+                                                onClick={() => handleMonthPay(items, !allPaid)}
+                                                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${allPaid
+                                                  ? 'border-emerald-500 text-emerald-600 bg-white hover:bg-emerald-50'
+                                                  : 'border-slate-300 text-slate-500 bg-white hover:border-emerald-400 hover:text-emerald-600'
+                                                  }`}
+                                              >
+                                                {payMonthPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Banknote className="w-3 h-3" />}
+                                                {allPaid ? 'Batalkan Pembayaran' : 'Bayar Semua'}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                      {items.map((item) => {
+                                        rowNum++;
+                                        const verifyKey = `verify-${item.id_presensi}`;
+                                        const payKey = `pay-${item.id_presensi}`;
+                                        const verifyPending = payRowPending.has(verifyKey);
+                                        const payPending = payRowPending.has(payKey);
+                                        const isOnline = item.tipe_absensi === 'link';
+                                        const isLate = isCheckInLate(item.waktu_checkin, sessionStartMap.get(item.id_sesi));
+                                        const currentNum = rowNum;
+                                        return (
+                                          <tr key={item.id_presensi} className="hover:bg-slate-50/40 transition-colors">
+                                            <td className="px-4 py-3 text-xs text-slate-400 font-medium">{currentNum}</td>
+                                            <td className="px-4 py-3">
+                                              <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">
+                                                {item.nama_mata_kuliah || '-'}
+                                              </span>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <span className="text-xs text-slate-600 whitespace-nowrap">{item.nama_kelas || '-'}</span>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <span className="text-xs text-slate-600 whitespace-nowrap">{formatDateCompact(item.tanggal_mengajar)}</span>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkin)}</span>
+                                                {isLate && (
+                                                  <span className="text-[8px] font-extrabold text-amber-600 border border-amber-400 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                                                    Terlambat
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              {isOnline ? (
+                                                <span className="text-[8px] font-extrabold text-crimson border border-crimson/40 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">Online</span>
+                                              ) : (
+                                                <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkout)}</span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              {isOnline && item.link_video ? (
+                                                <a
+                                                  href={toExternalUrl(item.link_video)}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-crimson hover:underline whitespace-nowrap"
+                                                >
+                                                  <ExternalLink size={12} />
+                                                  Buka
+                                                </a>
+                                              ) : (
+                                                <span className="text-slate-300 text-xs">—</span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3 min-w-[160px]">
+                                              {item.deskripsi_materi ? (
+                                                <span className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">{item.deskripsi_materi}</span>
+                                              ) : (
+                                                <span className="text-slate-300 text-xs">—</span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              {item.nama_asdos_rekan ? (
+                                                <span className="text-xs text-slate-600 whitespace-nowrap">{item.nama_asdos_rekan}</span>
+                                              ) : (
+                                                <span className="text-slate-300 text-xs">—</span>
+                                              )}
+                                            </td>
 
-                            <td className="px-4 py-3 text-center">
-                              {verifyPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-slate-300 mx-auto" />
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRowVerify(item.id_presensi, !item.is_verified)}
-                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all active:scale-90 cursor-pointer ${
-                                      item.is_verified
-                                        ? 'bg-white border-emerald-500'
-                                        : 'border-slate-300 bg-white hover:border-emerald-500'
-                                  }`}
-                                  title={item.is_verified ? 'Batalkan verifikasi' : 'Verifikasi'}
-                                >
-                                  {item.is_verified && <Check className="w-3 h-3 text-emerald-500" strokeWidth={3} />}
-                                </button>
-                              )}
-                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                              {verifyPending ? (
+                                                <Loader2 className="w-4 h-4 animate-spin text-slate-300 mx-auto" />
+                                              ) : (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleRowVerify(item.id_presensi, !item.is_verified)}
+                                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all active:scale-90 cursor-pointer ${item.is_verified
+                                                    ? 'bg-white border-emerald-500'
+                                                    : 'border-slate-300 bg-white hover:border-emerald-500'
+                                                    }`}
+                                                  title={item.is_verified ? 'Batalkan verifikasi' : 'Verifikasi'}
+                                                >
+                                                  {item.is_verified && <Check className="w-3 h-3 text-emerald-500" strokeWidth={3} />}
+                                                </button>
+                                              )}
+                                            </td>
 
-                            <td className="px-4 py-3 text-center">
-                              {payPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-slate-300 mx-auto" />
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRowPay(item.id_presensi, !item.is_paid)}
-                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all active:scale-90 cursor-pointer ${
-                                    item.is_paid
-                                      ? 'bg-emerald-600 border-emerald-600 shadow-sm'
-                                      : 'border-slate-300 bg-white hover:border-emerald-600'
-                                  }`}
-                                  title={item.is_paid ? 'Batalkan pembayaran' : 'Tandai lunas'}
-                                >
-                                  {item.is_paid && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                                </button>
-                              )}
-                            </td>
-                                  </tr>
+                                            <td className="px-4 py-3 text-center">
+                                              {payPending ? (
+                                                <Loader2 className="w-4 h-4 animate-spin text-slate-300 mx-auto" />
+                                              ) : (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleRowPay(item.id_presensi, !item.is_paid)}
+                                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all active:scale-90 cursor-pointer ${item.is_paid
+                                                    ? 'bg-emerald-600 border-emerald-600 shadow-sm'
+                                                    : 'border-slate-300 bg-white hover:border-emerald-600'
+                                                    }`}
+                                                  title={item.is_paid ? 'Batalkan pembayaran' : 'Tandai lunas'}
+                                                >
+                                                  {item.is_paid && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                                </button>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </React.Fragment>
                                   );
                                 })}
-                              </React.Fragment>
-                              );
-                            })}
-                            {payTableData.length < 15 && [...Array(15 - payTableData.length)].map((_, i) => (
-                              <tr key={`empty-${i}`} className="opacity-20">
-                                <td className="px-4 py-3 text-xs text-slate-400">{payTableData.length + i + 1}</td>
-                                <td colSpan={10} className="px-4 py-3">
-                                  <div className="h-2 bg-slate-100 rounded-full w-24" />
-                                </td>
-                              </tr>
-                            ))}
-                          </>
-                        );
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                                {payTableData.length < 15 && [...Array(15 - payTableData.length)].map((_, i) => (
+                                  <tr key={`empty-${i}`} className="opacity-20">
+                                    <td className="px-4 py-3 text-xs text-slate-400">{payTableData.length + i + 1}</td>
+                                    <td colSpan={10} className="px-4 py-3">
+                                      <div className="h-2 bg-slate-100 rounded-full w-24" />
+                                    </td>
+                                  </tr>
+                                ))}
+                              </>
+                            );
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 )}
               </div>
             )}

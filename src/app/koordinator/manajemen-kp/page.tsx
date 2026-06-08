@@ -217,10 +217,18 @@ export default function ManajemenKpPage() {
             </div>
             {!isLoading && (
               <div className="flex gap-4 px-2 pt-2">
-                <span className="text-[11px] text-slate-500">Menunggu <span className="font-bold text-slate-800">{statusCounts.pending}</span></span>
-                <span className="text-[11px] text-slate-500">Disetujui <span className="font-bold text-slate-800">{statusCounts.verified}</span></span>
-                <span className="text-[11px] text-slate-500">Ditolak <span className="font-bold text-slate-800">{statusCounts.rejected}</span></span>
-                <span className="text-[11px] text-slate-500">Total <span className="font-bold text-slate-800">{statusCounts.total}</span></span>
+                {activeTab === 'PENDING' && (
+                  <span className="text-[11px] text-slate-500">Ada <span className="font-bold text-slate-800">{statusCounts.pending}</span> Kelas Pengganti yang belum diverifikasi</span>
+                )}
+                {activeTab === 'VERIFIED' && (
+                  <span className="text-[11px] text-slate-500"><span className="font-bold text-slate-800">{statusCounts.verified}</span> Kelas Pengganti yang telah disetujui</span>
+                )}
+                {activeTab === 'REJECTED' && (
+                  <span className="text-[11px] text-slate-500"><span className="font-bold text-slate-800">{statusCounts.rejected}</span> Kelas Pengganti yang telah ditolak</span>
+                )}
+                {activeTab === 'ALL' && (
+                  <span className="text-[11px] text-slate-500">Total <span className="font-bold text-slate-800">{statusCounts.total}</span> pengajuan Kelas Pengganti</span>
+                )}
               </div>
             )}
           </div>
@@ -250,31 +258,39 @@ export default function ManajemenKpPage() {
                 )}
               </div>
 
-            <div className="md:hidden shrink-0">
-              <CustomSelect
-                variant="icon"
-                align="right"
-                value={activeTab}
-                onChange={v => setActiveTab(v as TabId)}
-                options={[
-                  { value: 'PENDING', label: 'Pending' },
-                  { value: 'VERIFIED', label: 'Disetujui' },
-                  { value: 'REJECTED', label: 'Ditolak' },
-                  { value: 'ALL', label: 'Semua' },
-                ]}
-                placeholder="Filter status"
-                icon={<Filter className="w-[18px] h-[18px]" />}
-                triggerClassName={activeTab !== 'PENDING' ? 'bg-red-50 border-crimson text-crimson' : ''}
-              />
-            </div>
+              <div className="md:hidden shrink-0">
+                <CustomSelect
+                  variant="icon"
+                  align="right"
+                  value={activeTab}
+                  onChange={v => setActiveTab(v as TabId)}
+                  options={[
+                    { value: 'PENDING', label: 'Pending' },
+                    { value: 'VERIFIED', label: 'Disetujui' },
+                    { value: 'REJECTED', label: 'Ditolak' },
+                    { value: 'ALL', label: 'Semua' },
+                  ]}
+                  placeholder="Filter status"
+                  icon={<Filter className="w-[18px] h-[18px]" />}
+                  triggerClassName={activeTab !== 'PENDING' ? 'bg-red-50 border-crimson text-crimson' : ''}
+                />
+              </div>
             </div>
 
             {!isLoading && (
               <div className="md:hidden flex gap-4">
-                <span className="text-[11px] text-slate-500">Menunggu <span className="font-bold text-slate-800">{statusCounts.pending}</span></span>
-                <span className="text-[11px] text-slate-500">Disetujui <span className="font-bold text-slate-800">{statusCounts.verified}</span></span>
-                <span className="text-[11px] text-slate-500">Ditolak <span className="font-bold text-slate-800">{statusCounts.rejected}</span></span>
-                <span className="text-[11px] text-slate-500">Total <span className="font-bold text-slate-800">{statusCounts.total}</span></span>
+                {activeTab === 'PENDING' && (
+                  <span className="text-[11px] text-slate-500">Ada <span className="font-bold text-slate-800">{statusCounts.pending}</span> KP yang belum diverifikasi</span>
+                )}
+                {activeTab === 'VERIFIED' && (
+                  <span className="text-[11px] text-slate-500"><span className="font-bold text-slate-800">{statusCounts.verified}</span> KP telah disetujui</span>
+                )}
+                {activeTab === 'REJECTED' && (
+                  <span className="text-[11px] text-slate-500"><span className="font-bold text-slate-800">{statusCounts.rejected}</span> KP ditolak</span>
+                )}
+                {activeTab === 'ALL' && (
+                  <span className="text-[11px] text-slate-500">Total <span className="font-bold text-slate-800">{statusCounts.total}</span> pengajuan KP</span>
+                )}
               </div>
             )}
 
