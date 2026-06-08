@@ -10,7 +10,7 @@ import {
 import type { UserListItem } from '@/lib/actions/manajemen';
 import { useManajemenStore } from '@/store/useManajemenStore';
 import Image from 'next/image';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search, Filter, Power } from 'lucide-react';
 import { AsdosPageShell, AsdosPageHeader, AsdosState, AsdosListSkeleton, AsdosPrimaryButton } from '@/components/dashboard/asdos/AsdosUI';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 

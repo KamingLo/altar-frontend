@@ -49,7 +49,7 @@ export default function GenerateQrPage() {
   const [mode, setMode] = useState<'NORMAL' | 'KIOSK'>('NORMAL');
   const [qrToken, setQrToken] = useState('');
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_SEC);
-  const [refreshCount, setRefreshCount] = useState(0);
+  const [, setRefreshCount] = useState(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);

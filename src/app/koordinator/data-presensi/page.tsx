@@ -588,9 +588,10 @@ export default function DataPresensiPage() {
       buildAsdosWorksheet(ws, selectedAsdosName, info, payTableData);
       const buffer = await wb.xlsx.writeBuffer();
       triggerDownload(buffer, `Presensi_${selectedAsdosName}_${new Date().toLocaleDateString('id-ID').replace(/\//g, '-')}.xlsx`);
-    } catch (err: any) {
-      console.error('Download failed:', err);
-      alert(`Gagal mengunduh file Excel: ${err?.message || err}`);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Download failed:', error);
+      alert(`Gagal mengunduh file Excel: ${error?.message || error}`);
     } finally {
       setDownloadPending(false);
     }
@@ -622,9 +623,10 @@ export default function DataPresensiPage() {
       });
       const buffer = await wb.xlsx.writeBuffer();
       triggerDownload(buffer, `Presensi_Semua_Asdos_${new Date().toLocaleDateString('id-ID').replace(/\//g, '-')}.xlsx`);
-    } catch (err: any) {
-      console.error('Download failed:', err);
-      alert(`Gagal mengunduh file Excel: ${err?.message || err}`);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Download failed:', error);
+      alert(`Gagal mengunduh file Excel: ${error?.message || error}`);
     } finally {
       setDownloadPending(false);
     }
