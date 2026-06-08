@@ -203,6 +203,12 @@ export default function KoordinatorHome() {
         </div>
       </div>
 
+      {/* TEMPORARY DEBUG INFO */}
+      <div className="mb-6 p-4 bg-[#1e293b] border border-slate-700 text-slate-200 rounded-2xl font-mono text-xs overflow-auto max-w-3xl">
+        <p className="font-bold text-amber-400 mb-2">// DEBUG INFO (Mohon infokan isi ini ke Antigravity):</p>
+        <pre>{JSON.stringify({ user }, null, 2)}</pre>
+      </div>
+
       <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6 md:mb-8 max-w-3xl animate-fade-up" style={{ animationDelay: '0.05s' }}>
         <Link
           href="/koordinator/manajemen-kp"
