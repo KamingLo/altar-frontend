@@ -1,8 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { checkIsAsdos, checkIsKoordinator } from '@/lib/actions/auth/checkRole';
+import { getSession } from '@/lib/actions/auth/session';
+import { useUserStore } from '@/store/useUserStore';
 import type { UserRole } from '@/types/api';
 
 export const useRoleGuard = (expectedRole: UserRole) => {
@@ -17,8 +19,26 @@ export const useRoleGuard = (expectedRole: UserRole) => {
           ? await checkIsKoordinator()
           : await checkIsAsdos();
 
-      if (!cancelled && !check.success) {
+      if (cancelled) return;
+
+      if (!check.success) {
         router.replace('/auth/login');
+        return;
+      }
+
+      // Recover session state in Zustand if it is missing (e.g., after OAuth redirect or page refresh)
+      const { user, setUser, setRole } = useUserStore.getState();
+      if (!user) {
+        const sessionRes = await getSession();
+        if (!cancelled && sessionRes.success && sessionRes.data) {
+          setUser(sessionRes.data);
+          const derivedRole: UserRole | null = sessionRes.data.id_koordinator
+            ? 'koordinator'
+            : sessionRes.data.id_asisten
+            ? 'asdos'
+            : null;
+          setRole(derivedRole);
+        }
       }
     };
 
