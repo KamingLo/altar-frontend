@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, startTransition } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, startTransition, useRef } from 'react';
 import Image from 'next/image';
 import {
   CalendarDays,
@@ -23,14 +23,21 @@ import {
 } from '@/lib/actions/koordinator';
 import { fetchSemesters, fetchSessions } from '@/lib/actions/manajemen-jadwal';
 import { semesterLabel, pengajarDisplayName, todayIso } from '@/lib/jadwal-utils';
-import type { SemesterItem, SessionTimeline } from '@/types/api';
+import type { SessionTimeline } from '@/types/api';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { AsdosPageShell, AsdosPageHeader } from '@/components/dashboard/asdos/AsdosUI';
+import { useDataMasterStore } from '@/store/useDataMasterStore';
+import { useUserStore } from '@/store/useUserStore';
 
 const REFRESH_INTERVAL_SEC = 300; 
 
 export default function GenerateQrPage() {
-  const [semesters, setSemesters] = useState<SemesterItem[]>([]);
+  const semesters = useDataMasterStore((state) => state.semesterList);
+  const setSemesterStore = useDataMasterStore((state) => state.setSemester);
+  const todaySessionsCache = useDataMasterStore((state) => state.todaySessionsCache);
+  const setTodaySessionsCache = useDataMasterStore((state) => state.setTodaySessionsCache);
+  const { user } = useUserStore();
+
   const [selectedSemesterId, setSelectedSemesterId] = useState<string>('');
   const [todaySessions, setTodaySessions] = useState<SessionTimeline[]>([]);
   const [isSessionsLoading, setIsSessionsLoading] = useState(true);
@@ -47,7 +54,22 @@ export default function GenerateQrPage() {
   }, [semesters]);
 
   const [mode, setMode] = useState<'NORMAL' | 'KIOSK'>('NORMAL');
+  const [isChangePinFlow, setIsChangePinFlow] = useState(false);
   const [qrToken, setQrToken] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((message: string, type: 'error' | 'success' = 'error') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type });
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_SEC);
   const [, setRefreshCount] = useState(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
@@ -75,6 +97,7 @@ export default function GenerateQrPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isKioskActionLoading, setIsKioskActionLoading] = useState(false);
+  const [isQrLoading, setIsQrLoading] = useState(false);
 
   const [timeStr, setTimeStr] = useState('');
   const [dateStr, setDateStr] = useState('');
@@ -151,15 +174,21 @@ export default function GenerateQrPage() {
 
 
   const loadSemestersData = useCallback(async () => {
+    if (semesters.length > 0) {
+      if (!selectedSemesterId) {
+        setSelectedSemesterId(semesters[0].id);
+      }
+      return;
+    }
     setIsSessionsLoading(true);
     const semRes = await fetchSemesters();
     if (semRes.success && semRes.items.length > 0) {
-      setSemesters(semRes.items);
+      setSemesterStore(semRes.items, semRes.items.length >= 50, 1);
       setSelectedSemesterId(semRes.items[0].id);
     } else {
       setIsSessionsLoading(false);
     }
-  }, []);
+  }, [semesters, selectedSemesterId, setSemesterStore]);
 
   useEffect(() => {
     loadSemestersData();
@@ -167,6 +196,12 @@ export default function GenerateQrPage() {
 
   const loadSessionsData = useCallback(async (semesterId: string) => {
     if (!semesterId) return;
+    const cacheKey = `${user?.id || 'anonymous'}_${semesterId}`;
+    if (todaySessionsCache[cacheKey]) {
+      setTodaySessions(todaySessionsCache[cacheKey]);
+      setIsSessionsLoading(false);
+      return;
+    }
     setIsSessionsLoading(true);
     const today = todayIso();
     const schedRes = await fetchSessions({
@@ -176,11 +211,12 @@ export default function GenerateQrPage() {
     });
     if (schedRes.success) {
       setTodaySessions(schedRes.items);
+      setTodaySessionsCache(cacheKey, schedRes.items);
     } else {
       setTodaySessions([]);
     }
     setIsSessionsLoading(false);
-  }, []);
+  }, [user?.id, todaySessionsCache, setTodaySessionsCache]);
 
   useEffect(() => {
     if (selectedSemesterId) {
@@ -214,12 +250,14 @@ export default function GenerateQrPage() {
   }, []);
 
   const refreshQRToken = useCallback(async () => {
+    setIsQrLoading(true);
     const res = await generateQRToken();
     startTransition(() => {
       if (res.success && res.data?.qr_token) {
         setQrToken(res.data.qr_token);
         setCountdown(REFRESH_INTERVAL_SEC);
       }
+      setIsQrLoading(false);
     });
   }, []);
 
@@ -251,7 +289,7 @@ export default function GenerateQrPage() {
   }, [cooldownRemaining]);
 
   const handleManualRefresh = useCallback(async () => {
-    if (cooldownRemaining > 0) return;
+    if (cooldownRemaining > 0 || isQrLoading) return;
     await refreshQRToken();
     setCountdown(REFRESH_INTERVAL_SEC);
     setRefreshCount(prev => {
@@ -262,7 +300,7 @@ export default function GenerateQrPage() {
       }
       return next;
     });
-  }, [refreshQRToken, cooldownRemaining]);
+  }, [refreshQRToken, cooldownRemaining, isQrLoading]);
 
   const downloadQRCode = async () => {
     if (!qrToken) return;
@@ -356,10 +394,11 @@ export default function GenerateQrPage() {
   }, []);
 
   const handleActivateKioskClick = async () => {
+    setIsChangePinFlow(false);
     setIsKioskActionLoading(true);
     try {
 
-      const res = await verifyKioskPIN("0000");
+      const res = await verifyKioskPIN("0000", false);
       const pinNotConfigured = res.message && res.message.toLowerCase().includes('not set');
 
       if (pinNotConfigured) {
@@ -375,9 +414,10 @@ export default function GenerateQrPage() {
   };
 
   const handleAturUbahPinClick = async () => {
+    setIsChangePinFlow(true);
     setIsKioskActionLoading(true);
     try {
-      const res = await verifyKioskPIN("0000");
+      const res = await verifyKioskPIN("0000", false);
       const pinNotConfigured = res.message && res.message.toLowerCase().includes('not set');
 
       if (pinNotConfigured) {
@@ -421,7 +461,12 @@ export default function GenerateQrPage() {
       }
       const res = await setKioskPIN(newPin);
       if (res.success) {
-        transitionPinMode('VERIFY_ENTER');
+        if (isChangePinFlow) {
+          closePinModal();
+          showToast('PIN Kiosk berhasil diperbarui!', 'success');
+        } else {
+          transitionPinMode('VERIFY_ENTER');
+        }
       } else {
         setPinError(res.message || 'Gagal menyimpan PIN baru.');
       }
@@ -453,7 +498,7 @@ export default function GenerateQrPage() {
         setIsSubmitting(false);
         return;
       }
-      const res = await verifyKioskPIN(enteredPin);
+      const res = await verifyKioskPIN(enteredPin, false);
       if (res.success) {
 
         transitionPinMode('SET');
@@ -462,7 +507,7 @@ export default function GenerateQrPage() {
       }
     }
     setIsSubmitting(false);
-  }, [pinMode, isConfirmStep, newPin, confirmPin, enteredPin, transitionPinMode, closePinModal]);
+  }, [pinMode, isConfirmStep, newPin, confirmPin, enteredPin, transitionPinMode, closePinModal, isChangePinFlow, showToast]);
 
   const handleExitKiosk = useCallback(async () => {
     setExitError('');
@@ -825,12 +870,12 @@ export default function GenerateQrPage() {
                             <button
                               type="button"
                               onClick={handleManualRefresh}
-                              disabled={cooldownRemaining > 0}
+                              disabled={cooldownRemaining > 0 || isQrLoading}
                               className="absolute inset-0 flex flex-col items-center justify-center gap-2 hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <RefreshCw className="w-10 h-10 text-crimson" />
+                              <RefreshCw className={`w-10 h-10 text-crimson ${isQrLoading ? 'animate-spin' : ''}`} />
                               <span className="text-xs font-extrabold text-crimson tracking-wide">
-                                {cooldownRemaining > 0 ? `Tunggu ${cooldownRemaining}s` : 'Perbarui QR'}
+                                {isQrLoading ? 'Memuat...' : (cooldownRemaining > 0 ? `Tunggu ${cooldownRemaining}s` : 'Perbarui QR')}
                               </span>
                             </button>
                           )}
@@ -847,7 +892,8 @@ export default function GenerateQrPage() {
                         <button
                           type="button"
                           onClick={downloadQRCode}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-crimson text-white hover:bg-[#7a1728] active:scale-95 transition-all text-xs md:text-sm font-bold shadow-sm shadow-crimson/10"
+                          disabled={isQrLoading}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-crimson text-white hover:bg-[#7a1728] active:scale-95 transition-all text-xs md:text-sm font-bold shadow-sm shadow-crimson/10 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Download className="w-4 h-4" />
                           <span>Unduh QR</span>
@@ -855,11 +901,11 @@ export default function GenerateQrPage() {
                          <button
                           type="button"
                           onClick={handleManualRefresh}
-                          disabled={cooldownRemaining > 0}
+                          disabled={cooldownRemaining > 0 || isQrLoading}
                           className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 active:scale-95 transition-all text-xs md:text-sm font-bold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <RefreshCw className="w-4 h-4 text-slate-400" />
-                          <span>{cooldownRemaining > 0 ? `Tunggu ${cooldownRemaining}s` : 'Perbarui QR'}</span>
+                          <RefreshCw className={`w-4 h-4 text-slate-400 ${isQrLoading ? 'animate-spin' : ''}`} />
+                          <span>{isQrLoading ? 'Memuat...' : (cooldownRemaining > 0 ? `Tunggu ${cooldownRemaining}s` : 'Perbarui QR')}</span>
                         </button>
                       </div>
                     )}
@@ -995,7 +1041,7 @@ export default function GenerateQrPage() {
           />
           <div className="fixed inset-0 z-[10001] flex items-center justify-center pointer-events-none p-4">
             <div
-              className={`w-full max-w-sm bg-white rounded-[2rem] shadow-2xl p-7 pointer-events-auto border border-slate-100 flex flex-col items-center transition-all duration-300 ${isPinVisible && !isPinClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+              className={`w-full max-w-sm bg-white rounded-[2rem] shadow-2xl p-4 md:p-7 pointer-events-auto border border-slate-100 flex flex-col items-center transition-all duration-300 ${isPinVisible && !isPinClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
             >
               <div className="w-12 h-12 rounded-full bg-rose-50 text-crimson flex items-center justify-center mb-4">
                 <KeyRound className="w-6 h-6 animate-pulse" />
@@ -1048,13 +1094,13 @@ export default function GenerateQrPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-3.5 w-full max-w-[280px]">
+              <div className="grid grid-cols-3 gap-3 md:gap-3.5 w-full max-w-[260px] md:max-w-[280px]">
                 {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
                   <button
                     key={num}
                     type="button"
                     onClick={() => handleNumpadPress(num, 'PIN')}
-                    className="w-full aspect-square rounded-full border border-slate-100 bg-slate-50/60 hover:bg-slate-100/90 active:scale-95 text-xl font-black text-slate-700 transition-all flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.01)]"
+                    className="w-full aspect-square rounded-full border border-slate-100 bg-slate-50/60 hover:bg-slate-100/90 active:scale-95 text-base md:text-xl font-black text-slate-700 transition-all flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.01)]"
                   >
                     {num}
                   </button>
@@ -1065,7 +1111,7 @@ export default function GenerateQrPage() {
                 <button
                   type="button"
                   onClick={() => handleNumpadPress('0', 'PIN')}
-                  className="w-full aspect-square rounded-full border border-slate-100 bg-slate-50/60 hover:bg-slate-100/90 active:scale-95 text-xl font-black text-slate-700 transition-all flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.01)]"
+                  className="w-full aspect-square rounded-full border border-slate-100 bg-slate-50/60 hover:bg-slate-100/90 active:scale-95 text-base md:text-xl font-black text-slate-700 transition-all flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.01)]"
                 >
                   0
                 </button>
@@ -1231,6 +1277,28 @@ export default function GenerateQrPage() {
         </>
       )}
 
+      <div
+        className={`fixed left-1/2 -translate-x-1/2 top-8 z-[100] w-[calc(100%-3rem)] max-w-[400px] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          toast ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0 pointer-events-none'
+        }`}
+      >
+        {toast && (
+          <div className="bg-white shadow-[0_12px_40px_rgba(0,0,0,0.15)] rounded-2xl p-4 flex items-center gap-3">
+            <div className={`p-2 rounded-full shrink-0 ${toast.type === 'error' ? 'bg-[#FCA5A5]/30 text-[#DC2626]' : 'bg-[#86EFAC]/30 text-[#16A34A]'}`}>
+              {toast.type === 'error' ? (
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+            <span className="text-[#0D1B2A] text-[13px] font-bold leading-tight flex-1">{toast.message}</span>
+          </div>
+        )}
+      </div>
 
     </div>
   );

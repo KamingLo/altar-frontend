@@ -1,4 +1,4 @@
-﻿'use server';
+'use server';
 
 import { cookies } from 'next/headers';
 import { apiClient } from '@/lib/api/client';
@@ -7,10 +7,10 @@ export async function setKioskPIN(pin: string) {
   return apiClient.post('/koor/kiosk/pin', { pin }, { auth: true });
 }
 
-export async function verifyKioskPIN(pin: string) {
+export async function verifyKioskPIN(pin: string, saveToken = true) {
   const res = await apiClient.post<{ token: string }>('/koor/kiosk/verify', { pin }, { auth: true });
   
-  if (res.success && res.data?.token) {
+  if (saveToken && res.success && res.data?.token) {
     const cookieStore = await cookies();
     cookieStore.set('auth_token', res.data.token, {
       httpOnly: true,

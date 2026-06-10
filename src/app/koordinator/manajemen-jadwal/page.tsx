@@ -17,6 +17,8 @@ import {
   User,
   Users,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   buatSesi,
@@ -30,6 +32,7 @@ import {
 import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem, SessionTimeline } from '@/types/api';
 import type { AsdosListItem } from '@/lib/actions/manajemen';
 import type { LecturerItem } from '@/lib/actions/lecturer';
+import { useDataMasterStore } from '@/store/useDataMasterStore';
 import {
   HARI_OPTIONS,
   JAM_OPTIONS,
@@ -266,6 +269,106 @@ function DatePickerField({
   );
 }
 
+function ExpandedDatePicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(() => parseLocalDate(value));
+  const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+
+  React.useEffect(() => {
+    if (value) setViewDate(parseLocalDate(value));
+  }, [value]);
+
+  const monthStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  const monthEnd = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+  const offset = monthStart.getDay();
+  const days = Array.from({ length: monthEnd.getDate() }, (_, i) =>
+    new Date(viewDate.getFullYear(), viewDate.getMonth(), i + 1),
+  );
+
+  const changeMonth = (delta: number) =>
+    setViewDate(c => new Date(c.getFullYear(), c.getMonth() + delta, 1));
+
+  const pickDate = (date: Date) => {
+    onChange(toIsoDateFromDate(date));
+    setOpen(false);
+  };
+
+  const handleOpen = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const left = Math.min(rect.left, window.innerWidth - 296);
+      setPopupPos({ top: rect.bottom + 8, left: Math.max(8, left) });
+    }
+    setOpen(v => !v);
+  };
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={handleOpen}
+        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800 hover:border-slate-300 transition-all active:scale-95"
+      >
+        <Calendar size={15} className="text-slate-400 shrink-0" />
+        <span>{parseLocalDate(value).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+      </button>
+
+      {open && typeof document !== 'undefined' && createPortal(
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-[9999] w-[280px] bg-white border border-slate-100 rounded-[20px] p-4 shadow-xl"
+            style={{ top: popupPos.top, left: popupPos.left }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <button type="button" onClick={() => changeMonth(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50">
+                <ChevronLeft size={16} />
+              </button>
+              <p className="text-sm font-bold text-slate-800 capitalize">
+                {viewDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+              </p>
+              <button type="button" onClick={() => changeMonth(1)} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day, i) => (
+                <div key={`${day}-${i}`} className="h-7 flex items-center justify-center text-[10px] font-bold text-slate-400">{day}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: offset }).map((_, i) => <div key={i} />)}
+              {days.map(day => {
+                const iso = toIsoDateFromDate(day);
+                const selected = iso === value;
+                return (
+                  <button
+                    key={iso}
+                    type="button"
+                    onClick={() => pickDate(day)}
+                    className={`h-9 rounded-xl text-xs font-bold transition-all ${
+                      selected
+                        ? 'bg-obsidian text-white'
+                        : sameMonth(day, viewDate)
+                          ? 'text-slate-700 hover:bg-slate-50'
+                          : 'text-slate-300'
+                    }`}
+                  >
+                    {day.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -407,12 +510,10 @@ export default function ManajemenJadwalPage() {
     if (type === 'TABLE') {
       setTableDate(startDate);
     }
-    // No date range change — both views share the already-loaded sessions
   };
 
   const handleTableDateChange = (value: string) => {
     setTableDate(value);
-    // Only fetch when navigating outside the currently loaded range
     if (value < startDate || value > endDate) {
       setStartDate(value);
       setEndDate(toIsoDateFromDate(addDays(parseLocalDate(value), 6)));
@@ -624,6 +725,7 @@ export default function ManajemenJadwalPage() {
 
   const refreshSessions = useCallback(async () => {
     if (!selectedSemesterId) return;
+    useDataMasterStore.getState().clearTodaySessionsCache();
     setLoading(true);
     setFetchError(null);
     const res = await fetchSessions({
@@ -2163,21 +2265,7 @@ export default function ManajemenJadwalPage() {
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[200]" onClick={() => setIsTableExpanded(false)} />
           <div className="fixed inset-4 md:inset-8 z-[201] bg-white rounded-[12px] shadow-2xl flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 shrink-0">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTableDate(toIsoDateFromDate(addDays(parseLocalDate(tableDate), -1)))}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-crimson hover:border-crimson/30 transition-all active:scale-95 text-sm font-bold"
-                >‹</button>
-                <span className="text-sm font-extrabold text-slate-800">
-                  {parseLocalDate(tableDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setTableDate(toIsoDateFromDate(addDays(parseLocalDate(tableDate), 1)))}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-crimson hover:border-crimson/30 transition-all active:scale-95 text-sm font-bold"
-                >›</button>
-              </div>
+              <ExpandedDatePicker value={tableDate} onChange={handleTableDateChange} />
               <button type="button" onClick={() => setIsTableExpanded(false)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-crimson hover:border-crimson/30 transition-all active:scale-95">
                 <X size={16} />
               </button>

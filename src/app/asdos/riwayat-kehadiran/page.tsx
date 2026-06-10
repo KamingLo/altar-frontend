@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
-import { Search, Filter, Clock, MapPin, BookOpen, Info, Table2, LayoutList, Check } from 'lucide-react';
+import { Search, Filter, Clock, MapPin, BookOpen, Info, Table2, LayoutList, Check, AlertCircle } from 'lucide-react';
 import { getMyPresensi, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { getSessionsByDate } from '@/lib/actions/jadwal';
 import { AsdosPageHeader, AsdosPageShell, AsdosState } from '@/components/dashboard/asdos/AsdosUI';
@@ -19,12 +19,14 @@ type HistoryItem = {
   isVerified: boolean; isPaid: boolean;
   isOnline: boolean; linkVideo: string;
   forgotCheckout?: boolean;
+  isLate?: boolean;
   waktuCheckInRaw?: string;
 };
 
 type TeachingSessionInfo = {
   teachingTeam: string;
   isPengganti: boolean;
+  waktuMulai?: string;
   waktuSelesai?: string;
 };
 
@@ -115,6 +117,15 @@ function mapPresensiToHistory(item: PresensiResponseDTO, teachingInfoBySession: 
     return false;
   })();
 
+  const isLate = (() => {
+    if (!item.waktu_checkin || !teachingInfo?.waktuMulai) return false;
+    const [startH, startM] = teachingInfo.waktuMulai.split(':').map(Number);
+    if (isNaN(startH) || isNaN(startM)) return false;
+    const checkin = new Date(item.waktu_checkin);
+    if (isNaN(checkin.getTime())) return false;
+    return checkin.getHours() * 60 + checkin.getMinutes() > startH * 60 + startM;
+  })();
+
   return {
     id: item.id_presensi,
     subject: subjectDisplayName(item.nama_mata_kuliah, isPengganti),
@@ -146,6 +157,7 @@ function mapPresensiToHistory(item: PresensiResponseDTO, teachingInfoBySession: 
     isOnline: isOnlinePresensi(item),
     linkVideo: item.link_video || '',
     forgotCheckout,
+    isLate,
     waktuCheckInRaw: item.waktu_checkin,
   };
 }
@@ -212,10 +224,13 @@ export default function RiwayatKehadiranPage() {
           fetchedDatesRef.current.add(date);
           sessions.forEach(session => {
             if (session.pengajar) {
-              const waktuSelesai = session.waktu.split(', ').pop()?.split(' - ')[1]?.trim();
+              const timePart = session.waktu.split(', ').pop();
+              const waktuMulai = timePart?.split(' - ')[0]?.trim();
+              const waktuSelesai = timePart?.split(' - ')[1]?.trim();
               lookup[getTeachingLookupKey(date, session.id_sesi)] = {
                 teachingTeam: pengajarDisplayName(session.pengajar),
                 isPengganti: session.tipe_jadwal === 'PENGGANTI',
+                waktuMulai,
                 waktuSelesai,
               };
             }
@@ -426,7 +441,13 @@ export default function RiwayatKehadiranPage() {
                                 return (
                                   <tr
                                     key={item.id}
-                                    className="hover:bg-slate-50/40 transition-colors"
+                                    className={`transition-colors ${
+                                      (item.forgotCheckout || (item.checkOut === '--:--' && item.status === 'SELESAI'))
+                                        ? 'bg-crimson/5 hover:bg-crimson/10'
+                                        : item.isLate
+                                          ? 'bg-amber-50 hover:bg-amber-100/70'
+                                          : 'hover:bg-slate-50/40'
+                                    }`}
                                   >
                                     <td className="px-4 py-3 text-xs text-slate-400 font-medium">{currentNum}</td>
                                     <td className="px-4 py-3">
@@ -452,10 +473,24 @@ export default function RiwayatKehadiranPage() {
                                       <span className="text-xs text-slate-600 whitespace-nowrap">{formatDateCompact(item.rawDate)}</span>
                                     </td>
                                     <td className="px-4 py-3">
-                                      <span className="text-xs text-slate-600 font-mono whitespace-nowrap">{item.checkIn}</span>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-xs text-slate-600 font-mono whitespace-nowrap">{item.checkIn}</span>
+                                        {item.isLate && (
+                                          <span className="text-[8px] font-extrabold text-amber-600 border border-amber-400 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                                            Terlambat
+                                          </span>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="px-4 py-3">
-                                      <span className="text-xs text-slate-600 font-mono whitespace-nowrap">{item.checkOut}</span>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-xs text-slate-600 font-mono whitespace-nowrap">{item.checkOut}</span>
+                                        {(item.forgotCheckout || (item.checkOut === '--:--' && item.status === 'SELESAI')) && (
+                                          <span className="text-[8px] font-extrabold text-crimson border border-crimson/40 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                                            Auto Co
+                                          </span>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="px-4 py-3 min-w-[160px]">
                                       {item.materi && item.materi !== '-' ? (
@@ -507,78 +542,104 @@ export default function RiwayatKehadiranPage() {
               <p className="text-sm text-slate-400 mt-1">Riwayat akan muncul setelah Anda melakukan check-in.</p>
             </div>
           )
-        ) : displayed.length > 0 ? displayed.map(item => {
-          return (
+        ) : displayed.length > 0 ? (
+          <div className="flex flex-col gap-6">
+            {(() => {
+              const groups: { dateKey: string; label: string; items: HistoryItem[] }[] = [];
+              for (const item of displayed) {
+                const raw = item.rawDate.split('T')[0];
+                const date = new Date(item.rawDate);
+                const isValid = !isNaN(date.getTime());
+                const label = isValid
+                  ? date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                  : 'Tanggal Tidak Diketahui';
+                const existing = groups.find(g => g.dateKey === raw);
+                if (existing) existing.items.push(item);
+                else groups.push({ dateKey: raw, label, items: [item] });
+              }
+              return groups.map(({ dateKey, label, items }) => (
+                <div key={dateKey} className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">{label}</span>
+                    <div className="flex-1 h-px bg-slate-100" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {items.map(item => (
             <section
               key={item.id}
-              className="bg-white rounded-[12px] md:rounded-[32px] p-6 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col gap-6 w-full"
+              className="bg-white rounded-[12px] p-5 shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col gap-4 w-full"
             >
-              <article className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-
-                <div className="flex flex-col gap-1 w-full md:w-1/3">
-                  <div className="flex items-start gap-2 mb-1 flex-wrap">
-                    <h2 className="text-xl md:text-2xl font-bold text-slate-900 leading-snug">{item.subject}</h2>
+              <article className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-start gap-2 mb-0.5 flex-wrap">
+                    <h2 className="text-base font-bold text-slate-900 leading-snug">{item.subject}</h2>
                     {item.isOnline && (
-                      <span className="mt-1 border border-crimson text-crimson text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
+                      <span className="mt-0.5 border border-crimson text-crimson text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
                         Online
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-slate-500 font-medium">Kelas: {item.className}</p>
-                  <p className="text-sm text-slate-500 font-medium">Ruangan: {item.room}</p>
-                  <p className="text-sm text-slate-500 font-medium">Asisten Dosen: {item.teachingTeam}</p>
+                  <p className="text-xs text-slate-500 font-medium">Kelas: {item.className}</p>
+                  <p className="text-xs text-slate-500 font-medium">Ruangan: {item.room}</p>
+                  <p className="text-xs text-slate-500 font-medium">Asisten Dosen: {item.teachingTeam}</p>
                 </div>
 
-                <div className="flex flex-row gap-6 md:gap-8 w-full md:w-auto">
-                  <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
-                    <span className="text-sm md:text-base font-bold text-slate-800">{item.date}</span>
+                <div className="flex flex-row gap-5 border-t border-slate-100 pt-3">
+                  <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-3">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</span>
+                    <span className="text-xs font-bold text-slate-800">{item.date}</span>
                   </div>
-                  <div className="flex flex-col gap-1 border-l-2 border-slate-100 pl-4">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
-                    <span className="text-sm md:text-base font-bold text-slate-800">{item.checkIn} – {item.checkOut}</span>
+                  <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-3">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Waktu</span>
+                    <span className="text-xs font-bold text-slate-800">{item.checkIn} – {item.checkOut}</span>
                   </div>
                 </div>
-
               </article>
 
-              <div className="flex flex-wrap gap-2 -mt-2">
-                <span className={`px-3.5 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest ${item.isVerified ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+              <div className="flex flex-wrap gap-1.5">
+                <span className={`px-2.5 py-1.5 rounded-lg text-[9px] font-extrabold uppercase tracking-widest ${item.isVerified ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
                   {item.isVerified ? 'Sudah Diverifikasi' : 'Belum Diverifikasi'}
                 </span>
-                <span className={`px-3.5 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest ${item.isPaid ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                <span className={`px-2.5 py-1.5 rounded-lg text-[9px] font-extrabold uppercase tracking-widest ${item.isPaid ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
                   {item.isPaid ? 'Sudah Dibayar' : 'Belum Dibayar'}
                 </span>
               </div>
 
-              <div className="bg-fog rounded-[20px] p-5 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-slate-800">
-                  <Info className="w-[18px] h-[18px] text-slate-800" strokeWidth={2.5} />
-                  <span className="text-sm md:text-base font-bold text-slate-800">Bahasan Materi</span>
+              {(item.forgotCheckout || (item.checkOut === '--:--' && item.status === 'SELESAI')) ? (
+                <div className="rounded-[14px] border border-crimson/20 bg-crimson/5 px-3 py-2.5 flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 text-crimson shrink-0" />
+                  <p className="text-[11px] font-semibold text-crimson">Sesi ini di-checkout otomatis oleh sistem (Auto CO).</p>
                 </div>
-                <p className="text-sm text-slate-500 mt-1 ml-1 leading-relaxed">
-                  &quot;{item.materi}&quot;
-                </p>
-                {item.isOnline && item.linkVideo && (
-                  <a
-                    href={item.linkVideo}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ml-1 text-xs font-semibold text-crimson underline underline-offset-2 break-all"
-                  >
-                    {item.linkVideo}
-                  </a>
-                )}
-                 {(item.forgotCheckout || (item.checkOut === '--:--' && item.status === 'SELESAI')) && (
-                  <p className="text-xs font-semibold text-crimson mt-2 ml-1">
-                    Sesi ini di-checkout otomatis oleh sistem (Auto CO).
+              ) : (
+                <div className="bg-fog rounded-[14px] p-4 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5 text-slate-800">
+                    <Info className="w-4 h-4 text-slate-800" strokeWidth={2.5} />
+                    <span className="text-xs font-bold text-slate-800">Bahasan Materi</span>
+                  </div>
+                  <p className="text-xs text-slate-500 ml-1 leading-relaxed">
+                    &quot;{item.materi}&quot;
                   </p>
-                )}
-              </div>
+                  {item.isOnline && item.linkVideo && (
+                    <a
+                      href={item.linkVideo}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-1 text-[11px] font-semibold text-crimson underline underline-offset-2 break-all"
+                    >
+                      {item.linkVideo}
+                    </a>
+                  )}
+                </div>
+              )}
 
             </section>
-          );
-        }) : (
+                    ))}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        ) : (
           <div className="bg-white border border-slate-100 rounded-[12px] md:rounded-[32px] p-6 md:p-8 text-center">
             <div className="mx-auto mb-4 w-12 h-12 rounded-[14px] bg-fog flex items-center justify-center text-slate-500">
               <Clock size={20} />

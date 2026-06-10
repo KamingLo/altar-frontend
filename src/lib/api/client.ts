@@ -1,4 +1,4 @@
-﻿import { cookies } from 'next/headers';
+import { cookies } from 'next/headers';
 import type { ActionResponse } from '@/types/api';
 
 const BASE_URL = process.env.BACKEND_URL ?? '';
@@ -31,12 +31,15 @@ async function request<T = unknown>(
     }
   }
 
-  const fetchOptions: RequestInit = { method, headers };
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  const fetchOptions: RequestInit = { method, headers, signal: controller.signal };
   if (body !== undefined) fetchOptions.body = JSON.stringify(body);
   if (cache !== undefined) fetchOptions.cache = cache;
 
   try {
     const res = await fetch(`${BASE_URL}${endpoint}`, fetchOptions);
+    clearTimeout(timeoutId);
 
     let json: {
       success?: boolean;
@@ -62,8 +65,15 @@ async function request<T = unknown>(
       data: (json?.data !== undefined ? json.data : null) as T,
     };
   } catch (error) {
+    clearTimeout(timeoutId);
     console.error(`[API] ${method} ${endpoint}:`, error);
-    return { success: false, message: 'Gagal terhubung ke server' };
+    const isTimeout = error instanceof Error && error.name === 'AbortError';
+    return {
+      success: false,
+      message: isTimeout
+        ? 'Gagal terhubung ke server: Waktu koneksi habis (Timeout)'
+        : 'Gagal terhubung ke server',
+    };
   }
 }
 

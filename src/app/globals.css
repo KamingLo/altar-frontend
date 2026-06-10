@@ -26,6 +26,7 @@
 
 html,
 body {
+  overscroll-behavior-y: none;
   background: var(--color-canvas);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;

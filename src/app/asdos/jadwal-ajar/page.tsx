@@ -310,7 +310,7 @@ function ExpandedDatePicker({ value, onChange }: { value: string; onChange: (val
         ref={triggerRef}
         type="button"
         onClick={handleOpen}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-extrabold text-slate-800 hover:border-slate-300 transition-all active:scale-95"
+        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800 hover:border-slate-300 transition-all active:scale-95"
       >
         <Calendar size={15} className="text-slate-400 shrink-0" />
         <span>{parseLocalDate(value).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
@@ -683,8 +683,8 @@ export default function JadwalAjarPage() {
               </div>
             </div>
           )}
-          <div className="flex gap-2 items-center shrink-0">
-            <div className="flex bg-slate-100 p-0.5 rounded-xl md:w-[260px] shrink-0">
+          <div className="flex gap-2 items-center w-full md:w-auto md:shrink-0">
+            <div className="flex bg-slate-100 p-0.5 rounded-xl w-full md:w-[260px] shrink-0">
               {(['PERSONAL', 'ALL'] as const).map(mode => (
                 <button
                   key={mode}

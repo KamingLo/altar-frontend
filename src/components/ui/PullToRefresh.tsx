@@ -20,6 +20,27 @@ export function PullToRefresh() {
 
   const onTouchStart = useCallback((e: TouchEvent) => {
     if (getScrollTop() > 0) return;
+
+    let el = e.target as HTMLElement | null;
+    while (el && el !== document.body) {
+      if (
+        el.classList.contains('fixed') ||
+        el.classList.contains('absolute') ||
+        el.classList.contains('z-50') ||
+        el.classList.contains('z-[201]') ||
+        el.classList.contains('z-[200]')
+      ) {
+        return;
+      }
+      try {
+        const style = window.getComputedStyle(el);
+        if (style.position === 'fixed' || style.position === 'absolute') {
+          return;
+        }
+      } catch {}
+      el = el.parentElement;
+    }
+
     startY.current = e.touches[0].clientY;
     active.current = true;
   }, []);

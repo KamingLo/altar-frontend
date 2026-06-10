@@ -15,8 +15,6 @@ export async function getSession() {
 
   const result = await apiClient.get<UserData>('/auth/me', { auth: true, cache: 'no-store' });
 
-  // Supplement missing role IDs from JWT payload (handles cases where OAuth token
-  // only returns one role from the API but the JWT itself encodes both)
   if (result.success && result.data) {
     const payload = decodeJwtPayload(token);
     console.log('[getSession] /auth/me data:', JSON.stringify(result.data));

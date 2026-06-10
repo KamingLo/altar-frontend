@@ -12,7 +12,6 @@ import { useDataMasterStore } from '@/store/useDataMasterStore';
 import { getMyPresensi } from '@/lib/actions/presensi';
 import { getSessionsByDate } from '@/lib/actions/jadwal';
 import { getSemesterList, getRuanganList } from '@/lib/actions/data-master';
-import { DashboardLoading } from '@/components/dashboard/DashboardLoading';
 
 export default function AsdosLayout({ children }: { children: React.ReactNode }) {
   const { isLoading } = useRoleGuard('asdos');
@@ -27,7 +26,8 @@ export default function AsdosLayout({ children }: { children: React.ReactNode })
 
     setPrefetching();
 
-    const today = new Date().toISOString().slice(0, 10);
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     Promise.all([
       getMyPresensi(),
@@ -52,14 +52,14 @@ export default function AsdosLayout({ children }: { children: React.ReactNode })
           setRuangan(items, items.length >= 200, 1);
         }
       })
-      .catch(() => { /* fetch errors are non-fatal; pages handle their own error states */ })
+      .catch(() => {})
       .finally(() => {
         setPrefetched();
       });
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (isLoading || !user) {
-    return <DashboardLoading />;
+    return null;
   }
 
   const menuGroups: MenuGroup[] = [];

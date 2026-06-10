@@ -9,13 +9,21 @@ import type { UserRole } from '@/types/api';
 
 export const useRoleGuard = (expectedRole: UserRole) => {
   const router = useRouter();
+  const user = useUserStore((state) => state.user);
+  const role = useUserStore((state) => state.role);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (user && role === expectedRole) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsLoading(false);
+    }
+  }, [user, role, expectedRole]);
 
   useEffect(() => {
     let cancelled = false;
 
     const verify = async () => {
-      setIsLoading(true);
       const check =
         expectedRole === 'koordinator'
           ? await checkIsKoordinator()
@@ -24,13 +32,13 @@ export const useRoleGuard = (expectedRole: UserRole) => {
       if (cancelled) return;
 
       if (!check.success) {
+        useUserStore.getState().clearUser();
         router.replace('/auth/login');
         return;
       }
 
-      // Recover session state in Zustand if it is missing (e.g., after OAuth redirect or page refresh)
-      const { user, setUser, setRole } = useUserStore.getState();
-      if (!user) {
+      const { user: currentUser, setUser, setRole } = useUserStore.getState();
+      if (!currentUser) {
         const sessionRes = await getSession();
         if (!cancelled && sessionRes.success && sessionRes.data) {
           setUser(sessionRes.data);

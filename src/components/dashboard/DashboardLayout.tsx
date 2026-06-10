@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Menu, LogOut, ChevronRight, Home, ChevronsLeft, ChevronsRight, ChevronDown, GraduationCap, LayoutDashboard, ArrowLeftRight, Bell } from 'lucide-react';
@@ -99,11 +99,48 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
 
   const lastPollTimeRef = useRef<number>(0);
   const pollingRef = useRef(false);
+  const swipeStartXRef = useRef(0);
+  const swipeStartYRef = useRef(0);
+  const isEdgeSwipeRef = useRef(false);
+
+  const handleMainTouchStart = useCallback((e: React.TouchEvent) => {
+    swipeStartXRef.current = e.touches[0].clientX;
+    swipeStartYRef.current = e.touches[0].clientY;
+
+    let el = e.target as HTMLElement | null;
+    while (el) {
+      const ox = window.getComputedStyle(el).overflowX;
+      if ((ox === 'auto' || ox === 'scroll') && el.scrollWidth > el.clientWidth) {
+        isEdgeSwipeRef.current = false;
+        return;
+      }
+      el = el.parentElement;
+    }
+
+    isEdgeSwipeRef.current = swipeStartXRef.current > 15 && swipeStartXRef.current < 220;
+  }, []);
+
+  const handleMainTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!isEdgeSwipeRef.current) return;
+    isEdgeSwipeRef.current = false;
+    const dx = e.changedTouches[0].clientX - swipeStartXRef.current;
+    const dy = Math.abs(e.changedTouches[0].clientY - swipeStartYRef.current);
+    if (dx > 60 && dx > dy) setIsSidebarOpen(true);
+  }, []);
+
+  const handleSidebarTouchStart = useCallback((e: React.TouchEvent) => {
+    swipeStartXRef.current = e.touches[0].clientX;
+    swipeStartYRef.current = e.touches[0].clientY;
+  }, []);
+
+  const handleSidebarTouchEnd = useCallback((e: React.TouchEvent) => {
+    const dx = e.changedTouches[0].clientX - swipeStartXRef.current;
+    const dy = Math.abs(e.changedTouches[0].clientY - swipeStartYRef.current);
+    if (dx < -60 && Math.abs(dx) > dy) setIsSidebarOpen(false);
+  }, []);
 
   useEffect(() => {
     if (pathname === homeHref) {
-      // If we are on homeHref, the home component itself handles fetching latest counts,
-      // so we can mark the last poll time as now to avoid immediate polling when navigating away.
       lastPollTimeRef.current = Date.now();
       return;
     }
@@ -113,7 +150,6 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
 
       const now = Date.now();
       if (now - lastPollTimeRef.current < 30000) {
-        // Skip API calls if fetched less than 30 seconds ago
         return;
       }
 
@@ -131,7 +167,8 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
           setPendingCount(count);
         } else {
           const { lastSeenKpId, lastSeenPresensiId } = useNotificationStore.getState();
-          const today = new Date().toISOString().split('T')[0];
+          const d = new Date();
+          const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
           const [kpRes, presensiRes] = await Promise.all([
             getAllSubstitutions(),
             getMyPresensi(),
@@ -448,6 +485,8 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
         <main
           className="relative z-10 w-full max-w-md lg:max-w-none h-screen bg-transparent overflow-hidden flex flex-col mx-auto lg:mx-0 transition-all duration-300"
           style={{ fontFamily: "'Inter', sans-serif" }}
+          onTouchStart={handleMainTouchStart}
+          onTouchEnd={handleMainTouchEnd}
         >
           <header
             id="dashboard-header-desktop"
@@ -542,18 +581,24 @@ export default function DashboardLayout({ menuGroups, children, homeHref, bgImag
           <div
             id="dashboard-children-container"
             onScroll={(e) => setIsScrolled((e.target as HTMLDivElement).scrollTop > 8)}
-            className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-6 lg:px-12 pt-20 lg:pt-24 pb-20"
+            className="relative z-10 flex-1 overflow-y-auto overscroll-y-none no-scrollbar px-6 lg:px-12 pt-20 lg:pt-24 pb-20"
           >
             {children}
           </div>
 
-          <div className={`lg:hidden fixed inset-0 z-50 ${isSidebarOpen ? '' : 'pointer-events-none'}`}>
+          <div
+            className={`lg:hidden fixed inset-0 z-50 ${isSidebarOpen ? '' : 'pointer-events-none'}`}
+            onTouchStart={handleSidebarTouchStart}
+            onTouchEnd={handleSidebarTouchEnd}
+          >
             <div
               className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ease-in-out ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
               onClick={() => setIsSidebarOpen(false)}
             />
             <div
               className={`absolute top-0 left-0 w-[280px] h-[calc(100dvh-1.5rem)] my-3 ml-3 rounded-[1.5rem] shadow-[20px_0_40px_rgba(0,0,0,0.2)] flex flex-col overscroll-none overflow-x-hidden transition-all duration-300 ease-in-out transform-gpu bg-crimson ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[110%]'}`}
+              onTouchStart={handleSidebarTouchStart}
+              onTouchEnd={handleSidebarTouchEnd}
             >
               <div className="pt-8 pb-6 px-6 border-b border-white/10 shrink-0">
                 <Image src="/logo-sb.png" alt="Logo" width={160} height={32} className="h-8 w-auto object-contain drop-shadow-md" style={{ width: 'auto' }} />

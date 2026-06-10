@@ -28,6 +28,7 @@ type ModalForm = {
 };
 
 const EditIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const TrashIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
 const PhoneIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>;
 const UserIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
@@ -77,7 +78,6 @@ export default function ManajemenAsdosPage() {
     toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   }, []);
 
-  const isFirstTabChange = useRef(true);
   const loadedTabsRef = useRef<Set<TabId>>(new Set());
 
   const [addStep, setAddStep] = useState<AddStep>('role_search');
@@ -144,20 +144,7 @@ export default function ManajemenAsdosPage() {
     setIsLoading(false);
   }, [setAsdos, setKoor, setUsers, setIsLoading, showToast]);
 
-  useEffect(() => {
-    if (loadedTabsRef.current.size > 0) return;
-    const loadAll = async () => {
-      setIsLoading(true);
-      const [asdosRes, koorRes, userRes] = await Promise.all([
-        getAsdosList(1, ''), getKoorList(1, ''), getUserList(1, ''),
-      ]);
-      if (asdosRes.success && asdosRes.data) { setAsdos(asdosRes.data, asdosRes.data.length === 10, 1); loadedTabsRef.current.add('asdos'); }
-      if (koorRes.success && koorRes.data) { setKoor(koorRes.data, koorRes.data.length === 10, 1); loadedTabsRef.current.add('koordinator'); }
-      if (userRes.success && userRes.data) { setUsers(userRes.data, userRes.data.length === 10, 1); loadedTabsRef.current.add('user'); }
-      setIsLoading(false);
-    };
-    loadAll();
-  }, [setAsdos, setKoor, setUsers, setIsLoading]);
+
 
   useEffect(() => {
     return () => {
@@ -174,11 +161,6 @@ export default function ManajemenAsdosPage() {
   }, []);
 
   useEffect(() => {
-    if (isFirstTabChange.current) {
-      isFirstTabChange.current = false;
-      return;
-    }
-
     if (!searchQuery && statusFilter === 'active' && loadedTabsRef.current.has(activeTab)) return;
     const timer = setTimeout(() => {
       loadTabData(activeTab, searchQuery, 1, false, statusFilter !== 'active');
@@ -221,6 +203,7 @@ export default function ManajemenAsdosPage() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleOpenDeleteConfirm = (item: DisplayItem) => {
     setModalType('delete');
     setSelectedId(item.id);
@@ -352,7 +335,7 @@ export default function ManajemenAsdosPage() {
     }
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail.endsWith('@stu.untar.ac.id')) {
-      setFormError('Format email salah. Harus menggunakan domain @stu.untar.ac.id.');
+      setFormError('Email harus menggunakan domain @stu.untar.ac.id.');
       return;
     }
     setIsSubmitting(true);
@@ -442,7 +425,7 @@ export default function ManajemenAsdosPage() {
   const identifierLabel = activeTab === 'asdos' ? 'NIM' : activeTab === 'koordinator' ? 'NIP' : 'Email';
 
   return (
-    <AsdosPageShell>
+    <AsdosPageShell scrollTopBottom="bottom-24">
 
       <AsdosPageHeader
         eyebrow="Manajemen User"
@@ -588,14 +571,6 @@ export default function ManajemenAsdosPage() {
                   >
                     <EditIcon />
                   </button>
-                  <button
-                    onClick={() => handleOpenDeleteConfirm(item)}
-                    className="p-2.5 hover:text-crimson rounded-xl transition-colors"
-                    aria-label="Hapus user"
-                    title="Hapus user"
-                  >
-                    <TrashIcon />
-                  </button>
                 </div>
               )}
             </div>
@@ -635,7 +610,7 @@ export default function ManajemenAsdosPage() {
         </p>
       </div>
 
-      {showAddButton && (
+{showAddButton && (
         <button
           onClick={() => handleOpenModal('add')}
           className="md:hidden fixed bottom-7 right-4 w-14 h-14 bg-crimson text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-800 active:scale-90 transition-transform shadow-crimson/30 z-20"
@@ -778,7 +753,7 @@ export default function ManajemenAsdosPage() {
                               value={modalForm.email}
                               onChange={(e) => setModalForm(prev => ({ ...prev, email: e.target.value }))}
                               className="w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-crimson focus:ring-1 focus:ring-crimson outline-none"
-                              placeholder="contoh@email.com"
+                              placeholder="nama@stu.untar.ac.id"
                               autoComplete="off"
                             />
                           </div>

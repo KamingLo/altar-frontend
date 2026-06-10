@@ -74,6 +74,47 @@ function parseWaktuStartMinutes(waktu: string): number | null {
   return parseInt(match[1]) * 60 + parseInt(match[2]);
 }
 
+function getAutoCheckOutTimeStr(waktu: string | undefined): string | null {
+  if (!waktu) return null;
+  const parts = String(waktu).split(' - ');
+  if (parts.length < 2) return null;
+  const endPart = parts[1].trim();
+  const match = endPart.match(/(\d{1,2})[:.h](\d{2})/);
+  if (!match) return null;
+  const hour = parseInt(match[1]);
+  const minute = parseInt(match[2]);
+  
+  let newMinute = minute + 30;
+  let newHour = hour;
+  if (newMinute >= 60) {
+    newHour += Math.floor(newMinute / 60);
+    newMinute = newMinute % 60;
+  }
+  newHour = newHour % 24;
+  
+  const hStr = String(newHour).padStart(2, '0');
+  const mStr = String(newMinute).padStart(2, '0');
+  return `${hStr}:${mStr}`;
+}
+
+function isPastAutoCheckout(tanggalMengajar: string, waktu: string | undefined): boolean {
+  if (!tanggalMengajar || !waktu) return false;
+  const parts = String(waktu).split(' - ');
+  if (parts.length < 2) return false;
+  const endPart = parts[1].trim();
+  const match = endPart.match(/(\d{1,2})[:.h](\d{2})/);
+  if (!match) return false;
+  const endH = parseInt(match[1]);
+  const endM = parseInt(match[2]);
+  
+  const datePart = tanggalMengajar.split('T')[0];
+  const [y, m, d] = datePart.split('-').map(Number);
+  if (!y || !m || !d) return false;
+  
+  const deadline = new Date(y, m - 1, d, endH, endM + 30, 0, 0);
+  return new Date() > deadline;
+}
+
 function isCheckInLate(waktu_checkin: string | Date, sessionStartMinutes: number | undefined): boolean {
   if (sessionStartMinutes === undefined) return false;
   const d = new Date(waktu_checkin);
@@ -139,14 +180,17 @@ function buildAsdosWorksheet(
   asdosName: string,
   info: { nim: string; email: string; phone: string },
   items: PresensiResponseDTO[],
+  sessionWaktuMap: Map<string, string>,
+  sessionStartMap: Map<string, number>,
 ) {
-  const NUM_COLS = 10;
-  const colWidthsEx = [4, 30, 10, 18, 8, 8, 35, 20, 14, 13];
+  const NUM_COLS = 11;
+  const colWidthsEx = [14, 30, 10, 18, 8, 8, 20, 35, 20, 14, 13];
   colWidthsEx.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+  const thinBorder = (argb = 'FFE2E8F0'): Partial<ExcelJS.Border> => ({ style: 'thin', color: { argb } });
 
   let r = 1;
 
-  // ── Title ──
   ws.mergeCells(r, 1, r, NUM_COLS);
   const titleCell = ws.getCell(r, 1);
   titleCell.value = 'LAPORAN PRESENSI ASISTEN DOSEN';
@@ -156,7 +200,6 @@ function buildAsdosWorksheet(
   ws.getRow(r).height = 26;
   r++;
 
-  // ── Asdos info rows ──
   const infoLabelFill: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
   const infoValueFill: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
   const infoRows: [string, string][] = [
@@ -180,10 +223,38 @@ function buildAsdosWorksheet(
     ws.getRow(r).height = 18;
     r++;
   }
-  r++; // empty gap
 
-  // ── Table header ──
-  const headers = ['No', 'Nama Pelajaran', 'Kelas', 'Tgl Perkuliahan', 'Mulai', 'Selesai', 'Bahasan Materi', 'Pengajar Rekan', 'Verifikasi', 'Pembayaran'];
+  const legendLabel = ws.getCell(r, 1);
+  legendLabel.value = 'Keterangan:';
+  legendLabel.font = { bold: true, size: 9, color: { argb: 'FF475569' } };
+  legendLabel.alignment = { horizontal: 'right', vertical: 'middle' };
+  
+  ws.mergeCells(r, 2, r, 4);
+  const lateLegend = ws.getCell(r, 2);
+  lateLegend.value = 'Terlambat Check-In';
+  lateLegend.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDF4D0' } };
+  lateLegend.font = { size: 9, color: { argb: 'FF92400E' }, bold: true };
+  lateLegend.alignment = { horizontal: 'center', vertical: 'middle' };
+  lateLegend.border = {
+    top: thinBorder('FFE2E8F0'), bottom: thinBorder('FFE2E8F0'),
+    left: thinBorder('FFE2E8F0'), right: thinBorder('FFE2E8F0'),
+  };
+
+  ws.mergeCells(r, 5, r, 8);
+  const forgotLegend = ws.getCell(r, 5);
+  forgotLegend.value = 'Otomatis Check-Out (Auto CO)';
+  forgotLegend.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEBEF' } };
+  forgotLegend.font = { size: 9, color: { argb: 'FF991B1B' }, bold: true };
+  forgotLegend.alignment = { horizontal: 'center', vertical: 'middle' };
+  forgotLegend.border = {
+    top: thinBorder('FFE2E8F0'), bottom: thinBorder('FFE2E8F0'),
+    left: thinBorder('FFE2E8F0'), right: thinBorder('FFE2E8F0'),
+  };
+  ws.getRow(r).height = 18;
+  r++;
+  r++;
+
+  const headers = ['No', 'Nama Pelajaran', 'Kelas', 'Tgl Perkuliahan', 'Mulai', 'Selesai', 'Link Video', 'Bahasan Materi', 'Pengajar Rekan', 'Verifikasi', 'Pembayaran'];
   headers.forEach((h, i) => {
     const cell = ws.getCell(r, i + 1);
     cell.value = h;
@@ -200,7 +271,6 @@ function buildAsdosWorksheet(
   ws.getRow(r).height = 20;
   r++;
 
-  // ── Group by month ──
   const groups: { key: string; label: string; items: PresensiResponseDTO[] }[] = [];
   const sorted = [...items].sort((a, b) => {
     const dateA = a.tanggal_mengajar || '';
@@ -218,11 +288,8 @@ function buildAsdosWorksheet(
     else groups.push({ key, label, items: [item] });
   }
 
-  const thinBorder = (argb = 'FFE2E8F0'): Partial<ExcelJS.Border> => ({ style: 'thin', color: { argb } });
-
   let rowNum = 0;
   for (const { label, items: groupItems } of groups) {
-    // Month header
     ws.mergeCells(r, 1, r, NUM_COLS);
     const mc = ws.getCell(r, 1);
     mc.value = label.toUpperCase();
@@ -236,8 +303,20 @@ function buildAsdosWorksheet(
     for (const item of groupItems) {
       rowNum++;
       const isOdd = rowNum % 2 !== 0;
-      const rowArgb = isOdd ? 'FFFFFFFF' : 'FFF8FAFC';
       const borderColor = 'FFE2E8F0';
+
+      const isOnline = item.tipe_absensi === 'link';
+      const isLate = isCheckInLate(item.waktu_checkin, (item.id_sesi_pengganti ? sessionStartMap.get(item.id_sesi_pengganti) : null) || sessionStartMap.get(item.id_sesi));
+      const checkoutEmpty = !item.waktu_checkout || item.waktu_checkout === '' || item.waktu_checkout === 'null' || String(item.waktu_checkout).startsWith('0001');
+      const waktuSesi = (item.id_sesi_pengganti ? sessionWaktuMap.get(item.id_sesi_pengganti) : null) || sessionWaktuMap.get(item.id_sesi);
+      const isForgotCheckout = !isOnline && checkoutEmpty && waktuSesi && isPastAutoCheckout(item.tanggal_mengajar || item.waktu_checkin || '', waktuSesi);
+
+      let rowArgb = isOdd ? 'FFFFFFFF' : 'FFF8FAFC';
+      if (isForgotCheckout) {
+        rowArgb = 'FFFFEBEF';
+      } else if (isLate) {
+        rowArgb = 'FFFDF4D0';
+      }
 
       const values: (string | number)[] = [
         rowNum,
@@ -245,7 +324,16 @@ function buildAsdosWorksheet(
         item.nama_kelas || '-',
         formatDateCompact(item.tanggal_mengajar),
         formatTime(item.waktu_checkin),
-        item.tipe_absensi === 'link' ? 'Online' : (formatTime(item.waktu_checkout) || '-'),
+        (() => {
+          if (checkoutEmpty) {
+            if (waktuSesi && isPastAutoCheckout(item.tanggal_mengajar || item.waktu_checkin || '', waktuSesi)) {
+              return getAutoCheckOutTimeStr(waktuSesi) || '-';
+            }
+            return '-';
+          }
+          return formatTime(item.waktu_checkout);
+        })(),
+        isOnline ? (item.link_video || '-') : '-',
         item.deskripsi_materi || '-',
         item.nama_asdos_rekan || '-',
         item.is_verified ? 'Terverifikasi' : 'Pending',
@@ -259,11 +347,11 @@ function buildAsdosWorksheet(
           top: thinBorder(borderColor), bottom: thinBorder(borderColor),
           left: thinBorder(borderColor), right: thinBorder(borderColor),
         };
-        cell.alignment = { vertical: 'middle', wrapText: i === 6 };
-        if (i === 8) {
+        cell.alignment = { vertical: 'middle', wrapText: i === 7 };
+        if (i === 9) {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: item.is_verified ? 'FFD1FAE5' : 'FFFEF9C3' } };
           cell.font = { size: 9, bold: true, color: { argb: item.is_verified ? 'FF065F46' : 'FF92400E' } };
-        } else if (i === 9) {
+        } else if (i === 10) {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: item.is_paid ? 'FFD1FAE5' : 'FFFEE2E2' } };
           cell.font = { size: 9, bold: true, color: { argb: item.is_paid ? 'FF065F46' : 'FF991B1B' } };
         } else {
@@ -275,6 +363,29 @@ function buildAsdosWorksheet(
       ws.getRow(r).height = 16;
       r++;
     }
+  }
+}
+
+function getSemesterDateRange(tahunAjaran: string, tipeSemester: string): { start_date: string; end_date: string } {
+  const years = tahunAjaran.split('/');
+  const yearStart = parseInt(years[0]);
+  const yearEnd = parseInt(years[1]) || (yearStart + 1);
+
+  if (tipeSemester === 'Ganjil') {
+    return {
+      start_date: `${yearStart}-08-01`,
+      end_date: `${yearEnd}-01-31`
+    };
+  } else if (tipeSemester === 'Genap') {
+    return {
+      start_date: `${yearEnd}-02-01`,
+      end_date: `${yearEnd}-07-31`
+    };
+  } else {
+    return {
+      start_date: `${yearEnd}-06-01`,
+      end_date: `${yearEnd}-08-31`
+    };
   }
 }
 
@@ -304,6 +415,7 @@ export default function DataPresensiPage() {
   const downloadMenuRef = useRef<HTMLDivElement>(null);
   const downloadMenuRefMobile = useRef<HTMLDivElement>(null);
   const [sessionStartMap, setSessionStartMap] = useState<Map<string, number>>(new Map());
+  const [sessionWaktuMap, setSessionWaktuMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     if (pageTab === 'PAY' && typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -341,17 +453,43 @@ export default function DataPresensiPage() {
   }, []);
 
   useEffect(() => {
-    if (MOCK_MODE || !semesterFilter) return;
-    getAllSessions({ id_semester: semesterFilter }).then((res) => {
-      if (!res.success || !res.data) return;
-      const map = new Map<string, number>();
-      for (const s of res.data.items) {
-        const mins = parseWaktuStartMinutes(s.waktu);
-        if (mins !== null) map.set(s.id_sesi, mins);
+    if (MOCK_MODE) return;
+    const targetSemesters = semesterFilter 
+      ? semesters.filter(s => s.id === semesterFilter)
+      : semesters;
+      
+    if (targetSemesters.length === 0) return;
+    
+    Promise.all(targetSemesters.map(async (sem) => {
+      const range = getSemesterDateRange(sem.tahun_ajaran, sem.tipe_semester);
+      try {
+        const res = await getAllSessions({
+          id_semester: sem.id,
+          start_date: range.start_date,
+          end_date: range.end_date,
+        });
+        return { semId: sem.id, success: res.success, data: res.data };
+      } catch (e) {
+        console.error(e);
+        return { semId: sem.id, success: false, data: null };
       }
-      setSessionStartMap(map);
-    }).catch(() => { });
-  }, [semesterFilter]);
+    })).then((results) => {
+      const startMap = new Map<string, number>();
+      const waktuMap = new Map<string, string>();
+      
+      for (const res of results) {
+        if (res.success && res.data?.items) {
+          for (const s of res.data.items) {
+            const mins = parseWaktuStartMinutes(s.waktu);
+            if (mins !== null) startMap.set(s.id_sesi, mins);
+            waktuMap.set(s.id_sesi, s.waktu);
+          }
+        }
+      }
+      setSessionStartMap(startMap);
+      setSessionWaktuMap(waktuMap);
+    });
+  }, [semesterFilter, semesters]);
 
   const fetchPresensi = useCallback(async (silent = false, semId?: string, retryCount = 0) => {
     if (MOCK_MODE) return;
@@ -584,7 +722,7 @@ export default function DataPresensiPage() {
       const info = await fetchAsdosInfo(selectedAsdosName);
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet(selectedAsdosName.slice(0, 31));
-      buildAsdosWorksheet(ws, selectedAsdosName, info, payTableData);
+      buildAsdosWorksheet(ws, selectedAsdosName, info, payTableData, sessionWaktuMap, sessionStartMap);
       const buffer = await wb.xlsx.writeBuffer();
       triggerDownload(buffer, `Presensi_${selectedAsdosName}_${new Date().toLocaleDateString('id-ID').replace(/\//g, '-')}.xlsx`);
     } catch (err: unknown) {
@@ -594,7 +732,7 @@ export default function DataPresensiPage() {
     } finally {
       setDownloadPending(false);
     }
-  }, [payTableData, selectedAsdosName, downloadPending]);
+  }, [payTableData, selectedAsdosName, downloadPending, sessionWaktuMap, sessionStartMap]);
 
   const handleDownloadSplitExcel = useCallback(async () => {
     console.log('handleDownloadSplitExcel clicked', { presensiListLength: presensiList.length, downloadPending });
@@ -618,7 +756,7 @@ export default function DataPresensiPage() {
         const info = infos[index];
         const items = asdosMap.get(name) || [];
         const ws = wb.addWorksheet(name.slice(0, 31));
-        buildAsdosWorksheet(ws, name, info, items);
+        buildAsdosWorksheet(ws, name, info, items, sessionWaktuMap, sessionStartMap);
       });
       const buffer = await wb.xlsx.writeBuffer();
       triggerDownload(buffer, `Presensi_Semua_Asdos_${new Date().toLocaleDateString('id-ID').replace(/\//g, '-')}.xlsx`);
@@ -629,7 +767,7 @@ export default function DataPresensiPage() {
     } finally {
       setDownloadPending(false);
     }
-  }, [presensiList, downloadPending]);
+  }, [presensiList, downloadPending, sessionWaktuMap, sessionStartMap]);
 
 
   return (
@@ -658,7 +796,7 @@ export default function DataPresensiPage() {
                   className={`flex-1 h-10 flex items-center justify-center gap-2 px-3 rounded-[8px] text-[11px] font-bold transition-all ${pageTab === t ? 'bg-white text-crimson shadow-sm' : 'text-slate-400 hover:text-slate-600'
                     }`}
                 >
-                  {t === 'VERIFY' ? 'Verifikasi' : 'Pembayaran'}
+                  {t === 'VERIFY' ? 'Verifikasi' : 'Rekapitulasi'}
                 </button>
               ))}
             </div>
@@ -1056,7 +1194,7 @@ export default function DataPresensiPage() {
                               const isLink = item.tipe_absensi === 'link';
                               const videoUrl = toExternalUrl(item.link_video);
                               const isCheckoutEmpty = !isLink && (!item.waktu_checkout || item.waktu_checkout === '' || item.waktu_checkout === 'null' || String(item.waktu_checkout).startsWith('0001'));
-                              const isLate = isCheckInLate(item.waktu_checkin, sessionStartMap.get(item.id_sesi));
+                              const isLate = isCheckInLate(item.waktu_checkin, (item.id_sesi_pengganti ? sessionStartMap.get(item.id_sesi_pengganti) : null) || sessionStartMap.get(item.id_sesi));
                               return (
                                 <section
                                   key={item.id_presensi}
@@ -1084,7 +1222,12 @@ export default function DataPresensiPage() {
                                           )}
                                           {isCheckoutEmpty && (
                                             <span className="text-[8px] font-extrabold text-crimson border border-crimson/40 px-1.5 py-0.5 rounded uppercase shrink-0">
-                                              Tidak Checkout
+                                              Auto Co
+                                            </span>
+                                          )}
+                                          {isLink && (
+                                            <span className="text-[8px] font-extrabold text-crimson border border-crimson/40 px-1.5 py-0.5 rounded uppercase shrink-0">
+                                              Online
                                             </span>
                                           )}
                                         </div>
@@ -1114,7 +1257,16 @@ export default function DataPresensiPage() {
                                         <div className="flex flex-col gap-0.5 border-l-2 border-slate-100 pl-1.5">
                                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Check-Out</span>
                                           <span className="text-[11px] font-bold text-slate-800">
-                                            {isLink ? 'Sesi Online' : (isCheckoutEmpty ? '-' : formatTime(item.waktu_checkout))}
+                                            {(() => {
+                                              if (isCheckoutEmpty) {
+                                                const waktu = (item.id_sesi_pengganti ? sessionWaktuMap.get(item.id_sesi_pengganti) : null) || sessionWaktuMap.get(item.id_sesi);
+                                                if (waktu && isPastAutoCheckout(item.tanggal_mengajar || item.waktu_checkin || '', waktu)) {
+                                                  return getAutoCheckOutTimeStr(waktu) || '-';
+                                                }
+                                                return '-';
+                                              }
+                                              return formatTime(item.waktu_checkout);
+                                            })()}
                                           </span>
                                         </div>
                                       </div>
@@ -1357,15 +1509,34 @@ export default function DataPresensiPage() {
                                         const verifyPending = payRowPending.has(verifyKey);
                                         const payPending = payRowPending.has(payKey);
                                         const isOnline = item.tipe_absensi === 'link';
-                                        const isLate = isCheckInLate(item.waktu_checkin, sessionStartMap.get(item.id_sesi));
+                                        const isLate = isCheckInLate(item.waktu_checkin, (item.id_sesi_pengganti ? sessionStartMap.get(item.id_sesi_pengganti) : null) || sessionStartMap.get(item.id_sesi));
+                                        const checkoutEmpty = !item.waktu_checkout || item.waktu_checkout === '' || item.waktu_checkout === 'null' || String(item.waktu_checkout).startsWith('0001');
+                                        const waktuSesi = (item.id_sesi_pengganti ? sessionWaktuMap.get(item.id_sesi_pengganti) : null) || sessionWaktuMap.get(item.id_sesi);
+                                        const isForgotCheckout = !isOnline && checkoutEmpty && waktuSesi && isPastAutoCheckout(item.tanggal_mengajar || item.waktu_checkin || '', waktuSesi);
                                         const currentNum = rowNum;
                                         return (
-                                          <tr key={item.id_presensi} className="hover:bg-slate-50/40 transition-colors">
+                                          <tr
+                                            key={item.id_presensi}
+                                            className={`transition-colors ${
+                                              isForgotCheckout
+                                                ? 'bg-crimson/5 hover:bg-crimson/10'
+                                                : isLate
+                                                  ? 'bg-amber-50 hover:bg-amber-100/70'
+                                                  : 'hover:bg-slate-50/40'
+                                            }`}
+                                          >
                                             <td className="px-4 py-3 text-xs text-slate-400 font-medium">{currentNum}</td>
                                             <td className="px-4 py-3">
-                                              <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">
-                                                {item.nama_mata_kuliah || '-'}
-                                              </span>
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">
+                                                  {item.nama_mata_kuliah || '-'}
+                                                </span>
+                                                {isOnline && (
+                                                  <span className="border border-crimson text-crimson text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 whitespace-nowrap">
+                                                    Online
+                                                  </span>
+                                                )}
+                                              </div>
                                             </td>
                                             <td className="px-4 py-3">
                                               <span className="text-xs text-slate-600 whitespace-nowrap">{item.nama_kelas || '-'}</span>
@@ -1384,11 +1555,24 @@ export default function DataPresensiPage() {
                                               </div>
                                             </td>
                                             <td className="px-4 py-3">
-                                              {isOnline ? (
-                                                <span className="text-[8px] font-extrabold text-crimson border border-crimson/40 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">Online</span>
-                                              ) : (
-                                                <span className="text-xs text-slate-600 whitespace-nowrap font-mono">{formatTime(item.waktu_checkout)}</span>
-                                              )}
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-xs text-slate-600 whitespace-nowrap font-mono">
+                                                  {(() => {
+                                                    if (checkoutEmpty) {
+                                                      if (waktuSesi && isPastAutoCheckout(item.tanggal_mengajar || item.waktu_checkin || '', waktuSesi)) {
+                                                        return getAutoCheckOutTimeStr(waktuSesi) || '--:--';
+                                                      }
+                                                      return '--:--';
+                                                    }
+                                                    return formatTime(item.waktu_checkout);
+                                                  })()}
+                                                </span>
+                                                {isForgotCheckout && (
+                                                  <span className="text-[8px] font-extrabold text-crimson border border-crimson/40 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">
+                                                    Auto Co
+                                                  </span>
+                                                )}
+                                              </div>
                                             </td>
                                             <td className="px-4 py-3">
                                               {isOnline && item.link_video ? (

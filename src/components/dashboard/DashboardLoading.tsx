@@ -5,7 +5,6 @@ export const DashboardLoading = () => (
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
       `}</style>
 
-    
     <div className="lg:hidden relative w-full max-w-[450px] min-h-[100svh] bg-canvas flex flex-col items-center justify-center overflow-hidden mx-auto shadow-2xl">
       <div className="flex flex-col items-center gap-5">
         <div className="relative flex h-10 w-10 items-center justify-center">

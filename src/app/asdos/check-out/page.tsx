@@ -1,40 +1,25 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { Check, Scan, ArrowLeft, BookOpen, AlertCircle, Loader2, Camera, Image as ImageIcon, RefreshCw } from 'lucide-react';
-import { getMyPresensi, getAllPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/actions/presensi';
+import { getMyPresensi, submitCheckOut, type PresensiResponseDTO } from '@/lib/actions/presensi';
 import { getSessionsByDate } from '@/lib/actions/jadwal';
 
 import Link from 'next/link';
 import { AsdosQrScanSkeleton, AsdosPageShell, AsdosPageHeader } from '@/components/dashboard/asdos/AsdosUI';
 import { isQrPresensi } from '@/lib/presensi-mode';
 import { parseUTC } from '@/lib/jadwal-utils';
-import { CustomSelect } from '@/components/ui/CustomSelect';
 
 function formatTeachingTeam(item: PresensiResponseDTO) {
   return item.nama_asdos_rekan ? `${item.nama_asdos} & ${item.nama_asdos_rekan}` : item.nama_asdos;
 }
 
-function hasCheckout(value?: string) {
-  return !!value && value !== '' && value !== 'null' && !String(value).startsWith('0001');
-}
 
-type SharedMateriOption = {
-  id: string;
-  materi: string;
-  nama: string;
-};
 
 export default function CheckOutPage() {
   const MAX_HURUF = 100;
 
-  const router = useRouter();
   const [step, setStep] = useState(1);
-  const [countdown, setCountdown] = useState<number | null>(null);
   const [materi, setMateri] = useState('');
-  const [partnerMateri, setPartnerMateri] = useState<{ materi: string; nama: string } | null>(null);
-  const [sharedMateriOptions, setSharedMateriOptions] = useState<SharedMateriOption[]>([]);
-  const [selectedSharedMateriId, setSelectedSharedMateriId] = useState('');
   const [activeTeachingTeam, setActiveTeachingTeam] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,7 +43,8 @@ export default function CheckOutPage() {
     async function fetchActivePresensi() {
       setIsLoading(true);
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const d = new Date();
+        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const [res, scheduleRes] = await Promise.all([
           getMyPresensi(),
           getSessionsByDate(today),
@@ -74,10 +60,9 @@ export default function CheckOutPage() {
                            checkout === 'null' ||
                            String(checkout).startsWith('0001');
             if (!isOpen) return false;
-            const presensiDate = String(p.tanggal_mengajar ?? '').split('T')[0];
-            if (presensiDate !== today) return false;
+            const checkInTime = new Date(p.waktu_checkin).getTime();
+            if (isNaN(checkInTime) || Math.abs(Date.now() - checkInTime) > 24 * 60 * 60 * 1000) return false;
 
-            // Check if past checkout deadline (end of class + 30 minutes)
             const matchedSchedule = (scheduleRes.success ? scheduleRes.data ?? [] : []).find(session =>
               session.id_sesi === p.id_sesi || session.id_sesi === p.id_sesi_pengganti,
             );
@@ -99,7 +84,7 @@ export default function CheckOutPage() {
                       0
                     );
                     if (new Date() > deadline) {
-                      return false; // Auto checked out virtually!
+                      return false;
                     }
                   }
                 }
@@ -113,61 +98,14 @@ export default function CheckOutPage() {
               session.id_sesi === active.id_sesi || session.id_sesi === active.id_sesi_pengganti,
             );
             setActiveTeachingTeam(matchedSchedule?.pengajar || formatTeachingTeam(active));
-
-            const findPartnerOptions = (pool: PresensiResponseDTO[]) =>
-              pool
-                .filter(p => {
-                  if (p.id_presensi === active.id_presensi) return false;
-                  const sameMain = p.id_sesi === active.id_sesi;
-                  const sameSub = !!active.id_sesi_pengganti && p.id_sesi_pengganti === active.id_sesi_pengganti;
-                  if (!sameMain && !sameSub) return false;
-                  if (String(p.tanggal_mengajar ?? '').split('T')[0] !== today) return false;
-                  return hasCheckout(p.waktu_checkout) && !!p.deskripsi_materi?.trim();
-                })
-                .map(p => ({
-                  id: p.id_presensi,
-                  materi: p.deskripsi_materi?.trim() ?? '',
-                  nama: p.nama_asdos || 'partner Anda',
-                }));
-
-            let sharedOptions = findPartnerOptions(records);
-
-            if (sharedOptions.length === 0 && active.nama_asdos_rekan) {
-              try {
-                const allRes = await getAllPresensi();
-                if (allRes.success && allRes.data) {
-                  sharedOptions = findPartnerOptions(allRes.data);
-                }
-              } catch {
-                // endpoint mungkin butuh role koordinator — abaikan
-              }
-            }
-
-            if (sharedOptions.length > 0) {
-              const firstOption = sharedOptions[0];
-              setSharedMateriOptions(sharedOptions);
-              setSelectedSharedMateriId(firstOption.id);
-              setPartnerMateri({ materi: firstOption.materi, nama: firstOption.nama });
-              setMateri(firstOption.materi);
-            } else {
-              setSharedMateriOptions([]);
-              setSelectedSharedMateriId('');
-              setPartnerMateri(null);
-              setMateri('');
-            }
+            setMateri('');
           } else {
             setActiveTeachingTeam('');
-            setSharedMateriOptions([]);
-            setSelectedSharedMateriId('');
-            setPartnerMateri(null);
             setMateri('');
           }
         } else {
           setActivePresensi(null);
           setActiveTeachingTeam('');
-          setSharedMateriOptions([]);
-          setSelectedSharedMateriId('');
-          setPartnerMateri(null);
           setMateri('');
         }
       } catch (error) {
@@ -200,18 +138,8 @@ export default function CheckOutPage() {
   useEffect(() => {
     if (step === 3) {
       document.getElementById('dashboard-children-container')?.scrollTo(0, 0);
-      setCountdown(10);
-    } else {
-      setCountdown(null);
     }
   }, [step]);
-
-  useEffect(() => {
-    if (countdown === null) return;
-    if (countdown === 0) { router.push('/asdos'); return; }
-    const t = setTimeout(() => setCountdown(c => (c ?? 1) - 1), 1000);
-    return () => clearTimeout(t);
-  }, [countdown, router]);
 
   const startDecodeLoop = useCallback(async () => {
     const jsQR = (await import('jsqr')).default;
@@ -365,13 +293,7 @@ export default function CheckOutPage() {
     }
   };
 
-  const handleSelectSharedMateri = (id: string) => {
-    const selected = sharedMateriOptions.find(option => option.id === id);
-    if (!selected) return;
-    setSelectedSharedMateriId(id);
-    setPartnerMateri({ materi: selected.materi, nama: selected.nama });
-    setMateri(selected.materi);
-  };
+
 
 
   if (isLoading) {
@@ -470,6 +392,7 @@ export default function CheckOutPage() {
                   <p className="text-[11px] md:text-xs font-medium leading-relaxed">{scanMessage}</p>
                 </div>
               )}
+
             </div>
 
             <div className="md:flex-1 flex flex-col items-center w-full gap-4">
@@ -583,7 +506,13 @@ export default function CheckOutPage() {
         </>
       )}
 
-      {step === 2 && activePresensi && (
+      {step === 2 && activePresensi && (() => {
+        const checkInMs = new Date(activePresensi.waktu_checkin).getTime();
+        const availableAt = new Date(checkInMs + 60 * 60 * 1000);
+        const isCheckoutAvailable = new Date() >= availableAt;
+        const availableAtStr = availableAt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+        return (
         <>
           <div className="mb-6 md:mb-8 flex items-center justify-between">
             <div>
@@ -640,52 +569,33 @@ export default function CheckOutPage() {
                 <span className="text-sm md:text-base font-bold text-slate-800">Bahasan Materi</span>
               </div>
 
-              {sharedMateriOptions.length > 1 && (
-                <div>
-                  <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
-                    Materi dari Asisten Dosen
-                  </label>
-                  <CustomSelect
-                    value={selectedSharedMateriId}
-                    onChange={handleSelectSharedMateri}
-                    triggerClassName="!rounded-[14px] !py-[15px] !border-slate-200 hover:!border-slate-300 !bg-white !font-semibold"
-                    options={sharedMateriOptions.map(option => ({
-                      value: option.id,
-                      label: option.nama,
-                      description: option.materi,
-                    }))}
-                    placeholder="-- Pilih Materi --"
-                  />
-                </div>
-              )}
-
               <div className="relative">
                 <textarea
                   value={materi}
                   onChange={e => {
-                    if (partnerMateri) return;
                     const val = e.target.value;
                     if (val.length <= MAX_HURUF) setMateri(val);
                   }}
-                  disabled={!!partnerMateri}
-                  placeholder="Ketik bahasan materi yang diajarkan..."
-                  className="w-full bg-fog rounded-[14px] p-4 md:p-5 pb-8 text-sm md:text-base text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-crimson/30 transition-all resize-none h-24 md:h-32 border-0 disabled:cursor-not-allowed disabled:text-slate-500"
+                  disabled={!isCheckoutAvailable}
+                  placeholder={isCheckoutAvailable ? "Ketik bahasan materi yang diajarkan..." : "Tersedia setelah 1 jam mengajar..."}
+                  className="w-full bg-fog rounded-[14px] p-4 md:p-5 pb-8 text-sm md:text-base text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-crimson/30 transition-all resize-none h-24 md:h-32 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <div className={`absolute bottom-3 right-4 text-[10px] font-medium bg-fog/80 px-1 ${materi.length >= MAX_HURUF ? 'text-crimson' : 'text-slate-400'}`}>
                   {materi.length} / {MAX_HURUF} huruf
                 </div>
               </div>
 
-              {partnerMateri ? (
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-                  <p className="text-[11px] md:text-xs font-semibold text-emerald-700 leading-relaxed">
-                    Bahasan materi sudah diisi oleh {partnerMateri.nama}. Materi dikunci agar laporan sesi tetap konsisten.
+              <p className="text-[10px] md:text-xs text-crimson font-medium leading-relaxed">
+                * Mohon isi bahasan materi dengan jelas. Jika mengajar bersama partner asisten dosen, pastikan bahasan materi yang diisi sama.
+              </p>
+
+              {!isCheckoutAvailable && (
+                <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
+                  <AlertCircle size={15} className="text-amber-500 shrink-0" />
+                  <p className="text-[11px] md:text-xs text-amber-700 font-medium leading-relaxed">
+                    Check-out tersedia mulai <span className="font-bold">{availableAtStr}</span> — minimal 1 jam setelah check-in.
                   </p>
                 </div>
-              ) : (
-                <p className="text-[10px] md:text-xs text-crimson font-medium leading-relaxed">
-                  * Mohon isi bahasan materi dengan jelas. Jika mengajar bersama partner asisten dosen, pastikan bahasan materi yang diisi sama.
-                </p>
               )}
 
               <div className="pt-2 border-t border-slate-100">
@@ -725,7 +635,7 @@ export default function CheckOutPage() {
                     <button
                       type="button"
                       onClick={() => setIsConfirmOpen(true)}
-                      disabled={!materi.trim()}
+                      disabled={!materi.trim() || !isCheckoutAvailable}
                       className="w-full md:w-auto bg-crimson text-white font-bold py-4 md:py-3.5 md:px-10 text-[15px] rounded-[14px] shadow-md shadow-crimson/20 active:scale-[0.98] transition-all disabled:opacity-50 hover:bg-[#7a1727]"
                     >
                       Check-out Sekarang
@@ -736,7 +646,8 @@ export default function CheckOutPage() {
             </section>
           </div>
         </>
-      )}
+        );
+      })()}
 
       {step === 3 && activePresensi && (
         <>
@@ -791,11 +702,6 @@ export default function CheckOutPage() {
               >
                 Kembali ke Beranda
               </Link>
-              {countdown !== null && (
-                <p className="text-center text-xs text-slate-400 mt-3">
-                  Diarahkan otomatis dalam <span className="font-bold text-slate-600">{countdown}s</span>
-                </p>
-              )}
             </div>
           </div>
         </>

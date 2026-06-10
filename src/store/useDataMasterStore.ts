@@ -1,5 +1,5 @@
-﻿import { create } from 'zustand';
-import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem } from '@/types/api';
+import { create } from 'zustand';
+import type { KelasItem, MataKuliahItem, RuanganItem, SemesterItem, SessionTimeline } from '@/types/api';
 
 interface DataMasterState {
   kelasList: KelasItem[];
@@ -15,12 +15,16 @@ interface DataMasterState {
   semesterPage: number;
   semesterHasMore: boolean;
 
+  todaySessionsCache: Record<string, SessionTimeline[]>;
+
   isLoading: boolean;
 
   setKelas: (list: KelasItem[], hasMore: boolean, page: number, append?: boolean) => void;
   setMK: (list: MataKuliahItem[], hasMore: boolean, page: number, append?: boolean) => void;
   setRuangan: (list: RuanganItem[], hasMore: boolean, page: number, append?: boolean) => void;
   setSemester: (list: SemesterItem[], hasMore: boolean, page: number, append?: boolean) => void;
+  setTodaySessionsCache: (key: string, sessions: SessionTimeline[]) => void;
+  clearTodaySessionsCache: () => void;
   setIsLoading: (v: boolean) => void;
   resetTab: (tab: 'kelas' | 'mk' | 'ruangan' | 'semester') => void;
 }
@@ -30,6 +34,7 @@ export const useDataMasterStore = create<DataMasterState>()((set) => ({
   mkList: [], mkPage: 1, mkHasMore: false,
   ruanganList: [], ruanganPage: 1, ruanganHasMore: false,
   semesterList: [], semesterPage: 1, semesterHasMore: false,
+  todaySessionsCache: {},
   isLoading: false,
 
   setKelas: (list, hasMore, page, append = false) =>
@@ -40,6 +45,9 @@ export const useDataMasterStore = create<DataMasterState>()((set) => ({
     set((s) => ({ ruanganList: append ? [...s.ruanganList, ...list] : list, ruanganHasMore: hasMore, ruanganPage: page })),
   setSemester: (list, hasMore, page, append = false) =>
     set((s) => ({ semesterList: append ? [...s.semesterList, ...list] : list, semesterHasMore: hasMore, semesterPage: page })),
+  setTodaySessionsCache: (key, sessions) =>
+    set((s) => ({ todaySessionsCache: { ...s.todaySessionsCache, [key]: sessions } })),
+  clearTodaySessionsCache: () => set({ todaySessionsCache: {} }),
   setIsLoading: (v) => set({ isLoading: v }),
 
   resetTab: (tab) => {

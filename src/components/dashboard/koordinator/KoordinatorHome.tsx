@@ -101,7 +101,8 @@ export default function KoordinatorHome() {
       const semesters = semesterRes.success && semesterRes.data?.items ? semesterRes.data.items : [];
       const activeSemesterId = semesters[0]?.id;
       if (activeSemesterId) {
-        const today = new Date().toISOString().split('T')[0];
+        const d = new Date();
+        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const sessionsRes = await getAllSessions({
           id_semester: activeSemesterId,
           start_date: today,
@@ -182,7 +183,7 @@ export default function KoordinatorHome() {
     return events.sort((a, b) => b.sort - a.sort).slice(0, 5);
   }, [allPresensiItems]);
 
-  const displayName = getDisplayName(user?.email);
+  const displayName = user?.username || getDisplayName(user?.email);
 
   return (
     <div className="max-w-6xl mx-auto px-1.5 sm:px-2 md:px-0 pb-10 md:pb-12">

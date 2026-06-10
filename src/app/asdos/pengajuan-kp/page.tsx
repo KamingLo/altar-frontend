@@ -311,9 +311,41 @@ export default function PengajuanKpPage() {
   const [occupiedSchedules, setOccupiedSchedules] = useState<Array<{ room: string; time: string; title: string }>>([]);
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState<string | null>(null);
-  const [coveredByOtherIds, setCoveredByOtherIds] = useState<Set<string>>(new Set());
-  const [myPendingOrVerifiedIds, setMyPendingOrVerifiedIds] = useState<Set<string>>(new Set());
-  const [coveredByOtherList, setCoveredByOtherList] = useState<Array<{ id_sesi: string; mata_kuliah: string; nama_kelas: string; original_date: string; substitute_date: string }>>([]);
+
+  const coveredItems = useMemo(() => {
+    return history.filter(
+      item => item.status !== 'REJECTED' && item.id_asdos1 !== user?.id_asisten && !!item.session?.id_sesi,
+    );
+  }, [history, user?.id_asisten]);
+
+  const coveredByOtherIds = useMemo(() => {
+    return new Set(coveredItems.map(item => item.session!.id_sesi));
+  }, [coveredItems]);
+
+  const myPendingOrVerifiedIds = useMemo(() => {
+    const myPendingOrVerified = history.filter(
+      item => item.status !== 'REJECTED' && item.id_asdos1 === user?.id_asisten && !!item.session?.id_sesi,
+    );
+    return new Set(myPendingOrVerified.map(item => item.session!.id_sesi));
+  }, [history, user?.id_asisten]);
+
+  const coveredByOtherList = useMemo(() => {
+    const seen = new Set<string>();
+    const uniqueList: Array<{ id_sesi: string; mata_kuliah: string; nama_kelas: string; original_date: string; substitute_date: string }> = [];
+    for (const item of coveredItems) {
+      const id = item.session!.id_sesi;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      uniqueList.push({
+        id_sesi: id,
+        mata_kuliah: item.session?.mata_kuliah ?? 'Mata kuliah tidak tersedia',
+        nama_kelas: item.session?.nama_kelas ?? '',
+        original_date: item.original_date,
+        substitute_date: item.substitute_date,
+      });
+    }
+    return uniqueList;
+  }, [coveredItems]);
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -322,31 +354,6 @@ export default function PengajuanKpPage() {
       const res = await getMySubstitutions();
       if (res.success && res.data) {
         setPage(1, res.data.items, res.data.total);
-        const coveredItems = res.data.items.filter(
-          item => item.status !== 'REJECTED' && item.id_asdos1 !== user?.id_asisten && !!item.session?.id_sesi,
-        );
-        setCoveredByOtherIds(new Set(coveredItems.map(item => item.session!.id_sesi)));
-
-        const myPendingOrVerified = res.data.items.filter(
-          item => item.status !== 'REJECTED' && item.id_asdos1 === user?.id_asisten && !!item.session?.id_sesi,
-        );
-        setMyPendingOrVerifiedIds(new Set(myPendingOrVerified.map(item => item.session!.id_sesi)));
-
-        const seen = new Set<string>();
-        const uniqueList: Array<{ id_sesi: string; mata_kuliah: string; nama_kelas: string; original_date: string; substitute_date: string }> = [];
-        for (const item of coveredItems) {
-          const id = item.session!.id_sesi;
-          if (seen.has(id)) continue;
-          seen.add(id);
-          uniqueList.push({
-            id_sesi: id,
-            mata_kuliah: item.session?.mata_kuliah ?? 'Mata kuliah tidak tersedia',
-            nama_kelas: item.session?.nama_kelas ?? '',
-            original_date: item.original_date,
-            substitute_date: item.substitute_date,
-          });
-        }
-        setCoveredByOtherList(uniqueList);
       } else {
         setHistoryError(res.message || 'Gagal memuat riwayat pengajuan.');
       }
@@ -355,7 +362,7 @@ export default function PengajuanKpPage() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [setPage, user?.id_asisten]);
+  }, [setPage]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
   useEffect(() => { setClientToday(todayIso()); }, []);
@@ -608,10 +615,20 @@ useEffect(() => {
     }
   };
 
-  const filteredHistory = useMemo(
-    () => statusFilter === 'ALL' ? history : history.filter(item => item.status === statusFilter),
-    [history, statusFilter],
-  );
+  const filteredHistory = useMemo(() => {
+    const baseList = statusFilter === 'ALL'
+      ? history
+      : history.filter(item => item.status === statusFilter);
+
+    return baseList.filter(item => {
+      if (item.status === 'REJECTED' && item.session?.id_sesi) {
+        if (myPendingOrVerifiedIds.has(item.session.id_sesi)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [history, statusFilter, myPendingOrVerifiedIds]);
 
   const myWeekSchedule = useMemo(() => {
     const myUsername = user?.username?.toLowerCase();
@@ -886,16 +903,18 @@ useEffect(() => {
               <DatePickerField value={substituteDate} min={clientToday} onChange={setSubstituteDate} disableSundays />
             </div>
 
-            <div>
-              <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
-                Partner Asisten Dosen
-              </label>
-              <div className="w-full bg-slate-50 border border-slate-200 rounded-[14px] px-5 py-4">
-                <p className="text-sm font-bold text-slate-800">
-                  {idSession && originalPartnerId ? originalPartnerName ?? 'Partner asli' : '-'}
-                </p>
+            {!!(idSession && originalPartnerId) && (
+              <div>
+                <label className="block text-[10px] md:text-[11px] font-bold text-slate-400/90 tracking-widest uppercase mb-2.5 ml-1">
+                  Partner Asisten Dosen
+                </label>
+                <div className="w-full bg-slate-50 border border-slate-200 rounded-[14px] px-5 py-4">
+                  <p className="text-sm font-bold text-slate-800">
+                    {originalPartnerName ?? 'Partner asli'}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -1238,7 +1257,7 @@ useEffect(() => {
           {!isMobile && (
             <div className={`md:w-1/2 w-full shrink-0 transition-opacity duration-300 ${isFormOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
               <div className="max-w-5xl mx-auto w-full">
-                <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6 items-start">
                   <aside
                     className="hidden md:block bg-white rounded-[12px] p-6 border border-slate-100 overflow-y-auto"
                     style={{ height: formBoxHeight ?? undefined, maxHeight: formBoxHeight ?? 'calc(100vh - 160px)' }}
@@ -1248,7 +1267,7 @@ useEffect(() => {
                   <div
                     ref={formBoxRef}
                     className="bg-white rounded-[12px] p-6 md:p-8 border border-slate-100 flex flex-col w-full self-start max-h-[calc(100vh-160px)] overflow-y-auto"
-                    style={isSuccess && formBoxHeight ? { minHeight: formBoxHeight } : undefined}
+                    style={formBoxHeight ? { minHeight: formBoxHeight } : undefined}
                   >
                     {renderFormContent()}
                   </div>

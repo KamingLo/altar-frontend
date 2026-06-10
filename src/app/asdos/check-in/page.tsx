@@ -8,7 +8,7 @@ import { getMySubstitutions, deleteSubstitution } from '@/lib/actions/pergantian
 
 import { AsdosQrScanSkeleton, AsdosPageShell } from '@/components/dashboard/asdos/AsdosUI';
 import { decodeJwtPayload } from '@/lib/auth/jwt';
-import { getSubstituteSessionId, isQrSession } from '@/lib/presensi-mode';
+import { getSubstituteSessionId, isQrSession, isQrPresensi } from '@/lib/presensi-mode';
 import { useUserStore } from '@/store/useUserStore';
 
 const getCurrentMinutes = () => {
@@ -77,6 +77,7 @@ export default function CheckInPage() {
   const [qrToken, setQrToken] = useState<string>('');
   const [cameraStatus, setCameraStatus] = useState<'idle' | 'requesting' | 'active' | 'denied' | 'scanning'>('idle');
   const [scanMessage, setScanMessage] = useState<string>('');
+  const [hasActivePresensi, setHasActivePresensi] = useState(false);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -135,18 +136,41 @@ export default function CheckInPage() {
 
     const normalizedToken = normalizeScannedQrToken(token);
     setQrToken(normalizedToken);
+    setHasActivePresensi(false);
+    setScanMessage('');
     setIsLoading(true);
 
     try {
-    const today = new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const [res, presensiRes] = await Promise.all([
       getSessionsByDate(today),
       getMyPresensi(),
     ]);
 
+    const allPresensi = presensiRes.success ? presensiRes.data ?? [] : [];
+
+    const activePresensi = allPresensi.find(p => {
+      if (!isQrPresensi(p)) return false;
+      const checkInTime = new Date(p.waktu_checkin).getTime();
+      if (isNaN(checkInTime) || Math.abs(Date.now() - checkInTime) > 24 * 60 * 60 * 1000) return false;
+      const co = p.waktu_checkout;
+      return !co || co === '' || co === 'null' || String(co).startsWith('0001');
+    });
+
+    if (activePresensi) {
+      setHasActivePresensi(true);
+      setScanMessage(`Kamu masih memiliki sesi "${activePresensi.nama_mata_kuliah}" yang belum checkout. Selesaikan checkout terlebih dahulu sebelum check-in ke jadwal lain.`);
+      setIsLoading(false);
+      return;
+    }
+
     const completedSessionIds = new Set<string>(
-      (presensiRes.success ? presensiRes.data ?? [] : [])
-        .filter(p => p.tanggal_mengajar?.slice(0, 10) === today)
+      allPresensi
+        .filter(p => {
+          const checkInTime = new Date(p.waktu_checkin).getTime();
+          return !isNaN(checkInTime) && Math.abs(Date.now() - checkInTime) < 24 * 60 * 60 * 1000;
+        })
         .flatMap(p => [p.id_sesi, p.id_sesi_pengganti].filter((v): v is string => !!v))
     );
 
@@ -173,12 +197,10 @@ export default function CheckInPage() {
         ? availableSessions.find(s => s.id_sesi === sessionId && isQrSession(s) && !canShowForCheckIn(s))
         : null;
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const currentMinutes = getCurrentMinutes();
-      // const isMatchedSessionDisabled = matchedSession
-      //   ? isSessionEnded(matchedSession, currentMinutes) || !canShowForCheckIn(matchedSession, currentMinutes)
-      //   : false;
-      const isMatchedSessionDisabled = false;
+      const isMatchedSessionDisabled = matchedSession
+        ? !canShowForCheckIn(matchedSession, currentMinutes)
+        : false;
 
       if (matchedSession && !isMatchedSessionDisabled) {
         setSelectedSessionId(matchedSession.id_sesi);
@@ -196,13 +218,14 @@ export default function CheckInPage() {
         if (matchedNonQrSession) {
           setScanMessage('Sesi ini menggunakan presensi online, bukan QR. Silakan gunakan menu Presensi Kelas Online.');
         } else if (matchedUpcomingQrSession) {
-          setScanMessage('Sesi QR ini belum masuk waktu check-in. Silakan coba lagi mendekati jam mengajar.');
-        // } else if (matchedSession && isSessionEnded(matchedSession, currentMinutes)) {
-        //   setScanMessage('Sesi ini sudah selesai dan tidak dapat dilakukan check-in.');
-        // }
+          const startMin = getSessionStartMinutes(matchedUpcomingQrSession.waktu);
+          const availMin = startMin !== null ? startMin - 15 : null;
+          const availStr = availMin !== null
+            ? `${String(Math.floor(availMin / 60)).padStart(2, '0')}:${String(availMin % 60).padStart(2, '0')}`
+            : null;
+          setScanMessage(`Sesi ini belum masuk waktu check-in.${availStr ? ` Bisa check-in mulai jam ${availStr}.` : ''}`);
         }
 
-        // const firstActive = fetchedSessions.find(s => !isSessionEnded(s, currentMinutes) && canShowForCheckIn(s, currentMinutes));
         const firstActive = fetchedSessions[0];
         if (firstActive) {
           setSelectedSessionId(firstActive.id_sesi);
@@ -392,12 +415,9 @@ export default function CheckInPage() {
 
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   const selectedSession = sessions.find(s => s.id_sesi === selectedSessionId);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const currentMinutes = getCurrentMinutes();
-  // const activeSessions = sessions.filter(s => !isSessionEnded(s, currentMinutes) && canShowForCheckIn(s, currentMinutes));
-  // const disabledSessions = sessions.filter(s => isSessionEnded(s, currentMinutes) || !canShowForCheckIn(s, currentMinutes));
-  const activeSessions = sessions;
-  const disabledSessions: SessionFromAPI[] = [];
+  const activeSessions = sessions.filter(s => canShowForCheckIn(s, currentMinutes));
+  const disabledSessions = sessions.filter(s => !canShowForCheckIn(s, currentMinutes));
 
   const handleCloseSheet = () => {
     setIsSheetClosing(true);
@@ -480,6 +500,14 @@ try {
     const isSel = selectedSessionId === s.id_sesi;
     const datePart = s.waktu.split(', ')[0] ?? '-';
     const timePart = s.waktu.split(', ')[1] ?? s.waktu;
+    const availableFromStr = (() => {
+      const startMinutes = getSessionStartMinutes(s.waktu);
+      if (startMinutes === null) return null;
+      const availMinutes = startMinutes - 15;
+      const h = Math.floor(availMinutes / 60);
+      const m = availMinutes % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    })();
 
     return (
       <React.Fragment key={s.id_sesi}>
@@ -506,7 +534,6 @@ try {
                   </span>
                 )}
               </div>
-              {/* Check button mobile — kanan atas */}
               <div className={`md:hidden shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isSel ? 'bg-crimson text-white shadow-md shadow-crimson/20' : 'bg-slate-100 text-slate-300'}`}>
                 <Check size={17} strokeWidth={3} />
               </div>
@@ -535,11 +562,19 @@ try {
               </div>
             </div>
 
-            {/* Check button desktop — ujung kanan */}
             <div className={`hidden md:flex shrink-0 w-10 h-10 rounded-xl items-center justify-center transition-all ${isSel ? 'bg-crimson text-white shadow-md shadow-crimson/20' : 'bg-slate-100 text-slate-300'}`}>
               <Check size={17} strokeWidth={3} />
             </div>
           </article>
+
+          {disabled && availableFromStr && (
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
+              <AlertCircle size={14} className="text-slate-400 shrink-0" />
+              <p className="text-[11px] text-slate-500 font-medium">
+                Check-in tersedia mulai <span className="font-bold text-slate-700">{availableFromStr}</span> (15 menit sebelum jadwal)
+              </p>
+            </div>
+          )}
 
         </section>
 
@@ -754,10 +789,17 @@ try {
               )}
 
               {scanMessage && (
-                <div className="mt-4 flex items-center gap-3 text-amber-600 bg-amber-50 px-4 py-3.5 rounded-[14px] border border-amber-100 w-full animate-in fade-in duration-300">
-                  <AlertCircle size={18} className="shrink-0" />
-                  <p className="text-[11px] md:text-xs font-medium leading-relaxed">{scanMessage}</p>
-                </div>
+                hasActivePresensi ? (
+                  <div className="mt-4 flex items-start gap-3 bg-crimson/5 border border-crimson/20 px-4 py-3.5 rounded-[14px] w-full animate-in fade-in duration-300">
+                    <AlertCircle size={18} className="shrink-0 text-crimson mt-0.5" />
+                    <p className="text-[11px] md:text-xs font-medium leading-relaxed text-crimson">{scanMessage}</p>
+                  </div>
+                ) : (
+                  <div className="mt-4 flex items-center gap-3 text-amber-600 bg-amber-50 px-4 py-3.5 rounded-[14px] border border-amber-100 w-full animate-in fade-in duration-300">
+                    <AlertCircle size={18} className="shrink-0" />
+                    <p className="text-[11px] md:text-xs font-medium leading-relaxed">{scanMessage}</p>
+                  </div>
+                )
               )}
             </div>
             <div className="md:flex-1 flex flex-col items-center w-full gap-4">
@@ -855,10 +897,17 @@ try {
                   </select>
                 )}
                 {scanMessage && (
-                  <div className="flex items-center gap-3 text-amber-600 bg-amber-50 px-4 py-3.5 rounded-2xl border border-amber-100 w-full shadow-sm animate-in fade-in duration-300">
-                    <AlertCircle size={18} className="shrink-0" />
-                    <p className="text-[11px] md:text-xs font-medium leading-relaxed">{scanMessage}</p>
-                  </div>
+                  hasActivePresensi ? (
+                    <div className="flex items-start gap-3 bg-crimson/5 border border-crimson/20 px-4 py-3.5 rounded-2xl w-full shadow-sm animate-in fade-in duration-300">
+                      <AlertCircle size={18} className="shrink-0 text-crimson mt-0.5" />
+                      <p className="text-[11px] md:text-xs font-medium leading-relaxed text-crimson">{scanMessage}</p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 text-amber-600 bg-amber-50 px-4 py-3.5 rounded-2xl border border-amber-100 w-full shadow-sm animate-in fade-in duration-300">
+                      <AlertCircle size={18} className="shrink-0" />
+                      <p className="text-[11px] md:text-xs font-medium leading-relaxed">{scanMessage}</p>
+                    </div>
+                  )
                 )}
               </div>
             </div>

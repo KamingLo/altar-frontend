@@ -67,7 +67,8 @@ export const asdosMenuItems = [
 ];
 
 function todayISO() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function formatShortDate(dateStr: string) {
@@ -163,6 +164,7 @@ type PresensiActivityItem = {
   isPaid: boolean;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function AsdosHomeSkeleton() {
   return (
     <div className="max-w-6xl mx-auto px-1.5 sm:px-2 md:px-0 pb-10 md:pb-12">
@@ -235,7 +237,9 @@ export default function AsdosHome() {
   const [kpItems, setKpItems] = useState<SubstituteSessionDetail[]>([]);
   const [kpItem, setKpItem] = useState<SubstituteSessionDetail | null>(null);
   const [presensiItem, setPresensiItem] = useState<PresensiResponseDTO | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isSessionsLoading, setIsSessionsLoading] = useState(true);
+  const [isKpLoading, setIsKpLoading] = useState(true);
+  const [isPresensiLoading, setIsPresensiLoading] = useState(true);
   const [currentMinutes, setCurrentMinutes] = useState(getCurrentMinutes);
   const fetchingRef = useRef(false);
 
@@ -248,57 +252,79 @@ export default function AsdosHome() {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
     let cancelled = false;
-    async function fetchDashboard() {
-      try {
-        const date = todayISO();
-        const { lastSeenKpId, lastSeenPresensiId, setLastSeenKpId, setLastSeenPresensiId } = useNotificationStore.getState();
 
-        const [scheduleRes, kpRes, presensiRes] = await Promise.all([
-          getSessionsByDate(date),
-          getMySubstitutions(),
-          getMyPresensi(),
-        ]);
+    const date = todayISO();
 
+    getSessionsByDate(date)
+      .then((res) => {
         if (cancelled) return;
+        setSessionsToday(res.success && res.data ? res.data : []);
+        setIsSessionsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch sessions:", err);
+        if (!cancelled) setIsSessionsLoading(false);
+      });
 
-        const schedules = scheduleRes.success && scheduleRes.data ? scheduleRes.data : [];
-        const substitutions = kpRes.success && kpRes.data?.items ? kpRes.data.items : [];
-        const presensi = presensiRes.success && presensiRes.data ? presensiRes.data : [];
+    getMySubstitutions()
+      .then((res) => {
+        if (cancelled) return;
+        const substitutions = res.success && res.data?.items ? res.data.items : [];
+        setKpItems(substitutions);
 
+        const { lastSeenKpId, setLastSeenKpId } = useNotificationStore.getState();
         const recentKp = substitutions
           .filter((item) => item.status === 'VERIFIED' || item.status === 'REJECTED')
           .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0] ?? null;
 
         const kpToShow = recentKp && recentKp.id !== lastSeenKpId ? recentKp : null;
+        setKpItem(kpToShow);
+        if (recentKp) setLastSeenKpId(recentKp.id);
+        setIsKpLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch substitutions:", err);
+        if (!cancelled) setIsKpLoading(false);
+      });
 
+    getMyPresensi()
+      .then((res) => {
+        if (cancelled) return;
+        const presensi = res.success && res.data ? res.data : [];
+        setPresensiItems(presensi);
+
+        const { lastSeenPresensiId, setLastSeenPresensiId } = useNotificationStore.getState();
         const verifiedToday = presensi
           .filter((p) => p.is_verified && String(p.tanggal_mengajar).split('T')[0] === date)
           .sort((a, b) => new Date(b.waktu_checkin || b.tanggal_mengajar).getTime() - new Date(a.waktu_checkin || a.tanggal_mengajar).getTime())[0] ?? null;
 
         const presensiToShow = verifiedToday && verifiedToday.id_presensi !== lastSeenPresensiId ? verifiedToday : null;
-
-        setSessionsToday(schedules);
-        setKpItems(substitutions);
-        setPresensiItems(presensi);
-        setKpItem(kpToShow);
         setPresensiItem(presensiToShow);
-        setPendingCount((kpToShow ? 1 : 0) + (presensiToShow ? 1 : 0));
-
-        if (recentKp) setLastSeenKpId(recentKp.id);
         if (verifiedToday) setLastSeenPresensiId(verifiedToday.id_presensi);
+        setIsPresensiLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch presensi:", err);
+        if (!cancelled) setIsPresensiLoading(false);
+      });
 
-        if (!cancelled) markSeen();
-      } finally {
-        fetchingRef.current = false;
-        if (!cancelled) setIsLoading(false);
-      }
+    fetchingRef.current = false;
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setPendingCount((kpItem ? 1 : 0) + (presensiItem ? 1 : 0));
+  }, [kpItem, presensiItem, setPendingCount]);
+
+  useEffect(() => {
+    if (!isKpLoading && !isPresensiLoading) {
+      markSeen();
     }
+  }, [isKpLoading, isPresensiLoading, markSeen]);
 
-    fetchDashboard();
-    return () => { cancelled = true; };
-  }, [markSeen, setPendingCount]);
-
-  const displayName = getDisplayName(user?.email);
+  const displayName = user?.username || getDisplayName(user?.email);
 
   const presensiActivities = useMemo<PresensiActivityItem[]>(() => {
     return [...presensiItems]
@@ -363,10 +389,6 @@ export default function AsdosHome() {
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, 3);
   }, [kpItems]);
-
-  if (isLoading) {
-    return <AsdosHomeSkeleton />;
-  }
 
   const renderScheduleCard = (schedule: SessionFromAPI, showActions: boolean) => {
     const today = todayISO();
@@ -455,6 +477,8 @@ export default function AsdosHome() {
     );
   };
 
+  const showNotification = (!isKpLoading && kpItem) || (!isPresensiLoading && presensiItem);
+
   return (
     <div className="max-w-6xl mx-auto px-1.5 sm:px-2 md:px-0 pb-10 md:pb-12">
       <div className="mb-6 md:mb-8 animate-fade-up">
@@ -469,7 +493,7 @@ export default function AsdosHome() {
         </p>
       </div>
 
-      {(kpItem || presensiItem) && (
+      {showNotification && (
         <div className="mb-8 animate-fade-up" style={{ animationDelay: '0.05s' }}>
           <div className="flex items-center gap-2 mb-4 px-1">
             <div className="relative">
@@ -479,7 +503,7 @@ export default function AsdosHome() {
             <h3 className="font-bold text-lg text-slate-800">Notifikasi</h3>
           </div>
           <div className="space-y-3">
-            {kpItem && (
+            {kpItem && !isKpLoading && (
               <div className="bg-white p-4 rounded-2xl shadow-md lg:shadow-sm flex items-center gap-4 border border-slate-100">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${kpItem.status === 'VERIFIED' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>
                   <CheckCircle2 size={20} />
@@ -497,7 +521,7 @@ export default function AsdosHome() {
                 </Link>
               </div>
             )}
-            {presensiItem && (
+            {presensiItem && !isPresensiLoading && (
               <div className="bg-white p-4 rounded-2xl shadow-md lg:shadow-sm flex items-center gap-4 border border-slate-100">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
                   <CalendarSync size={20} />
@@ -542,7 +566,25 @@ export default function AsdosHome() {
             </Link>
           </div>
           <div className="bg-white rounded-2xl shadow-md lg:shadow-sm p-4 lg:p-5 space-y-4 border border-slate-100 flex-1">
-            {sessionsToday.length === 0 ? (
+            {isSessionsLoading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 2 }, (_, i) => (
+                  <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 space-y-4">
+                    <div className="flex justify-between gap-4">
+                      <div className="space-y-2 flex-1">
+                        <div className="h-5 w-44 rounded-lg animate-shimmer" />
+                        <div className="h-3.5 w-28 rounded-lg animate-shimmer" />
+                      </div>
+                      <div className="h-6 w-20 rounded-full animate-shimmer" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="h-4 w-24 rounded-lg animate-shimmer" />
+                      <div className="h-4 w-24 rounded-lg animate-shimmer" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : sessionsToday.length === 0 ? (
               <div className="py-16 text-center">
                 <p className="text-sm font-semibold text-slate-400">Tidak ada jadwal hari ini</p>
                 <p className="text-xs font-medium text-slate-400 mt-1">Gunakan waktu ini untuk cek riwayat mengajar anda.</p>
@@ -584,7 +626,16 @@ export default function AsdosHome() {
             </Link>
           </div>
           <div className="bg-white rounded-2xl shadow-md lg:shadow-sm border border-slate-100 p-4 lg:p-5 space-y-3">
-            {activityRows.length === 0 ? (
+            {isPresensiLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }, (_, i) => (
+                  <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 space-y-2 animate-pulse">
+                    <div className="h-4 w-2/3 bg-slate-100 rounded" />
+                    <div className="h-3.5 w-1/2 bg-slate-100 rounded mt-2" />
+                  </div>
+                ))}
+              </div>
+            ) : activityRows.length === 0 ? (
               <div className="py-6 text-center text-slate-400">
                 <p className="text-sm font-semibold">Belum ada aktivitas terbaru</p>
                 <p className="text-[10px] font-medium mt-1">Verifikasi kehadiran atau pembayaran akan muncul di sini.</p>
@@ -618,7 +669,16 @@ export default function AsdosHome() {
             </Link>
           </div>
           <div className="bg-white rounded-2xl shadow-md lg:shadow-sm border border-slate-100 p-4 lg:p-5 space-y-3">
-            {recentKpItems.length === 0 ? (
+            {isKpLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }, (_, i) => (
+                  <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 space-y-2 animate-pulse">
+                    <div className="h-4 w-2/3 bg-slate-100 rounded" />
+                    <div className="h-3.5 w-1/2 bg-slate-100 rounded mt-2" />
+                  </div>
+                ))}
+              </div>
+            ) : recentKpItems.length === 0 ? (
               <div className="py-6 text-center text-slate-400">
                 <p className="text-sm font-semibold">Belum ada pengajuan kelas pengganti</p>
                 <p className="text-[10px] font-medium mt-1">Status pengajuan akan muncul di sini.</p>

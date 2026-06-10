@@ -129,14 +129,33 @@ export default function ManajemenKpPage() {
     }
   };
 
+  const visibleSubstitutions = React.useMemo(() => {
+    return substitutionList.filter(req => {
+      if (req.status !== 'REJECTED') return true;
+
+      const hasNewer = substitutionList.some(other => {
+        if (other.id === req.id) return false;
+
+        const reqSesiId = req.session?.id_sesi;
+        const otherSesiId = other.session?.id_sesi;
+        if (!reqSesiId || !otherSesiId || reqSesiId !== otherSesiId) return false;
+        if (req.original_date !== other.original_date) return false;
+
+        return new Date(other.created_at) > new Date(req.created_at);
+      });
+
+      return !hasNewer;
+    });
+  }, [substitutionList]);
+
   const statusCounts = {
-    pending: substitutionList.filter(r => r.status === 'PENDING').length,
-    verified: substitutionList.filter(r => r.status === 'VERIFIED').length,
-    rejected: substitutionList.filter(r => r.status === 'REJECTED').length,
-    total: substitutionList.length,
+    pending: visibleSubstitutions.filter(r => r.status === 'PENDING').length,
+    verified: visibleSubstitutions.filter(r => r.status === 'VERIFIED').length,
+    rejected: visibleSubstitutions.filter(r => r.status === 'REJECTED').length,
+    total: visibleSubstitutions.length,
   };
 
-  const filteredRequests = substitutionList.filter(req => {
+  const filteredRequests = visibleSubstitutions.filter(req => {
 
     if (activeTab !== 'ALL') {
       if (req.status !== activeTab) return false;
